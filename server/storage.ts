@@ -33,6 +33,11 @@ export interface IStorage {
   getClauseLibrary(): Promise<Clause[]>;
   createClause(clause: InsertClause): Promise<Clause>;
 
+  // Reports
+  getReports(): Promise<Report[]>;
+  createReport(report: InsertReport): Promise<Report>;
+  updateReport(id: number, updates: Partial<Report>): Promise<Report>;
+
   // Dashboard
   getDashboardStats(): Promise<any>;
 }
@@ -41,6 +46,22 @@ export class DatabaseStorage implements IStorage {
   // Clients
   async getClients(): Promise<Client[]> {
     return db.select().from(clients).orderBy(desc(clients.createdAt));
+  }
+  // ... rest of implementation
+
+  // Reports
+  async getReports(): Promise<Report[]> {
+    return db.select().from(reports).orderBy(desc(reports.createdAt));
+  }
+
+  async createReport(report: InsertReport): Promise<Report> {
+    const [newReport] = await db.insert(reports).values(report).returning();
+    return newReport;
+  }
+
+  async updateReport(id: number, updates: Partial<Report>): Promise<Report> {
+    const [updated] = await db.update(reports).set(updates).where(eq(reports.id, id)).returning();
+    return updated;
   }
 
   async getClient(id: number): Promise<Client | undefined> {

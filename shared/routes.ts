@@ -6,12 +6,14 @@ import {
   insertRiskSchema, 
   insertClauseSchema,
   insertSavingsSchema,
+  insertReportSchema,
   clients,
   contracts,
   complianceAudits,
   risks,
   clauseLibrary,
-  savingsOpportunities
+  savingsOpportunities,
+  reports
 } from './schema';
 
 // === SHARED ERROR SCHEMAS ===
@@ -184,6 +186,37 @@ export const api = {
           clauseText: z.string(),
           explanation: z.string(),
         }),
+        500: errorSchemas.internal,
+      },
+    },
+  },
+  reports: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/reports' as const,
+      responses: {
+        200: z.array(z.custom<typeof reports.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/reports' as const,
+      input: insertReportSchema,
+      responses: {
+        201: z.custom<typeof reports.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    generate: {
+      method: 'POST' as const,
+      path: '/api/reports/generate' as const,
+      input: z.object({
+        title: z.string(),
+        type: z.string(),
+        regulatoryBody: z.string().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof reports.$inferSelect>(),
         500: errorSchemas.internal,
       },
     },

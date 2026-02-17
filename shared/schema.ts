@@ -128,6 +128,24 @@ export const savingsOpportunities = pgTable("savings_opportunities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const reports = pgTable("reports", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // regulatory_compliance, risk_assessment, executive_summary
+  regulatoryBody: text("regulatory_body"), // ODPC, CBK, etc.
+  status: text("status").notNull().default("pending"), // pending, generated, failed
+  content: jsonb("content").$type<{
+    kdpaAdherence?: string;
+    incidentResponse?: string;
+    dpaAnalysis?: string;
+    riskPosture?: string;
+    sections: Array<{ title: string; body: string }>;
+  }>(),
+  format: text("format").notNull().default("pdf"),
+  fileUrl: text("file_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -165,6 +183,7 @@ export const insertComplianceAuditSchema = createInsertSchema(complianceAudits).
 export const insertRiskSchema = createInsertSchema(risks).omit({ id: true, createdAt: true });
 export const insertClauseSchema = createInsertSchema(clauseLibrary).omit({ id: true });
 export const insertSavingsSchema = createInsertSchema(savingsOpportunities).omit({ id: true, createdAt: true });
+export const insertReportSchema = createInsertSchema(reports).omit({ id: true, createdAt: true });
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -183,3 +202,6 @@ export type InsertClause = z.infer<typeof insertClauseSchema>;
 
 export type SavingsOpportunity = typeof savingsOpportunities.$inferSelect;
 export type InsertSavings = z.infer<typeof insertSavingsSchema>;
+
+export type Report = typeof reports.$inferSelect;
+export type InsertReport = z.infer<typeof insertReportSchema>;

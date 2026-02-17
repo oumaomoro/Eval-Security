@@ -227,6 +227,76 @@ export async function registerRoutes(
     res.json(risk);
   });
 
+  // Reports
+  app.get(api.reports.list.path, async (req, res) => {
+    const reports = await storage.getReports();
+    res.json(reports);
+  });
+
+  app.post(api.reports.create.path, async (req, res) => {
+    try {
+      const input = api.reports.create.input.parse(req.body);
+      const report = await storage.createReport(input);
+      res.status(201).json(report);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.post(api.reports.generate.path, async (req, res) => {
+    try {
+      const { title, type, regulatoryBody } = req.body;
+      
+      const report = await storage.createReport({
+        title,
+        type,
+        regulatoryBody,
+        status: "pending",
+        format: "pdf",
+        content: { sections: [] }
+      });
+
+      // Async AI Generation
+      (async () => {
+        try {
+          const prompt = `Generate a comprehensive ${type} report for ${regulatoryBody || "general regulatory"} compliance in East Africa. 
+          Focus on:
+          - KDPA Adherence (Kenya Data Protection Act)
+          - Incident Response Capabilities
+          - Data Processing Agreements (DPA)
+          - Overall Risk Posture
+          
+          Provide detailed text for each section in a professional regulatory format.
+          Return JSON with keys: kdpaAdherence, incidentResponse, dpaAnalysis, riskPosture, and a 'sections' array of {title, body}.`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-5.1",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+          });
+
+          const result = JSON.parse(response.choices[0].message.content || "{}");
+          
+          await storage.updateReport(report.id, {
+            status: "generated",
+            content: result,
+            fileUrl: `https://example.com/reports/${report.id}.pdf`
+          });
+        } catch (e) {
+          console.error("Report generation failed:", e);
+          await storage.updateReport(report.id, { status: "failed" });
+        }
+      })();
+
+      res.status(201).json(report);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to initiate report generation" });
+    }
+  });
+
   // Clauses
   app.get(api.clauses.list.path, async (req, res) => {
     const clauses = await storage.getClauseLibrary();
