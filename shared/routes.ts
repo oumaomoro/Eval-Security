@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { 
   insertClientSchema, 
   insertContractSchema, 
+  insertAuditRulesetSchema,
   insertComplianceAuditSchema, 
   insertRiskSchema, 
   insertClauseSchema,
@@ -9,6 +10,7 @@ import {
   insertReportSchema,
   clients,
   contracts,
+  auditRulesets,
   complianceAudits,
   risks,
   clauseLibrary,
@@ -110,6 +112,24 @@ export const api = {
     },
   },
   compliance: {
+    rulesets: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/compliance/rulesets' as const,
+        responses: {
+          200: z.array(z.custom<typeof auditRulesets.$inferSelect>()),
+        },
+      },
+      create: {
+        method: 'POST' as const,
+        path: '/api/compliance/rulesets' as const,
+        input: insertAuditRulesetSchema,
+        responses: {
+          201: z.custom<typeof auditRulesets.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+    },
     list: {
       method: 'GET' as const,
       path: '/api/compliance-audits' as const,
@@ -124,11 +144,26 @@ export const api = {
         scope: z.object({
           contractIds: z.array(z.number()),
           standards: z.array(z.string()),
+          rulesetId: z.number().optional(),
         }),
+        auditType: z.enum(['manual', 'automated', 'scheduled', 'continuous']).optional(),
       }),
       responses: {
         201: z.custom<typeof complianceAudits.$inferSelect>(),
         500: errorSchemas.internal,
+      },
+    },
+    monitoring: {
+      method: 'GET' as const,
+      path: '/api/compliance/monitoring' as const,
+      responses: {
+        200: z.array(z.object({
+          contractId: z.number(),
+          vendorName: z.string(),
+          complianceScore: z.number(),
+          lastAudit: z.string(),
+          status: z.string(),
+        })),
       },
     },
   },
@@ -233,6 +268,7 @@ export const api = {
           criticalRisks: z.number(),
           upcomingRenewals: z.array(z.custom<typeof contracts.$inferSelect>()),
           costByVendor: z.array(z.object({ vendor: z.string(), cost: z.number() })),
+          complianceTrends: z.array(z.object({ month: z.string(), score: z.number() })),
         }),
       },
     },

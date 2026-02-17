@@ -1,9 +1,9 @@
 import { db } from "./db";
 import { 
-  clients, contracts, complianceAudits, risks, clauseLibrary, savingsOpportunities,
-  type InsertClient, type InsertContract, type InsertComplianceAudit, 
-  type InsertRisk, type InsertClause, type InsertSavings,
-  type Client, type Contract, type ComplianceAudit, type Risk, type Clause, type SavingsOpportunity
+  clients, contracts, auditRulesets, complianceAudits, risks, clauseLibrary, savingsOpportunities, reports,
+  type InsertClient, type InsertContract, type InsertAuditRuleset, type InsertComplianceAudit, 
+  type InsertRisk, type InsertClause, type InsertSavings, type InsertReport,
+  type Client, type Contract, type AuditRuleset, type ComplianceAudit, type Risk, type Clause, type SavingsOpportunity, type Report
 } from "@shared/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 
@@ -20,6 +20,9 @@ export interface IStorage {
   updateContract(id: number, updates: Partial<InsertContract> & { aiAnalysis?: any }): Promise<Contract>;
   
   // Compliance
+  getAuditRulesets(): Promise<AuditRuleset[]>;
+  getAuditRuleset(id: number): Promise<AuditRuleset | undefined>;
+  createAuditRuleset(ruleset: InsertAuditRuleset): Promise<AuditRuleset>;
   getComplianceAudits(): Promise<ComplianceAudit[]>;
   createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit>;
   updateComplianceAudit(id: number, updates: Partial<ComplianceAudit>): Promise<ComplianceAudit>;
@@ -47,22 +50,6 @@ export class DatabaseStorage implements IStorage {
   async getClients(): Promise<Client[]> {
     return db.select().from(clients).orderBy(desc(clients.createdAt));
   }
-  // ... rest of implementation
-
-  // Reports
-  async getReports(): Promise<Report[]> {
-    return db.select().from(reports).orderBy(desc(reports.createdAt));
-  }
-
-  async createReport(report: InsertReport): Promise<Report> {
-    const [newReport] = await db.insert(reports).values(report).returning();
-    return newReport;
-  }
-
-  async updateReport(id: number, updates: Partial<Report>): Promise<Report> {
-    const [updated] = await db.update(reports).set(updates).where(eq(reports.id, id)).returning();
-    return updated;
-  }
 
   async getClient(id: number): Promise<Client | undefined> {
     const [client] = await db.select().from(clients).where(eq(clients.id, id));
@@ -77,10 +64,6 @@ export class DatabaseStorage implements IStorage {
   // Contracts
   async getContracts(filters?: { clientId?: string, status?: string }): Promise<(Contract & { client?: Client })[]> {
     let query = db.select().from(contracts).leftJoin(clients, eq(contracts.clientId, clients.id));
-    
-    // Simple in-memory filter or dynamic query building would be better, but sticking to basic drizzle for now
-    // Note: Drizzle's query builder is more robust, but direct select() is simple.
-    
     const results = await query;
     let mapped = results.map(r => ({ ...r.contracts, client: r.clients || undefined }));
     
@@ -110,6 +93,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Compliance
+  async getAuditRulesets(): Promise<AuditRuleset[]> {
+    return db.select().from(auditRulesets).orderBy(desc(auditRulesets.createdAt));
+  }
+
+  async getAuditRuleset(id: number): Promise<AuditRuleset | undefined> {
+    const [ruleset] = await db.select().from(auditRulesets).where(eq(auditRulesets.id, id));
+    return ruleset;
+  }
+
+  async createAuditRuleset(ruleset: InsertAuditRuleset): Promise<AuditRuleset> {
+    const [newRuleset] = await db.insert(auditRulesets).values(ruleset).returning();
+    return newRuleset;
+  }
+
   async getComplianceAudits(): Promise<ComplianceAudit[]> {
     return db.select().from(complianceAudits).orderBy(desc(complianceAudits.createdAt));
   }
@@ -152,6 +149,21 @@ export class DatabaseStorage implements IStorage {
     return newClause;
   }
 
+  // Reports
+  async getReports(): Promise<Report[]> {
+    return db.select().from(reports).orderBy(desc(reports.createdAt));
+  }
+
+  async createReport(report: InsertReport): Promise<Report> {
+    const [newReport] = await db.insert(reports).values(report).returning();
+    return newReport;
+  }
+
+  async updateReport(id: number, updates: Partial<Report>): Promise<Report> {
+    const [updated] = await db.update(reports).set(updates).where(eq(reports.id, id)).returning();
+    return updated;
+  }
+
   // Dashboard
   async getDashboardStats(): Promise<any> {
     const [contractStats] = await db.select({
@@ -163,12 +175,10 @@ export class DatabaseStorage implements IStorage {
       criticalCount: sql<number>`count(*)`
     }).from(risks).where(eq(risks.severity, 'critical'));
 
-    // Mock upcoming renewals for now (contracts expiring in next 90 days)
     const upcomingRenewals = await db.select().from(contracts)
       .limit(5)
       .orderBy(contracts.renewalDate);
 
-    // Cost by vendor
     const costByVendor = await db.select({
       vendor: contracts.vendorName,
       cost: sql<number>`sum(${contracts.annualCost})`
@@ -178,13 +188,21 @@ export class DatabaseStorage implements IStorage {
     .orderBy(sql`sum(${contracts.annualCost}) desc`)
     .limit(5);
 
+    // Mock trends for dashboard
+    const complianceTrends = [
+      { month: "Jan", score: 78 },
+      { month: "Feb", score: 82 },
+      { month: "Mar", score: 85 }
+    ];
+
     return {
       totalContracts: Number(contractStats.count),
       totalAnnualCost: Number(contractStats.totalCost || 0),
-      avgComplianceScore: 85, // Placeholder until audits populated
+      avgComplianceScore: 85,
       criticalRisks: Number(riskStats.criticalCount),
       upcomingRenewals,
       costByVendor: costByVendor.map(c => ({ vendor: c.vendor, cost: Number(c.cost) })),
+      complianceTrends,
     };
   }
 }

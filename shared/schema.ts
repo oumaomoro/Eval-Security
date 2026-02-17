@@ -52,14 +52,30 @@ export const contracts = pgTable("contracts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const auditRulesets = pgTable("audit_rulesets", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  standard: text("standard").notNull(), // PCI DSS, CCPA, GDPR, Custom, etc.
+  rules: jsonb("rules").$type<Array<{
+    id: string;
+    requirement: string;
+    description: string;
+    severity: "critical" | "high" | "medium" | "low";
+  }>>().notNull(),
+  isCustom: boolean("is_custom").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const complianceAudits = pgTable("compliance_audits", {
   id: serial("id").primaryKey(),
   contractId: integer("contract_id").references(() => contracts.id), // Can be null if audit covers multiple
+  rulesetId: integer("ruleset_id").references(() => auditRulesets.id),
   auditName: text("audit_name").notNull(),
-  auditType: text("audit_type").notNull(), // manual, automated, scheduled
+  auditType: text("audit_type").notNull(), // manual, automated, scheduled, continuous
   scope: jsonb("scope").$type<{
     contractIds: number[];
-    standards: string[]; // KDPA, CBK, GDPR, etc.
+    standards: string[]; // KDPA, CBK, GDPR, PCI DSS, CCPA, etc.
     categories: string[];
   }>(),
   status: text("status").notNull().default("in_progress"), // in_progress, completed, failed
@@ -72,6 +88,7 @@ export const complianceAudits = pgTable("compliance_audits", {
     recommendation: string;
     standard?: string;
     section?: string;
+    ruleId?: string;
   }>>(),
   
   complianceByStandard: jsonb("compliance_by_standard").$type<Record<string, number>>(),
@@ -159,6 +176,22 @@ export const contractsRelations = relations(contracts, ({ one, many }) => ({
   }),
   risks: many(risks),
   savingsOpportunities: many(savingsOpportunities),
+  audits: many(complianceAudits),
+}));
+
+export const auditRulesetsRelations = relations(auditRulesets, ({ many }) => ({
+  audits: many(complianceAudits),
+}));
+
+export const complianceAuditsRelations = relations(complianceAudits, ({ one }) => ({
+  contract: one(contracts, {
+    fields: [complianceAudits.contractId],
+    references: [contracts.id],
+  }),
+  ruleset: one(auditRulesets, {
+    fields: [complianceAudits.rulesetId],
+    references: [auditRulesets.id],
+  }),
 }));
 
 export const risksRelations = relations(risks, ({ one }) => ({
@@ -179,6 +212,7 @@ export const savingsRelations = relations(savingsOpportunities, ({ one }) => ({
 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
 export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAuditRulesetSchema = createInsertSchema(auditRulesets).omit({ id: true, createdAt: true });
 export const insertComplianceAuditSchema = createInsertSchema(complianceAudits).omit({ id: true, createdAt: true });
 export const insertRiskSchema = createInsertSchema(risks).omit({ id: true, createdAt: true });
 export const insertClauseSchema = createInsertSchema(clauseLibrary).omit({ id: true });
@@ -190,6 +224,9 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 
 export type Contract = typeof contracts.$inferSelect;
 export type InsertContract = z.infer<typeof insertContractSchema>;
+
+export type AuditRuleset = typeof auditRulesets.$inferSelect;
+export type InsertAuditRuleset = z.infer<typeof insertAuditRulesetSchema>;
 
 export type ComplianceAudit = typeof complianceAudits.$inferSelect;
 export type InsertComplianceAudit = z.infer<typeof insertComplianceAuditSchema>;
