@@ -1,0 +1,63 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, buildUrl, type InsertRisk } from "@shared/routes";
+import { useToast } from "@/hooks/use-toast";
+
+export function useRisks(filters?: { contractId?: string }) {
+  return useQuery({
+    queryKey: [api.risks.list.path, filters],
+    queryFn: async () => {
+      const url = filters 
+        ? `${api.risks.list.path}?${new URLSearchParams(filters as any).toString()}`
+        : api.risks.list.path;
+      
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch risks");
+      return api.risks.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateRisk() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: InsertRisk) => {
+      const res = await fetch(api.risks.create.path, {
+        method: api.risks.create.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create risk");
+      return api.risks.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.risks.list.path] });
+      toast({ title: "Risk Added", description: "New risk has been registered." });
+    },
+  });
+}
+
+export function useMitigateRisk() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, status, strategy }: { id: number; status: string; strategy?: string }) => {
+      const url = buildUrl(api.risks.mitigate.path, { id });
+      const res = await fetch(url, {
+        method: api.risks.mitigate.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, strategy }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update risk mitigation");
+      return api.risks.mitigate.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.risks.list.path] });
+      toast({ title: "Risk Updated", description: "Mitigation status updated." });
+    },
+  });
+}
