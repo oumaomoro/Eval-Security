@@ -1,0 +1,11 @@
+name = "cyberoptimize-frontend"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-03-30"
+
+[build]
+command = "npm run build"
+watch_dir = "src"
+
+[env.production]
+# Add any required production environment variables here to expose to Vite at build time.
+# VITE_API_URL = "https://your-vercel-backend-url.vercel.app"

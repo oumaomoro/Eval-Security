@@ -1,0 +1,18 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "contracts": "Contracts",
+    "clients": "Clients",
+    "upload": "Analysis Upload",
+    "billing": "Billing",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Welcome to CyberOptimize",
+    "subtitle": "Your AI-Driven Contract Compliance Overview"
+  },
+  "upload": {
+    "title": "Upload Document",
+    "dropText": "Drag & drop your PDF contract securely here"
+  }
+}

@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyberoptimize-backend
+    restart: always
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./backend/.env
+    networks:
+      - cyberoptimize-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Pass build-time variables from local environment or .env file
+        # In a real CI/CD pipeline, these would be injected by the runner
+        # Defaulting to localhost bridging for the docker-compose test
+        - VITE_API_URL=http://localhost:3001/api
+    container_name: cyberoptimize-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - cyberoptimize-network
+
+networks:
+  cyberoptimize-network:
+    driver: bridge

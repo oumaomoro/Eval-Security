@@ -1,0 +1,36 @@
+{
+  "name": "cyberoptimize-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "build": "echo 'Backend does not require a build step'",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.0",
+    "@vercel/kv": "^3.0.0",
+    "archiver": "^7.0.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.104.0",
+    "pdf-parse": "^1.1.4",
+    "pdfkit": "^0.18.0",
+    "resend": "^6.9.4",
+    "stripe": "^21.0.1",
+    "unzipper": "^0.12.3",
+    "uuid": "^9.0.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "supertest": "^7.2.2"
+  }
+}

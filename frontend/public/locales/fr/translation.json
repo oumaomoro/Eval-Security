@@ -1,0 +1,18 @@
+{
+  "nav": {
+    "dashboard": "Tableau de Bord",
+    "contracts": "Contrats",
+    "clients": "Clients",
+    "upload": "Télécharger l'Analyse",
+    "billing": "Facturation",
+    "settings": "Paramètres"
+  },
+  "dashboard": {
+    "title": "Bienvenue sur CyberOptimize",
+    "subtitle": "Votre aperçu de la conformité des contrats par l'IA"
+  },
+  "upload": {
+    "title": "Télécharger un document",
+    "dropText": "Glissez et déposez votre contrat PDF sécurisé ici"
+  }
+}

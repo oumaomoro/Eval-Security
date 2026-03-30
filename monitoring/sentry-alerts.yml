@@ -1,0 +1,37 @@
+# Sentry Alert Map
+# Alerts Ops team strictly when the programmatic endpoints collapse.
+
+rules:
+  - id: api-rate-limit-abuse
+    name: "API: 429 Too Many Requests Spike"
+    action: trigger
+    condition:
+      type: event_frequency
+      interval: 1m
+      threshold: 10
+      environment: production
+    filters:
+      - property: transaction
+        value: "/api/external/analyze"
+      - property: http_status
+        value: 429
+    actions:
+      - target: slack
+        channel: "#secops-alerts"
+      - target: email
+        users: ["admin@cyberoptimize.com"]
+
+  - id: internal-server-error-spike
+    name: "Backend: 500 Unknown Crash Matrix"
+    action: trigger
+    condition:
+      type: event_frequency
+      interval: 1m
+      threshold: 5
+      environment: production
+    filters:
+      - property: http_status
+        value: 500
+    actions:
+      - target: pagerduty
+        severity: critical
