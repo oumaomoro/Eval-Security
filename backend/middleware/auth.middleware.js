@@ -11,9 +11,6 @@ dotenv.config();
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const LEGACY_JWT_SECRET = process.env.JWT_SECRET || 'cyberoptimize-secret-2024';
 
-// DEV BYPASS user ID (matches mock data handlers)
-const DEV_USER_ID = '00000000-0000-0000-0000-000000000000';
-
 export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   let token = authHeader && authHeader.split(' ')[1];
@@ -68,21 +65,6 @@ export const authenticateToken = async (req, res, next) => {
     }
   }
 
-  // ── DEV BYPASS: decode without signature verification (development only) ───────
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      const decoded = jwt.decode(token);
-      if (decoded && decoded.sub) {
-        req.user = {
-          id: decoded.sub,
-          email: decoded.email,
-          role: decoded.role || 'authenticated'
-        };
-        return next();
-      }
-    } catch (e) { /* invalid token format */ }
-  }
-
   return res.status(403).json({ 
     error: 'Access Forbidden', 
     message: 'Invalid or expired security token. Please sign in again.' 
@@ -125,7 +107,6 @@ export const requireEnterprisePlan = async (req, res, next) => {
 
 // Phase 2: Enhanced Tier & Trial Limit checking
 export const checkContractLimit = async (userId) => {
-  if (!isSupabaseConfigured()) return { allowed: true, limit: Infinity, tier: 'mock' };
   try {
     const { data: profile, error } = await supabase
       .from('profiles')

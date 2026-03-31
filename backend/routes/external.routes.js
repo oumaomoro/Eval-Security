@@ -36,14 +36,33 @@ router.post('/analyze', apiLimiter, upload.single('file'), async (req, res) => {
     }
     const token = authHeader.split(' ')[1];
 
-    // Find user by API key and ensure api_access is true
-    const { data: profile, error } = await supabase
+    // Secure Lookup Logic: Identify the user associated with the token
+    const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, api_access, tier, role')
-      .eq('api_key', token)
-      .single();
+      .select('id, api_key, api_key_hashed, api_access, tier, role')
+      .not('api_key', 'is', null);
 
-    if (error || !profile || !profile.api_access) {
+    if (error || !profiles) {
+      return res.status(401).json({ error: 'System busy, please try again later.' });
+    }
+
+    let profile = null;
+    for (const p of profiles) {
+       if (p.api_key_hashed) {
+          // Robust comparison against the secure hash
+          const match = await bcrypt.compare(token, p.api_key);
+          if (match) { 
+            profile = p;
+            break;
+          }
+       } else if (p.api_key === token) {
+          // Legacy support for un-rotated keys
+          profile = p;
+          break;
+       }
+    }
+
+    if (!profile || !profile.api_access) {
       return res.status(401).json({ error: 'Invalid API key or API access not enabled' });
     }
 

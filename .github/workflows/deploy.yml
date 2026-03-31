@@ -96,7 +96,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: 'cyberoptimize-frontend' # Ensure this matches your Pages project name
+          projectName: 'cyberoptimize-frontend' # Linked to costloci.com
           directory: './frontend/dist'
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           branch: main

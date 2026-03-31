@@ -62,20 +62,7 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
        console.log(`[Overage] User ${req.user.id} exceeded limit of ${limit}. Proceeding with overage charge.`);
     }
 
-    // DEV BYPASS: Mock analysis for test user
-    if (req.user.id === '00000000-0000-0000-0000-000000000000') {
-      const mockContract = {
-        id: 'mock-' + Date.now(),
-        user_id: req.user.id,
-        vendor_name: 'Analysis Result',
-        product_service: 'Demo Service',
-        annual_cost: 12500,
-        status: 'active',
-        file_name: req.file.originalname,
-        ai_analysis: { risk_flags: ['Demo Risk - No live backend'] }
-      };
-      return res.json({ success: true, data: mockContract, message: 'Contract analyzed (MOCK)' });
-    }
+
 
     // No explicit clientId needed - scoped by user_id
     
@@ -167,13 +154,8 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
 
       return res.json({ success: true, data: contract, message: 'Contract analyzed successfully' });
     } catch (err) {
-      // Mock response if DB not connected or insert fails
-      return res.json({
-        success: true,
-        data: { ...contractInsertData, id: `cont-mock-${Date.now()}` },
-        _note: 'DB Fallback active',
-        message: 'Contract analyzed successfully'
-      });
+      console.error('[Contract Error]', err);
+      return res.status(500).json({ error: 'Failed to save analysis to database', message: err.message });
     }
     // Replaced entirely above 
 
@@ -185,36 +167,7 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
 
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    // DEV BYPASS: Return mock contracts for test user
-    if (req.user.id === '00000000-0000-0000-0000-000000000000') {
-      const mockContracts = [
-        {
-          id: 'mock-1',
-          vendor_name: 'CloudFlare',
-          product_service: 'Enterprise WAF & CDN',
-          annual_cost: 45000,
-          payment_frequency: 'monthly',
-          contract_start_date: '2024-01-01',
-          renewal_date: '2025-01-01',
-          license_count: 1,
-          file_name: 'cloudflare_service_agreement_v2.pdf',
-          ai_analysis: { risk_flags: ['Auto-renewal notice period < 30 days'] }
-        },
-        {
-          id: 'mock-2',
-          vendor_name: 'Datadog',
-          product_service: 'Infrastructure Monitoring',
-          annual_cost: 28000,
-          payment_frequency: 'annual',
-          contract_start_date: '2024-03-15',
-          renewal_date: '2025-03-15',
-          license_count: 50,
-          file_name: 'datadog_order_form.pdf',
-          ai_analysis: { risk_flags: [] }
-        }
-      ];
-      return res.json({ success: true, data: mockContracts, count: 2 });
-    }
+
 
     // Professional Data Siloing: Scoped by organization_id
     try {
@@ -225,12 +178,8 @@ router.get('/', authenticateToken, async (req, res) => {
       if (error) throw error;
       return res.json({ success: true, data: contracts || [], count: contracts?.length || 0 });
     } catch (err) {
-      // Mock fallback if configured table doesn't exist yet
-      return res.json({ success: true, data: [], count: 0, _note: 'Empty or uninitialized' });
+      return res.status(500).json({ error: 'Failed to fetch contracts', message: err.message });
     }
-    
-      // Otherwise fallback logic above already fired for DEV_USER_ID, but just in case:
-    return res.json({ success: true, data: [], count: 0 });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -239,37 +188,15 @@ router.get('/', authenticateToken, async (req, res) => {
 // Phase 11.3: GET Immutable Chain of Custody Audit Trail for a specific contract
 router.get('/:id/audit', authenticateToken, async (req, res) => {
   try {
-    if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .eq('contract_id', req.params.id)
-        .eq('user_id', req.user.id)
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('contract_id', req.params.id)
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return res.json({ success: true, data: data || [] });
-    }
-
-    // Mock Audit Trail for local development
-    return res.json({
-      success: true,
-      _source: 'mock',
-      data: [
-        {
-          id: 'log-1',
-          action_type: 'DPO_MATRIX_GENERATED',
-          description: 'Dynamic framework mapping initiated for GDPR Article 28. Readiness: 65/100',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'log-2',
-          action_type: 'DOCUMENT_UPLOADED_AND_ANALYZED',
-          description: 'Contract parsed by RAG engine and categorized as moderate risk.',
-          created_at: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
-        }
-      ]
-    });
+    if (error) throw error;
+    return res.json({ success: true, data: data || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -8,19 +8,12 @@ const router = express.Router();
 // GET /api/gold-standard - List available standards
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('gold_standard_clauses')
-        .select('id, standard_name, clause_category, created_at')
-        .order('standard_name', { ascending: true });
-      if (error) throw error;
-      return res.json({ success: true, data: data || [] });
-    }
-    // Mock for local dev
-    res.json({ success: true, data: [
-      { id: 'gs-1', standard_name: 'GDPR Article 28 (CyberOptimize Std)', clause_category: 'data_processing' },
-      { id: 'gs-2', standard_name: 'Enterprise MSA v3', clause_category: 'general' }
-    ] });
+    const { data, error } = await supabase
+      .from('gold_standard_clauses')
+      .select('id, standard_name, clause_category, created_at')
+      .order('standard_name', { ascending: true });
+    if (error) throw error;
+    return res.json({ success: true, data: data || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -38,23 +31,19 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const embedding = await generateEmbedding(clause_text);
 
-    if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('gold_standard_clauses')
-        .insert([{
-          standard_name,
-          clause_category,
-          clause_text,
-          embedding
-        }])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return res.json({ success: true, data, message: 'Gold Standard clause added with embedding.' });
-    }
-
-    res.json({ success: true, message: 'Clause embedded (mock mode)', data: { standard_name, clause_category } });
+    const { data, error } = await supabase
+      .from('gold_standard_clauses')
+      .insert([{
+        standard_name,
+        clause_category,
+        clause_text,
+        embedding
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return res.json({ success: true, data, message: 'Gold Standard clause added with embedding.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

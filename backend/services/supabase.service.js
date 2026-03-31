@@ -13,9 +13,10 @@ const supabaseKey = (serviceRoleKey && serviceRoleKey !== 'YOUR_SERVICE_ROLE_KEY
   ? serviceRoleKey
   : anonKey;
 
-if (!supabaseKey || supabaseKey === 'YOUR_SERVICE_ROLE_KEY_FROM_SUPABASE_DASHBOARD') {
-  console.warn('⚠️  Supabase not fully configured — running in mock-data mode.');
-  console.warn('   Add SUPABASE_SERVICE_ROLE_KEY to backend/.env for full DB access.');
+if (!supabaseKey || supabaseKey === 'YOUR_SERVICE_ROLE_KEY_FROM_SUPABASE_DASHBOARD' || !supabaseUrl || supabaseUrl.includes('your-project-ref')) {
+  console.error('❌ CRITICAL ERROR: Supabase is not configured. Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env');
+  console.error('Halting backend startup to prevent insecure deployment.');
+  process.exit(1);
 } else if (supabaseKey === anonKey) {
   console.warn('⚠️  Using Supabase ANON key — RLS applies. Add SERVICE_ROLE_KEY for full access.');
 } else {
@@ -31,14 +32,10 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 
 /**
  * Check if Supabase is configured and usable
+ * (Always true in production, as missing config now halts the server)
  */
 export function isSupabaseConfigured() {
-  return !!(
-    supabaseUrl &&
-    serviceRoleKey &&
-    serviceRoleKey !== 'YOUR_SERVICE_ROLE_KEY_FROM_SUPABASE_DASHBOARD' &&
-    !supabaseUrl.includes('your-project-ref')
-  );
+  return true;
 }
 
 /**

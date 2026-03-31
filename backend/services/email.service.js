@@ -15,6 +15,30 @@ export const EmailService = {
 
     return this.queueEmail(email, subject, html);
   },
+  async sendWelcomeEmail(email, fullName) {
+    const { WELCOME_EMAIL_TEMPLATE } = await import('./email.templates.js');
+    return this.queueEmail(email, 'Welcome to CyberOptimize! 🚀', WELCOME_EMAIL_TEMPLATE(fullName));
+  },
+
+  async sendOnboardingDay3(email, fullName) {
+    const { DAY_3_ONBOARDING_TEMPLATE } = await import('./email.templates.js');
+    return this.queueEmail(email, 'How to Analyze Your First Contract 🎥', DAY_3_ONBOARDING_TEMPLATE(fullName));
+  },
+
+  async sendOnboardingDay7(email, fullName) {
+    const { DAY_7_DEMO_TEMPLATE } = await import('./email.templates.js');
+    return this.queueEmail(email, 'Join Our Exclusive Live Demo 🛠️', DAY_7_DEMO_TEMPLATE(fullName));
+  },
+
+  async sendOnboardingDay12(email, fullName) {
+    const { DAY_12_TRIAL_TEMPLATE } = await import('./email.templates.js');
+    return this.queueEmail(email, 'Final Call: Your Trial is Ending Soon ⏳', DAY_12_TRIAL_TEMPLATE(fullName));
+  },
+
+  async sendActivationNudge(email, fullName) {
+    const { DAY_3_ACTIVATION_TEMPLATE } = await import('./email.templates.js');
+    return this.queueEmail(email, 'Unlock Your hidden savings 💸', DAY_3_ACTIVATION_TEMPLATE(fullName));
+  },
 
   async queueEmail(to, subject, html) {
     console.log(`[EmailService] Queueing email to ${to}: ${subject}`);
@@ -59,7 +83,7 @@ export const EmailService = {
          } else {
             // Real dispatch
             await resend.emails.send({
-               from: 'CyberOptimize <alerts@cyberoptimize.com>',
+               from: 'CyberOptimize <alerts@costloci.com>',
                to: email.to,
                subject: email.subject,
                html: email.html
@@ -69,7 +93,7 @@ export const EmailService = {
          processedCount++;
        } catch (dispatchErr) {
          console.error(`[EmailService] Dispatch failed for ${email.id}:`, dispatchErr.message);
-         const attempts = email.attempts + 1;
+         const attempts = (email.attempts || 0) + 1;
          let status = 'pending';
          let next_attempt = new Date(Date.now() + Math.pow(2, attempts) * 60000).toISOString(); // Exponential backoff in minutes
          

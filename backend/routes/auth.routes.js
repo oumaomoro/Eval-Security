@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase.js';
 import jwt from 'jsonwebtoken';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'cyberoptimize-secret-2024';
 
@@ -44,6 +45,11 @@ router.post('/register', async (req, res) => {
       .single();
 
     if (profileError) throw profileError;
+
+    // Trigger Resend Welcome Email
+    import('../services/email.service.js')
+      .then(({ EmailService }) => EmailService.sendWelcomeEmail(email, 'Optimizor'))
+      .catch(err => console.error('Failed to dispatch welcome email:', err));
 
     if (requiresVerification) {
       return res.status(201).json({
@@ -215,16 +221,22 @@ router.get('/google', async (req, res) => {
 
 router.post('/regenerate-api-key', authenticateToken, async (req, res) => {
   try {
-    const newKey = crypto.randomBytes(32).toString('hex');
-    const { data: profile, error } = await supabase
+    const rawKey = `sk_${crypto.randomBytes(24).toString('hex')}`;
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(rawKey, salt);
+
+    const { error } = await supabase
       .from('profiles')
-      .update({ api_key: newKey })
-      .eq('id', req.user.id)
-      .select('api_key')
-      .single();
+      .update({ 
+        api_key: hash,
+        api_key_hashed: true 
+      })
+      .eq('id', req.user.id);
       
     if (error) throw error;
-    res.json({ success: true, api_key: profile.api_key });
+    
+    // The rawKey is returned ONLY here and never stored in plaintext
+    res.json({ success: true, api_key: rawKey });
   } catch (error) {
     console.error('Failed to regenerate API key:', error);
     res.status(500).json({ error: 'Failed to regenerate API key' });

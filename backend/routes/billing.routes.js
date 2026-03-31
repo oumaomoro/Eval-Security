@@ -398,37 +398,81 @@ router.get('/status', authenticateToken, async (req, res) => {
 router.post('/webhook/:provider', async (req, res) => {
   const provider = req.params.provider;
   let eventId = null;
+  let eventBody = req.body;
 
   try {
-    // 1. Log the incoming webhook immediately
+    // 1. Stripe Webhook Cryptographic Verification
+    if (provider === 'stripe' && process.env.STRIPE_WEBHOOK_SECRET && stripe) {
+       const sig = req.headers['stripe-signature'];
+       try {
+         // Verifies the event origin using the raw request body
+         const event = stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+         eventBody = event;
+       } catch (err) {
+         console.error(`[billing] Stripe Webhook Signature Error: ${err.message}`);
+         Sentry.captureException(err, { tags: { category: 'webhook_auth_failure' } });
+         return res.status(400).send(`Webhook Signature Error: ${err.message}`);
+       }
+    }
+
+    // 2. Audit Trail: Log the incoming verified event
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase.from('webhook_events').insert({
         provider: provider,
-        event_type: req.body.type || req.body.event || 'unknown',
-        payload: req.body,
+        event_type: eventBody.type || eventBody.event || 'unknown',
+        payload: eventBody,
         headers: req.headers
       }).select('id').single();
       if (!error && data) eventId = data.id;
     }
 
-    // 2. Stripe Webhook handling for API Tier Subscriptions
-    if (provider === 'stripe' && req.body.type === 'checkout.session.completed') {
-       const session = req.body.data.object;
+    console.log(`[billing] Processing ${provider} event: ${eventBody.type || eventBody.event}`);
+
+    // 3. Automated Tier Fulfillment (Stripe)
+    if (provider === 'stripe') {
+       const session = eventBody.data.object;
        const userId = session.client_reference_id;
-       if (userId) {
-          // If the product was API Tier, set api_access = true
-          if (session.amount_total === 29900 || session.amount_total === 287000) { // e.g., $299 * 100
-             await supabase.from('profiles').update({ api_access: true }).eq('id', userId);
-          } else {
-             // Otherwise assume regular fulfillment
-             await performFulfillment({ id: userId }, 'pro', supabase, isSupabaseConfigured);
-          }
+       const stripeCustomerId = session.customer;
+
+       switch (eventBody.type) {
+          case 'checkout.session.completed':
+             if (userId) {
+                // Map session amount to tier logic
+                const amount = session.amount_total;
+                let targetTier = 'pro';
+                if (amount >= 99900) targetTier = 'enterprise';
+                else if (amount >= 39900) targetTier = 'pro';
+                else if (amount >= 14900) targetTier = 'starter';
+
+                await supabase.from('profiles').update({ 
+                  stripe_customer_id: stripeCustomerId,
+                  tier: targetTier,
+                  upgraded_at: new Date().toISOString()
+                }).eq('id', userId);
+                
+                await performFulfillment({ id: userId }, targetTier, supabase, isSupabaseConfigured);
+             }
+             break;
+
+          case 'customer.subscription.updated':
+          case 'customer.subscription.created':
+             const sub = eventBody.data.object;
+             // Subscription updates use customer ID for lookups
+             if (stripeCustomerId) {
+                const status = sub.status;
+                const tier = status === 'active' ? 'pro' : 'free'; // Simple toggle, can be mapped to price_id
+                await supabase.from('profiles').update({ 
+                  tier: tier,
+                  status_note: `Subscription status: ${status}`
+                }).eq('stripe_customer_id', stripeCustomerId);
+             }
+             break;
        }
     }
 
-    // 3. Paystack Webhook handling
-    if (provider === 'paystack' && req.body.event === 'charge.success') {
-       const data = req.body.data;
+    // 4. Paystack Webhook Fulfillment
+    if (provider === 'paystack' && eventBody.event === 'charge.success') {
+       const data = eventBody.data;
        const userId = data.metadata?.user_id;
        const targetTier = data.metadata?.tier || 'pro';
        if (userId) {
@@ -436,11 +480,18 @@ router.post('/webhook/:provider', async (req, res) => {
        }
     }
 
+    // 5. Finalize Audit Logging
     if (eventId) {
-      await supabase.from('webhook_events').update({ processed: true, processed_at: new Date().toISOString() }).eq('id', eventId);
+      await supabase.from('webhook_events').update({ 
+        processed: true, 
+        processed_at: new Date().toISOString() 
+      }).eq('id', eventId);
     }
+    
     res.status(200).json({ received: true });
   } catch (err) {
+    console.error(`[billing] Webhook processing exception: ${err.message}`);
+    Sentry.captureException(err);
     if (eventId) await supabase.from('webhook_events').update({ error: err.message }).eq('id', eventId);
     res.status(200).json({ received: true, error: err.message });
   }

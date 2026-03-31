@@ -114,11 +114,8 @@ router.get('/:provider/auth-url', requireAuth, (req, res) => {
     };
     return res.json({ success: true, auth_url: authUrls[provider] || redirectUri });
   } else {
-    console.warn(`[integrations] ${provider.toUpperCase()}_CLIENT_ID missing. Enabling MOCK flow.`);
-    // In mock mode, we immediately return the frontend callback URL with a fake code and state
-    const mockCode = `mock_auth_code_${Date.now()}`;
-    const mockCallbackUrl = `${redirectUri}?code=${mockCode}&state=${safeState}`;
-    return res.json({ success: true, auth_url: mockCallbackUrl });
+    console.error(`[integrations] Implementation Error: ${provider.toUpperCase()}_CLIENT_ID missing in production.`);
+    return res.status(500).json({ error: `${provider} integration is not configured.` });
   }
 });
 
@@ -149,15 +146,7 @@ router.post('/callback', requireAuth, async (req, res) => {
       // E.g., await fetch('https://account-d.docusign.com/oauth/token', ...)
       throw new Error(`Real token exchange pending config for ${provider}`);
     } else {
-      // Mock the token data since no keys exist
-      console.warn(`[integrations] Mocking token storage for ${provider}`);
-      tokenData = {
-        access_token: `mock_access_token_${provider}_${Date.now()}`,
-        refresh_token: `mock_refresh_token_${provider}_${Date.now()}`,
-        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        connected_at: new Date().toISOString(),
-        mock: true
-      };
+      throw new Error(`${provider} integration is not configured.`);
     }
 
     // Read current integrations

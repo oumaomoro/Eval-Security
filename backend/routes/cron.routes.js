@@ -36,6 +36,49 @@ router.post('/process-email-queue', async (req, res) => {
 });
 
 /**
+ * 1.5. Day 3 Activation Nudge (Drip Campaign)
+ * Endpoint: POST /api/cron/send-activation-nudge
+ */
+router.post('/send-activation-nudge', async (req, res) => {
+  try {
+    // 1. Fetch profiles created roughly 3 days ago
+    const threeDaysAgoStart = new Date(Date.now() - 3.5 * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgoEnd = new Date(Date.now() - 2.5 * 24 * 60 * 60 * 1000).toISOString();
+    
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('id, email, full_name')
+      .gte('created_at', threeDaysAgoStart)
+      .lte('created_at', threeDaysAgoEnd)
+      .eq('tier', 'free');
+
+    if (error) throw error;
+    
+    let nudged = 0;
+    
+    // 2. For each profile, check if they have uploaded a contract
+    for (const profile of profiles || []) {
+       if (!profile.email) continue;
+       const { count, error: countErr } = await supabase
+         .from('contracts')
+         .select('*', { count: 'exact', head: true })
+         .eq('user_id', profile.id);
+       
+       // 3. If zero contracts, send nudge
+       if (!countErr && count === 0) {
+          await EmailService.sendActivationNudge(profile.email, profile.full_name);
+          nudged++;
+       }
+    }
+    
+    res.json({ success: true, nudged_count: nudged });
+  } catch (error) {
+    console.error('[Cron] Activation Nudge Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * 2. OpenAI Usage Alert (Cron Job)
  * Endpoint: POST /api/cron/openai-usage
  */
@@ -162,6 +205,71 @@ router.post('/bill-overages', async (req, res) => {
     res.json({ success: true, billed_users: results.length, summary: results });
   } catch (err) {
     console.error('[Cron] Bill Overages Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Feature 3: Onboarding Drip Campaign
+ * Endpoint: POST /api/cron/send-onboarding-emails
+ */
+router.post('/send-onboarding-emails', async (req, res) => {
+  try {
+    const milestones = [
+      { day: 1, method: 'sendWelcomeEmail', label: 'day_1' },
+      { day: 3, method: 'sendOnboardingDay3', label: 'day_3' },
+      { day: 7, method: 'sendOnboardingDay7', label: 'day_7' },
+      { day: 12, method: 'sendOnboardingDay12', label: 'day_12' }
+    ];
+
+    let totalSent = 0;
+    const summary = [];
+
+    for (const milestone of milestones) {
+      // Calculate target range for this milestone (e.g., exactly 1 day ago)
+      const targetStart = new Date(Date.now() - (milestone.day + 0.5) * 24 * 60 * 60 * 1000).toISOString();
+      const targetEnd = new Date(Date.now() - (milestone.day - 0.5) * 24 * 60 * 60 * 1000).toISOString();
+
+      // 1. Find users in this cohort
+      const { data: users, error: userError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .gte('created_at', targetStart)
+        .lte('created_at', targetEnd);
+
+      if (userError) throw userError;
+
+      for (const user of users || []) {
+        if (!user.email) continue;
+
+        // 2. Check if already sent
+        const { data: alreadySent } = await supabase
+          .from('onboarding_emails_sent')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('milestone', milestone.label)
+          .single();
+
+        if (!alreadySent) {
+          // 3. Dispatch & Track
+          try {
+            await EmailService[milestone.method](user.email, user.full_name);
+            await supabase.from('onboarding_emails_sent').insert({
+              user_id: user.id,
+              milestone: milestone.label
+            });
+            totalSent++;
+          } catch (dispatchError) {
+            console.error(`[Cron] Drip dispatch error for ${user.id} at ${milestone.label}:`, dispatchError.message);
+          }
+        }
+      }
+      summary.push({ milestone: milestone.label, cohort_size: (users || []).length });
+    }
+
+    res.json({ success: true, processed_milestones: summary, emails_queued: totalSent });
+  } catch (err) {
+    console.error('[Cron] Onboarding Drip Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

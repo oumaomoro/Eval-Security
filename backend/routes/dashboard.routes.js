@@ -6,19 +6,7 @@ const router = express.Router();
 
 router.get('/metrics', authenticateToken, async (req, res) => {
   try {
-    // DEV BYPASS: Return mock metrics for test user
-    if (req.user.id === '00000000-0000-0000-0000-000000000000' || !isSupabaseConfigured()) {
-      const mockMetrics = {
-        total_contracts: 12,
-        total_spend: 145000,
-        upcoming_renewals: 3,
-        high_risk_contracts: 2,
-        roi_savings: 18000, // Simulated $150/hr * 10hrs * 12 contracts
-        maturity_score: 84,
-        risk_trend: [65, 59, 80, 81, 56, 55, 40].reverse() // Simulated progress
-      };
-      return res.json({ success: true, data: mockMetrics, _source: 'mock' });
-    }
+
 
     let contracts = [];
     try {
@@ -31,7 +19,7 @@ router.get('/metrics', authenticateToken, async (req, res) => {
         contracts = data || [];
       }
     } catch (dbErr) {
-      console.warn('[dashboard] Table fetch failed (might not exist yet):', dbErr.message);
+      throw dbErr;
     }
 
     const total_contracts = contracts.length;
@@ -67,19 +55,8 @@ router.get('/metrics', authenticateToken, async (req, res) => {
       data: metrics 
     });
   } catch (error) {
-    console.error('[dashboard] Internal metric failure, falling back to zeros:', error.message);
-    res.json({ 
-      success: true, 
-      data: {
-        total_contracts: 0,
-        total_spend: 0,
-        upcoming_renewals: 0,
-        high_risk_contracts: 0,
-        roi_savings: 0,
-        maturity_score: 0,
-        risk_trend: [0, 0, 0, 0, 0, 0, 0]
-      }
-    });
+    console.error('[dashboard] Dashboard metric failure:', error.message);
+    res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
   }
 });
 

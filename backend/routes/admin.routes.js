@@ -19,8 +19,18 @@ router.use(authenticateToken);
 router.use(protectAdmin);
 
 router.get('/audit-logs', async (req, res) => {
-  // We mock fetching from generic audit tables
-  res.json({ success: true, logs: [{ id: 1, action: "API Key Created", user: "system" }] });
+  try {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+      
+    if (error) throw error;
+    res.json({ success: true, logs: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch audit logs', message: err.message });
+  }
 });
 
 router.get('/webhooks', async (req, res) => {

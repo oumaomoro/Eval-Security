@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import contractRoutes from './routes/contract.routes.js';
@@ -26,6 +28,16 @@ import signnowRoutes from './routes/signnow.routes.js';
 
 dotenv.config();
 
+// Initialize Sentry Telemetry
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  tracesSampleRate: 1.0, 
+  profilesSampleRate: 1.0,
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -35,8 +47,9 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(helmet()); // Sets various HTTP headers for security
 const allowedOrigins = [
-  'https://square-scene-8487.oumaomoro10.workers.dev',
-  'https://app.cyberoptimize.io',
+  'https://costloci.com',
+  'https://www.costloci.com',
+  'https://cyberoptimize-frontend.pages.dev', // Fallback for direct testing
   'http://localhost:5180',
   'http://localhost:5173'
 ];
@@ -61,7 +74,12 @@ const limiter = rateLimit({
 });
 
 app.use('/api', limiter);
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
 
 // Routes
@@ -69,8 +87,9 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    environment: process.env.NODE_ENV
+    version: '1.2.0',
+    environment: process.env.NODE_ENV,
+    monitoring: 'Sentry Active'
   });
 });
 
@@ -93,18 +112,23 @@ app.use('/api/external', externalRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/signnow', signnowRoutes);
 
-// Centralized Error Handling (Production Protection)
-app.use((err, req, res, next) => {
-  console.error(`[Error] ${req.method} ${req.url}:`, err.stack);
-  
-  const status = err.status || 500;
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Internal Server Error' 
-    : err.message;
+// Sentry error handler (must be after all controllers, but before regular error handlers)
+Sentry.setupExpressErrorHandler(app);
 
+// Final Error Handling Middleware
+app.use((err, req, res, next) => {
+  console.error('[server] Unhandled error:', err.message);
+  
+  // Tag critical failures in Sentry for targeted alerting
+  if (req.path.includes('webhook') || req.path.includes('billing')) {
+    Sentry.captureException(err, { tags: { category: 'financial_transaction' } });
+  }
+
+  const status = err.status || 500;
   res.status(status).json({
     success: false,
-    error: message,
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+    sentry: res.sentry,
     timestamp: new Date().toISOString()
   });
 });
