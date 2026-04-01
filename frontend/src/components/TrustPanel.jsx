@@ -43,7 +43,7 @@ export default function TrustPanel() {
         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
           Security & Trust Center
         </h1>
-        <p className="text-slate-500 mt-2 text-lg">Detailed documentation of the CyberOptimize security posture and compliance certifications.</p>
+        <p className="text-slate-500 mt-2 text-lg">Detailed documentation of the Costloci security posture and compliance certifications.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">

@@ -1,5 +1,5 @@
 -- ============================================================
--- CyberOptimize — Enterprise Hardening & Expansion (Phase 26.5)
+-- Costloci — Enterprise Hardening & Expansion (Phase 26.5)
 -- Run this in your Supabase SQL Editor
 -- ============================================================
 

@@ -1,12 +1,12 @@
 /**
- * Centralized API Client for CyberOptimize
+ * Centralized API Client for Costloci
  * Automatically handles Authorization headers and base URL
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const getHeaders = () => {
-  const token = localStorage.getItem('cyberoptimize_token');
+  const token = localStorage.getItem('costloci_token');
   const headers = {
     'Content-Type': 'application/json',
   };
@@ -39,7 +39,7 @@ export const api = {
 
   // Special method for multipart/form-data (uploads)
   upload: async (endpoint, formData) => {
-    const token = localStorage.getItem('cyberoptimize_token');
+    const token = localStorage.getItem('costloci_token');
     const headers = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

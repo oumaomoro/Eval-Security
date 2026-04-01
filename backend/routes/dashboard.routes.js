@@ -1,62 +1,86 @@
 import express from 'express';
-import { supabase, isSupabaseConfigured } from '../services/supabase.service.js';
+import { supabase } from '../services/supabase.service.js';
+import { isSupabaseConfigured, orgScopedQuery } from '../services/db.utils.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 router.get('/metrics', authenticateToken, async (req, res) => {
   try {
-
-
-    let contracts = [];
-    try {
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('*')
-        .eq('user_id', req.user.id);
-        
-      if (!error) {
-        contracts = data || [];
-      }
-    } catch (dbErr) {
-      throw dbErr;
+    // ── STAGE 1: LIGHTWEIGHT CONNECTIVITY TEST ─────────────────────
+    // head-only count to verify access and data presence
+    const { count: connectivityCount, error: connError } = await orgScopedQuery('contracts', req.user, 'id', { count: 'exact', head: true });
+      
+    if (connError) {
+      console.error('[Dashboard] Connectivity Failed:', connError.message);
+      return res.status(502).json({ 
+        success: false, 
+        error: 'DATABASE_CONNECTIVITY_ISSUE',
+        details: connError.message 
+      });
     }
 
-    const total_contracts = contracts.length;
-    const avg_risk = total_contracts > 0 
-      ? contracts.reduce((sum, c) => sum + (c.risk_score || 50), 0) / total_contracts
-      : 0;
-    
-    // Profitability Metric: Estimated cost saved (AI vs Manual Legal Review)
-    const roi_savings = total_contracts * 150 * 4;
+    if (connectivityCount === 0) {
+      return res.json({ 
+        success: true, 
+        data: {
+          total_contracts: 0,
+          total_spend: 0,
+          upcoming_renewals: 0,
+          high_risk_contracts: 0,
+          roi_savings: 0,
+          maturity_score: 100,
+          risk_trend: [0, 0, 0, 0, 0, 0, 0]
+        } 
+      });
+    }
 
+    // ── STAGE 2: MEMORY-OPTIMIZED FIELD SELECTION ──────────────────
+    // Strip unnecessary overhead (e.g. metadata, heavy content)
+    const { data: contracts, error: dbError } = await orgScopedQuery('contracts', req.user, 'id, risk_score, annual_cost, renewal_date')
+      .order('created_at', { ascending: false })
+      .limit(200); 
+        
+    if (dbError) throw dbError;
+
+    const data = contracts || [];
+    const total_contracts = data.length;
+    
+    // Defensive Aggregation
+    const sum_risk = data.reduce((sum, c) => sum + (Number(c.risk_score) || 50), 0);
+    const avg_risk = total_contracts > 0 ? sum_risk / total_contracts : 0;
+    
     const metrics = {
       total_contracts,
-      total_spend: contracts.reduce((sum, c) => sum + (Number(c.annual_cost) || 0), 0),
-      upcoming_renewals: contracts.filter(c => {
+      total_spend: data.reduce((sum, c) => sum + (Number(c.annual_cost) || 0), 0),
+      upcoming_renewals: data.filter(c => {
         if (!c.renewal_date) return false;
         const renewal = new Date(c.renewal_date);
         const thirtyDays = new Date();
         thirtyDays.setDate(thirtyDays.getDate() + 30);
-        return renewal <= thirtyDays && renewal >= new Date();
+        const now = new Date();
+        return renewal <= thirtyDays && renewal >= now;
       }).length,
-      high_risk_contracts: contracts.filter(c => 
-        (c.ai_analysis?.risk_flags?.length > 0) || (c.risk_score > 70)
+      high_risk_contracts: data.filter(c => 
+        (c.risk_score && Number(c.risk_score) > 70)
       ).length,
-      roi_savings,
+      roi_savings: total_contracts * 150 * 4,
       maturity_score: Math.round(100 - avg_risk),
       risk_trend: total_contracts > 0 
         ? [70, 68, 65, 60, 55, 50, Math.round(avg_risk)] 
         : [0, 0, 0, 0, 0, 0, 0]
     };
 
-    res.json({ 
-      success: true, 
-      data: metrics 
-    });
+    res.json({ success: true, data: metrics });
   } catch (error) {
-    console.error('[dashboard] Dashboard metric failure:', error.message);
-    res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
+    console.error('[dashboard] Metric failure:', error);
+    // Secure yet detailed error for production diagnosis
+    res.status(500).json({ 
+      success: false,
+      error: 'CRITICAL_METRIC_FAILURE',
+      message: error.message,
+      code: error.code || 'UNKNOWN_ERR'
+    });
   }
 });
 

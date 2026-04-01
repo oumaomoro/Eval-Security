@@ -1,4 +1,4 @@
-# CyberOptimize Production Setup
+# Costloci Production Setup
 
 A completely fully-scaffolded, production-ready full-stack cybersecurity contract analysis SaaS application leveraging React/Vite, Tailwind, Express, Supabase, and OpenAI.
 
@@ -8,7 +8,7 @@ A completely fully-scaffolded, production-ready full-stack cybersecurity contrac
 
 Make sure to populate your respective `.env` files with valid credentials.
 
-**Backend** (`cyberoptimize-prod/backend/.env`):
+**Backend** (`costloci-prod/backend/.env`):
 - `SUPABASE_URL` (Your Supabase Project URL)
 - `SUPABASE_ANON_KEY` (Used for auth verification fallback)
 - `SUPABASE_SERVICE_ROLE_KEY` (Required for full admin database read/write)
@@ -18,7 +18,7 @@ Make sure to populate your respective `.env` files with valid credentials.
 - `PAYSTACK_SECRET_KEY` (African Regional Gateway)
 - `FRONTEND_URL` (Required for payment redirects, e.g., http://localhost:5180)
 
-**Frontend** (`cyberoptimize-prod/frontend/.env`):
+**Frontend** (`costloci-prod/frontend/.env`):
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_PAYPAL_CLIENT_ID`
@@ -45,7 +45,7 @@ npm run dev
 ```
 
 ### 4. Automated Testing (Full Stack)
-CyberOptimize includes a zero-touch, full-lifecycle verification suite. To run the complete smoke test:
+Costloci includes a zero-touch, full-lifecycle verification suite. To run the complete smoke test:
 ```bash
 npm run test:full
 ```
@@ -61,7 +61,7 @@ This automated suite verifies **Auth security**, **AI Contract Analysis**, **ROI
 - **Hardening**: Built-in `helmet` security headers, `express-rate-limit` protection, and global production-tier error handling.
 
 ## 🎨 Enterprise White-Labeling (MSP Mode)
-CyberOptimize enables full agency white-labeling. MSPs can customize the following via **Settings**:
+Costloci enables full agency white-labeling. MSPs can customize the following via **Settings**:
 - **Branded Logos**: Custom logos applied to the Workspace Sidebar and all PDF Reports.
 - **Primary Design Tokens**: Organization-specific colors injected into the UI and Report accents.
 - **Legal IP Rights Holder**: Professional watermarking of audit reports with your agency's legal name.

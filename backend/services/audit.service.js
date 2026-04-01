@@ -1,4 +1,5 @@
-import { supabase, isSupabaseConfigured } from './supabase.service.js';
+import { supabase } from './supabase.service.js';
+import { isSupabaseConfigured } from './db.utils.js';
 
 /**
  * Phase 11.3: Immutable Audit Logging for SOC 2 Readiness

@@ -10,7 +10,7 @@ export const WELCOME_EMAIL_TEMPLATE = (fullName) => `
 </head>
 <body>
   <div class="container">
-    <h2>Welcome to CyberOptimize, ${fullName || 'Optimizor'}! 🚀</h2>
+    <h2>Welcome to Costloci, ${fullName || 'Optimizor'}! 🚀</h2>
     <p>We are thrilled to help you analyze, streamline, and protect your vendor contracts using intelligent automation.</p>
     <p><strong>Quick Start Guide:</strong></p>
     <ul>
@@ -39,7 +39,7 @@ export const DAY_3_ONBOARDING_TEMPLATE = (fullName) => `
 <body>
   <div class="container">
     <h2>How to Analyze Your First Contract 🎥</h2>
-    <p>Hi ${fullName || 'Optimizor'}, we want to make sure you get the most out of CyberOptimize.</p>
+    <p>Hi ${fullName || 'Optimizor'}, we want to make sure you get the most out of Costloci.</p>
     <div class="video-box">
       <p style="color: #64748b;">[Video Guide: Analyzing Vendor Agreements]</p>
       <a href="https://costloci.com/guides/upload" class="button">Watch 2-Minute Tutorial</a>
@@ -64,7 +64,7 @@ export const DAY_7_DEMO_TEMPLATE = (fullName) => `
 <body>
   <div class="container">
     <h2>Join Our Exclusive Live Demo 🛠️</h2>
-    <p>Hi ${fullName || 'Optimizor'}, you've been using CyberOptimize for a week—how is it going?</p>
+    <p>Hi ${fullName || 'Optimizor'}, you've been using Costloci for a week—how is it going?</p>
     <p>We're hosting a live "Strategic Mastery" webinar this week to show you how to leverage AI for complex contract negotiations and vendor cost optimization.</p>
     <ul>
       <li>Advanced risk score interpretation</li>
@@ -91,7 +91,7 @@ export const DAY_12_TRIAL_TEMPLATE = (fullName) => `
 <body>
   <div class="container">
     <h2>Final Call: Your Trial is Ending Soon ⏳</h2>
-    <p>Hi ${fullName || 'Optimizor'}, your CyberOptimize Professional trial will expire in <span class="warning">48 hours</span>.</p>
+    <p>Hi ${fullName || 'Optimizor'}, your Costloci Professional trial will expire in <span class="warning">48 hours</span>.</p>
     <p>To avoid losing access to your AI analytics, cost optimization reports, and advanced clause tracking, please upgrade your account today.</p>
     <p><strong>Use code PRO20 for 20% off your first 3 months!</strong></p>
     <a href="https://costloci.com/billing" class="button">Upgrade My Account</a>
@@ -99,3 +99,25 @@ export const DAY_12_TRIAL_TEMPLATE = (fullName) => `
 </body>
 </html>
 `;
+
+export const PASSWORD_RESET_TEMPLATE = (resetLink) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: 'Inter', sans-serif; color: #1e293b; line-height: 1.6; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .button { background-color: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Reset Your Costloci Password 🔐</h2>
+    <p>We received a request to reset the password for your Costloci account. Click the button below to choose a new one:</p>
+    <a href="${resetLink}" class="button">Reset Password</a>
+    <p style="margin-top: 30px; font-size: 13px; color: #64748b;">If you didn't request this, you can safely ignore this email. This link will expire in 2 hours.</p>
+  </div>
+</body>
+</html>
+`;
+

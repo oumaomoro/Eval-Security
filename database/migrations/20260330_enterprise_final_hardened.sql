@@ -1,5 +1,5 @@
 -- ============================================================
--- CyberOptimize — Enterprise Final Hardening & Expansion
+-- Costloci — Enterprise Final Hardening & Expansion
 -- Comprehensive Idempotent Migration for Phase 27.0
 -- Run this in your Supabase SQL Editor
 -- ============================================================

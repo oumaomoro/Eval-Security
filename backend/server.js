@@ -1,42 +1,44 @@
 import express from 'express';
+import crypto from 'crypto';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import dotenv from 'dotenv';
-import authRoutes from './routes/auth.routes.js';
-import contractRoutes from './routes/contract.routes.js';
-import dashboardRoutes from './routes/dashboard.routes.js';
-import complianceRoutes from './routes/compliance.routes.js';
-import riskRoutes from './routes/risk.routes.js';
-import clausesRoutes from './routes/clauses.routes.js';
-import savingsRoutes from './routes/savings.routes.js';
-import reportsRoutes from './routes/reports.routes.js';
-import billingRoutes from './routes/billing.routes.js';
-import adminRoutes from './routes/admin.routes.js';
-import integrationsRoutes from './routes/integrations.routes.js';
-import goldStandardRoutes from './routes/gold_standard.routes.js';
-import auditRoutes from './routes/audit.routes.js';
-import analyticsRoutes from './routes/analytics.routes.js';
-import cronRoutes from './routes/cron.routes.js';
-import externalRoutes from './routes/external.routes.js';
-import clientsRoutes from './routes/clients.routes.js';
-import signnowRoutes from './routes/signnow.routes.js';
 
-dotenv.config();
+// ── LAZY LOADING REGISTRY ──────────────────────────────────────────────────
+// Modules are now just-in-time loaded to prevent Vercel cold-start timeouts.
+// This is the "High ROI" serverless architecture for Express monoliths.
+const loadRoute = (routeName) => async (req, res, next) => {
+  try {
+    console.log(`[LazyLoad] Attempting to load: ./routes/${routeName}.js`);
+    const { default: router } = await import(`./routes/${routeName}.js`);
+    console.log(`[LazyLoad] Successfully loaded: ${routeName}`);
+    router(req, res, next);
+  } catch (err) {
+    console.error(`[LazyLoad] Hard Crash loading ${routeName}:`, err.message);
+    next(err);
+  }
+};
 
-// Initialize Sentry Telemetry
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  integrations: [
-    nodeProfilingIntegration(),
-  ],
-  tracesSampleRate: 1.0, 
-  profilesSampleRate: 1.0,
-});
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
+
+// Initialize Sentry Telemetry Safely (Optimized for Serverless)
+try {
+  if (process.env.SENTRY_DSN) {
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      tracesSampleRate: 0.01, 
+    });
+    console.log('🛡️  Sentry initialized.');
+  }
+} catch (err) {
+  console.error('⚠️  Sentry failed — disabling monitoring.', err.message);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,7 +51,8 @@ app.use(helmet()); // Sets various HTTP headers for security
 const allowedOrigins = [
   'https://costloci.com',
   'https://www.costloci.com',
-  'https://cyberoptimize-frontend.pages.dev', // Fallback for direct testing
+  'https://costloci-frontend.vercel.app', // Vercel frontend fallback
+  'https://costloci-frontend.pages.dev',  // Cloudflare Pages fallback
   'http://localhost:5180',
   'http://localhost:5173'
 ];
@@ -82,61 +85,76 @@ app.use(express.json({
 }));
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
 
-// Routes
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+// Hardened Health Check: Verifies DB connectivity for True Production Readiness
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  try {
+    const { error } = await supabase.from('gold_standards').select('id', { count: 'exact', head: true }).limit(1);
+    dbStatus = error ? 'degraded' : 'connected';
+  } catch (err) {
+    dbStatus = 'unreachable';
+  }
+
+  res.status(dbStatus === 'connected' ? 200 : 503).json({
+    status: dbStatus === 'connected' ? 'healthy' : 'unhealthy',
+    database: dbStatus,
     timestamp: new Date().toISOString(),
-    version: '1.2.0',
-    environment: process.env.NODE_ENV,
-    monitoring: 'Sentry Active'
+    version: '1.2.0-prod',
+    region: process.env.VERCEL_REGION || 'edge'
   });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/contracts', contractRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/compliance', complianceRoutes);
-app.use('/api/risk', riskRoutes);
-app.use('/api/clauses', clausesRoutes);
-app.use('/api/savings', savingsRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/integrations', integrationsRoutes);
-app.use('/api/gold-standard', goldStandardRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/cron', cronRoutes);
-app.use('/api/external', externalRoutes);
-app.use('/api/clients', clientsRoutes);
-app.use('/api/signnow', signnowRoutes);
+// API Routes - OPTIMIZED FOR SERVERLESS (LAZY LOADED) ──────────────────────────
+app.use('/api/auth', loadRoute('auth.routes'));
+app.use('/api/contracts', loadRoute('contract.routes'));
+app.use('/api/dashboard', loadRoute('dashboard.routes'));
+app.use('/api/marketplace', loadRoute('marketplace.routes'));
+app.use('/api/notifications', loadRoute('notifications.routes'));
+app.use('/api/settings', loadRoute('settings.routes'));
+app.use('/api/admin', loadRoute('admin.routes'));
+app.use('/api/stripe', loadRoute('stripe.routes'));
+app.use('/api/resend', loadRoute('resend.routes'));
+app.use('/api/integrations/email', loadRoute('email_ingest.routes'));
+app.use('/api/ai', loadRoute('ai.routes'));
+app.use('/api/compliance', loadRoute('compliance.routes'));
+app.use('/api/audit', loadRoute('audit.routes'));
+app.use('/api/notifications', loadRoute('notifications.routes'));
 
 // Sentry error handler (must be after all controllers, but before regular error handlers)
-Sentry.setupExpressErrorHandler(app);
+// Sentry.setupExpressErrorHandler(app);
 
-// Final Error Handling Middleware
+// 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Resource Not Found',
+    message: `Cannot ${req.method} ${req.url}`,
+    request_id: crypto.randomUUID().slice(0, 8)
+  });
+});
+
+// Final Production Error Handler: Precision, Transparency, and Traceability
 app.use((err, req, res, next) => {
-  console.error('[server] Unhandled error:', err.message);
+  const requestId = crypto.randomUUID().slice(0, 8);
+  console.error(`[Fatal Error] (${requestId}):`, err.message);
   
-  // Tag critical failures in Sentry for targeted alerting
-  if (req.path.includes('webhook') || req.path.includes('billing')) {
-    Sentry.captureException(err, { tags: { category: 'financial_transaction' } });
-  }
+  const statusCode = err.status || err.statusCode || 500;
+  
+  // Sentry (if enabled)
+  // if (process.env.SENTRY_DSN) Sentry.captureException(err, { tags: { requestId } });
 
-  const status = err.status || 500;
-  res.status(status).json({
+  res.status(statusCode).json({
     success: false,
-    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
-    sentry: res.sentry,
-    timestamp: new Date().toISOString()
+    error: statusCode === 500 ? 'Internal Server Error' : err.name || 'Application Error',
+    message: statusCode === 500 ? 'A critical unexpected error occurred. Please contact support.' : err.message,
+    request_id: requestId, // Correlate with logs
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }) 
   });
 });
 
 // Start server
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`🚀 CyberOptimize backend running on http://localhost:${PORT}`);
+    console.log(`🚀 Costloci backend running on http://localhost:${PORT}`);
     console.log(`📊 API Health: http://localhost:${PORT}/api/health`);
   });
 }

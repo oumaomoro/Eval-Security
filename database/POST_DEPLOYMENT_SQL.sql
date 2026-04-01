@@ -1,5 +1,5 @@
 -- ============================================================
--- Eval Security — Final Master Production SQL Script
+-- Costloci — Final Master Production SQL Script
 -- Run this in your Supabase SQL Editor to initialize the Database.
 -- ============================================================
 

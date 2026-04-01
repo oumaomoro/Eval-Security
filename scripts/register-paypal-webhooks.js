@@ -9,7 +9,7 @@ dotenv.config({ path: path.resolve('./backend/.env') });
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 const PAYPAL_MODE = process.env.PAYPAL_MODE || 'live';
-const WEBHOOK_URL = 'https://backend-7tgq9hs.vercel.app/api/billing/webhook/paypal';
+const WEBHOOK_URL = 'https://api.costloci.com/api/billing/webhook/paypal';
 
 const base = PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 

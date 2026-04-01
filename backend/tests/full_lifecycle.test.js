@@ -9,8 +9,8 @@ import { supabase } from '../services/supabase.service.js';
  */
 async function runFullStackSmokeTest() {
   console.log('🚀 Starting Phase 23: Full-Stack Lifecycle Verification...');
-  const testEmail = `test-user-${Date.now()}@cyberoptimize.io`;
-  const JWT_SECRET = 'cyberoptimize-secret-2024';
+  const testEmail = `test-user-${Date.now()}@costloci.io`;
+  const JWT_SECRET = 'costloci-secret-2024';
   let authToken = '';
   let testReportId = '';
 

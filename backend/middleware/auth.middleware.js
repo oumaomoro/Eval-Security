@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import { supabase, isSupabaseConfigured } from '../services/supabase.service.js';
+import { supabase } from '../services/supabase.service.js';
+import { isSupabaseConfigured } from '../services/db.utils.js';
 
 dotenv.config();
 
@@ -9,7 +10,7 @@ dotenv.config();
 // and use the user ID from the payload to scope queries. Full signature verification uses the JWT secret
 // found in Project Settings > API > JWT Settings.
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-const LEGACY_JWT_SECRET = process.env.JWT_SECRET || 'cyberoptimize-secret-2024';
+const LEGACY_JWT_SECRET = process.env.JWT_SECRET || 'costloci-secret-2026';
 
 export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];

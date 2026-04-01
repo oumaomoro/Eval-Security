@@ -1,4 +1,4 @@
-# CyberOptimize DNS and Domain Automation (costloci.com)
+# Costloci DNS and Domain Automation (costloci.com)
 # Zone ID: 745455d71d503d23c1c16003b1bf099b
 
 param(
@@ -10,8 +10,8 @@ $ZONE_ID = "745455d71d503d23c1c16003b1bf099b"
 $BACKEND_SUBDOMAIN = "api"
 $WWW_SUBDOMAIN = "www"
 $VERCEL_CNAME = "cname.vercel-dns.com"
-$PAGES_TARGET = "cyberoptimize-frontend.pages.dev"
-$PAGES_PROJECT = "cyberoptimize-frontend"
+$PAGES_TARGET = "costloci-frontend.pages.dev"
+$PAGES_PROJECT = "costloci-frontend"
 $ACCOUNT_ID = "8dc05e6cc0ee7377c2f17f4ff69baec9" # Verified from API token Profile
 
 if (-not $CF_API_TOKEN) {

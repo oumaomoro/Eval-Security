@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Costloci AI Analysis</title>
+
+    <!-- Office JS -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+
+    <!-- Redirect to the React Add-in Page -->
+    <script type="text/javascript">
+        Office.onReady(function (info) {
+            if (info.host === Office.HostType.Word) {
+                // Redirect to the main React application's add-in route
+                window.location.href = "/addin";
+            }
+        });
+    </script>
+</head>
+<body style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white;">
+    <div style="text-align: center;">
+        <h2 style="color: #3b82f6;">Costloci AI</h2>
+        <p>Initializing Secure Connection...</p>
+    </div>
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</body>
+</html>

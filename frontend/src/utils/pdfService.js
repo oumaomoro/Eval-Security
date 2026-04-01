@@ -2,14 +2,14 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 /**
- * Premium PDF Portfolio Service for CyberOptimize Enterprise.
+ * Premium PDF Portfolio Service for Costloci Enterprise.
  * Implements a "Board-Ready" executive aesthetic with categorical analysis.
  */
 export const generateBrandedPdf = (report, brandingConfig) => {
   const doc = new jsPDF();
   const primaryColor = brandingConfig?.primaryColor || '#2563eb';
   const logoUrl = brandingConfig?.logoUrl;
-  const ipRights = brandingConfig?.ip_rights_holder || 'CyberOptimize Partner';
+  const ipRights = brandingConfig?.ip_rights_holder || 'Costloci Partner';
   const watermarkEnabled = brandingConfig?.watermark_enabled || false;
   const watermarkText = brandingConfig?.watermark_text || 'CONFIDENTIAL';
   
@@ -64,7 +64,7 @@ export const generateBrandedPdf = (report, brandingConfig) => {
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
   doc.text(`Vendor: ${report.vendor_name || 'N/A'}`, 20, 125);
-  doc.text(`Generated for: ${brandingConfig?.companyName || 'CyberOptimize Partner'}`, 20, 135);
+  doc.text(`Generated for: ${brandingConfig?.companyName || 'Costloci Partner'}`, 20, 135);
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 145);
 
   // Trust Score Radial (Simulated)
@@ -196,7 +196,7 @@ export const generateBrandedPdf = (report, brandingConfig) => {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text(`© ${new Date().getFullYear()} ${ipRights} | CyberOptimize Enterprise`, 15, 285);
+    doc.text(`© ${new Date().getFullYear()} ${ipRights} | Costloci Enterprise`, 15, 285);
     doc.text(`Page ${i} of ${pageCount}`, 195, 285, { align: 'right' });
   }
 
@@ -210,7 +210,7 @@ export const generateRiskScorecardPdf = (contract, brandingConfig) => {
   const doc = new jsPDF();
   const primaryColor = brandingConfig?.primaryColor || '#dc2626'; // Red for risk theme usually
   const logoUrl = brandingConfig?.logoUrl;
-  const ipRights = brandingConfig?.ip_rights_holder || 'CyberOptimize Partner';
+  const ipRights = brandingConfig?.ip_rights_holder || 'Costloci Partner';
 
   const addHeader = (title) => {
     doc.setFillColor(30, 41, 59);

@@ -8,7 +8,7 @@ export default function OnboardingTour() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const hasSeenTour = localStorage.getItem('cyberoptimize_onboarded');
+    const hasSeenTour = localStorage.getItem('costloci_onboarded');
     if (!hasSeenTour) {
       // Small delay for smooth entrance after login
       setTimeout(() => setIsVisible(true), 1500);
@@ -17,7 +17,7 @@ export default function OnboardingTour() {
 
   const handleDismiss = () => {
     setIsVisible(false);
-    localStorage.setItem('cyberoptimize_onboarded', 'true');
+    localStorage.setItem('costloci_onboarded', 'true');
   };
 
   const nextStep = () => {
@@ -32,7 +32,7 @@ export default function OnboardingTour() {
 
   const steps = [
     {
-      title: "Welcome to CyberOptimize Enterprise",
+      title: "Welcome to Costloci Enterprise",
       desc: "Your AI-powered Contract Risk and Compliance engine. Let's get you oriented in 30 seconds.",
       actionText: "Start Tour",
       icon: "👋"

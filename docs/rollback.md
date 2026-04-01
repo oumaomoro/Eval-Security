@@ -1,6 +1,6 @@
 # Post-Deployment Rollback Procedures
 
-This document outlines the systematic steps to revert the 8 Strategic Enhancements (Phase 24) without disrupting adjacent legacy systems in the CyberOptimize platform.
+This document outlines the systematic steps to revert the 8 Strategic Enhancements (Phase 24) without disrupting adjacent legacy systems in the Costloci platform.
 
 ## 1. Rolling Back Vercel/Redis Caching
 If the `@vercel/kv` integration causes latency spikes or fails to interpret legacy tokens:

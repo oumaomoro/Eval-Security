@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🔧 Configuring Vercel Cron Jobs for CyberOptimize Platform..."
+echo "🔧 Configuring Vercel Cron Jobs for Costloci Platform..."
 
 if ! command -v vercel &> /dev/null; then
     echo "❌ Vercel CLI not found. Please install globally via npm i -g vercel."

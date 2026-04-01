@@ -18,8 +18,8 @@ export default function Settings() {
   const [branding, setBranding] = useState({
     logoUrl: user?.user_metadata?.branding_config?.logoUrl || '',
     primaryColor: user?.user_metadata?.branding_config?.primaryColor || '#2563eb',
-    companyName: user?.user_metadata?.company_name || 'CyberOptimize Partner',
-    ip_rights_holder: user?.user_metadata?.branding_config?.ip_rights_holder || 'CyberOptimize Partner',
+    companyName: user?.user_metadata?.company_name || 'Costloci Partner',
+    ip_rights_holder: user?.user_metadata?.branding_config?.ip_rights_holder || 'Costloci Partner',
     watermark_enabled: user?.user_metadata?.branding_config?.watermark_enabled || false,
     watermark_text: user?.user_metadata?.branding_config?.watermark_text || 'CONFIDENTIAL'
   });
@@ -141,7 +141,7 @@ export default function Settings() {
         await api.get(`/integrations/${id}`, { method: 'DELETE' }); // api wrapper uses standard GET/POST. Oh wait, my wrapper doesn't support DELETE directly.
         await fetch(`${import.meta.env.VITE_API_URL}/integrations/${id}`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('cyberoptimize_token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('costloci_token')}` }
         });
         setIntegrations(ints => ints.map(int => int.id === id ? { ...int, status: 'disconnected' } : int));
       } catch (err) {
@@ -180,7 +180,7 @@ export default function Settings() {
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <LinkIcon size={20} className="text-blue-600"/> Connected Integrations
           </h2>
-          <p className="text-sm text-slate-500 mt-1">Boost automation by syncing CyberOptimize with your existing security stack.</p>
+          <p className="text-sm text-slate-500 mt-1">Boost automation by syncing Costloci with your existing security stack.</p>
         </div>
         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/30">
           {integrations.map(int => (
@@ -380,7 +380,7 @@ export default function Settings() {
             <Lock size={24} />
           </div>
           <h3 className="text-lg font-bold text-slate-900 mb-2">Security & Privacy</h3>
-          <p className="text-sm text-slate-500 mb-6">CyberOptimize maintains strict data isolation boundaries. Your contracts are never used to train generalized AI models without explicit opt-in.</p>
+          <p className="text-sm text-slate-500 mb-6">Costloci maintains strict data isolation boundaries. Your contracts are never used to train generalized AI models without explicit opt-in.</p>
           <div className="space-y-3">
             <button className="px-5 py-2.5 bg-slate-100 font-semibold text-slate-600 text-sm rounded-xl w-full hover:bg-slate-200 transition-colors">View Audit Logs</button>
             <div className="pt-4 border-t border-slate-100">
@@ -392,7 +392,7 @@ export default function Settings() {
                </p>
                <button 
                  onClick={() => {
-                   const token = localStorage.getItem('cyberoptimize_token');
+                   const token = localStorage.getItem('costloci_token');
                    const url = `${import.meta.env.VITE_API_URL}/reports/export/audit-pack`;
                    window.open(url + `?token=${token}`, '_blank');
                  }}

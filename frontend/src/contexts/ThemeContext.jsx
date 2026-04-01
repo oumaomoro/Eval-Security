@@ -14,7 +14,7 @@ export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     // Check localStorage first, fallback to system preference
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cyberoptimize_theme');
+      const saved = localStorage.getItem('costloci_theme');
       if (saved) return saved;
       // Default to enterprise dark mode for that premium feel
       return 'dark'; 
@@ -31,7 +31,7 @@ export const ThemeProvider = ({ children }) => {
       root.classList.add('light');
       root.classList.remove('dark');
     }
-    localStorage.setItem('cyberoptimize_theme', theme);
+    localStorage.setItem('costloci_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {

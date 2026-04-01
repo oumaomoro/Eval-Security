@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
 import BrandingConfig from '../config/branding'
 import { supabase } from '../contexts/AuthContext'
-import { Link } from 'react-router-dom'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -14,6 +13,14 @@ export default function Login() {
   
   const { signIn, signUp } = useAuth()
   const navigate = useNavigate()
+
+  // Handle ?signup=true URL parameter for landing page deep-links
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('signup') === 'true') {
+      setIsLogin(false)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

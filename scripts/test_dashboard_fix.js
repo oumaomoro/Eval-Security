@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 
 const API_URL = 'http://localhost:3001/api';
-const SECRET = 'cyberoptimize-secret-2024';
+const SECRET = 'costloci-secret-2024';
 
 // Simulate a user who has NO contracts in the DB
 const testUser = {

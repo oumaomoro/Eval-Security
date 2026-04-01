@@ -98,7 +98,7 @@ export default function Billing() {
           await refreshUser()
           await fetchData()
         } else {
-          setBanner({ type: 'error', text: `Payment could not be confirmed (status: ${res.data?.status}). Contact support@cyberoptimize.io.` })
+          setBanner({ type: 'error', text: `Payment could not be confirmed (status: ${res.data?.status}). Contact support@costloci.io.` })
         }
       } catch (err) {
         setBanner({ type: 'error', text: `Capture failed: ${err.response?.data?.error || err.message}` })

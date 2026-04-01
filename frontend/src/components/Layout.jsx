@@ -6,6 +6,7 @@ import { LayoutDashboard, FileText, UploadCloud, LogOut, Shield, ShieldAlert, Al
 import OnboardingTour from './OnboardingTour'
 import LanguageSwitcher from './LanguageSwitcher'
 import BrandingConfig from '../config/branding'
+import NotificationBell from './NotificationBell'
 
 export default function Layout({ children }) {
   const { signOut, user } = useAuth()
@@ -26,8 +27,10 @@ export default function Layout({ children }) {
     { path: '/compliance', label: 'Compliance', icon: ShieldAlert },
     { path: '/risk', label: 'Risks', icon: AlertTriangle },
     { path: '/clauses', label: 'Clause Intelligence', icon: BookOpen },
+    { path: '/marketplace', label: 'Marketplace', icon: ShoppingCart },
     { path: '/savings', label: 'Cost Optimizer', icon: DollarSign },
     { path: '/reports', label: 'Reports', icon: Layers },
+    { path: '/reports/builder', label: 'Report Designer', icon: BarChart },
     { path: '/clients', label: 'Clients', icon: Users },
     { path: '/billing', label: 'Billing', icon: DollarSign },
     { path: '/settings', label: 'Settings & APIs', icon: Settings },
@@ -51,23 +54,24 @@ export default function Layout({ children }) {
       `}</style>
 
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 dark:bg-slate-900 border-r border-slate-800 text-slate-300 flex flex-col transition-all">
-        <div className="p-6 flex items-center justify-between border-b border-slate-800">
+      <aside className="w-64 glass dark:glass border-r border-slate-800 text-slate-300 flex flex-col transition-all z-20">
+        <div className="p-6 flex items-center justify-between border-b border-white/5">
           <div className="flex items-center gap-3">
-            {BrandingConfig.logoUrl ? (
-              <img src={BrandingConfig.logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-1" />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20" style={{ backgroundColor: BrandingConfig.primaryColor }}>
-                <Shield size={20} strokeWidth={2.5} />
-              </div>
-            )}
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/10 bg-slate-900 border border-white/5 overflow-hidden">
+              {BrandingConfig.logoUrl ? (
+                <img src={BrandingConfig.logoUrl} alt={BrandingConfig.appName} className="w-full h-full object-cover" />
+              ) : (
+                <Shield className="text-cyan-400" size={18} strokeWidth={2.5} />
+              )}
+            </div>
             <span className="text-xl font-bold tracking-tight text-white">{BrandingConfig.appName}</span>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <LanguageSwitcher />
             <button 
               onClick={toggleTheme} 
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
               title="Toggle Enterprise Mode"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -75,7 +79,7 @@ export default function Layout({ children }) {
           </div>
         </div>
         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 px-2">
             <div className="w-9 h-9 flex-shrink-0 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-700">
               {user?.email?.[0].toUpperCase()}
             </div>
@@ -92,7 +96,7 @@ export default function Layout({ children }) {
             </div>
             <button 
               onClick={signOut}
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+              className="p-1.5 hover:bg-rose-500/10 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
               title="Sign Out"
             >
               <LogOut size={16} />
@@ -105,12 +109,14 @@ export default function Layout({ children }) {
                 <Link 
                   key={item.path} 
                   to={item.path} 
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors ${
-                    active ? 'text-white shadow-md' : 'hover:bg-slate-800 hover:text-white text-slate-400'
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all group ${
+                    active 
+                      ? 'text-white border-l-2 border-cyan-400 bg-white/5 shadow-[0_0_15px_rgba(34,211,238,0.2)]' 
+                      : 'hover:bg-white/5 hover:text-white text-slate-400'
                   }`}
-                  style={active ? { backgroundColor: primaryColor, boxShadow: `0 4px 12px ${primaryColor}40` } : {}}
+                  style={active ? { textShadow: '0 0 8px rgba(34,211,238,0.5)' } : {}}
                 >
-                  <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+                  <item.icon size={20} strokeWidth={active ? 2.5 : 2} className={active ? 'text-cyan-400' : 'group-hover:text-white'} />
                   {item.label}
                 </Link>
               )
@@ -119,8 +125,8 @@ export default function Layout({ children }) {
           
           { (user?.role === 'admin' || user?.tier === 'admin') && (
             <div className="mt-8">
-              <p className="px-6 text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Administration</p>
-              <nav className="flex-1 px-4 space-y-1">
+              <p className="px-3 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Administration Portal</p>
+              <nav className="space-y-1">
                 {adminMenu.map((item) => {
                   const isActive = location.pathname.startsWith(item.path)
                   return (
@@ -129,11 +135,11 @@ export default function Layout({ children }) {
                       to={item.path}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                         isActive 
-                          ? 'bg-rose-500/10 text-rose-500' 
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          ? 'bg-rose-500/10 text-rose-500 border-l-2 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.2)]' 
+                          : 'text-slate-400 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      <item.icon size={18} className={isActive ? 'text-rose-500' : 'text-slate-500'} />
+                      <item.icon size={18} className={isActive ? 'text-rose-500' : 'text-slate-500 group-hover:text-white'} />
                       {item.label}
                     </Link>
                   )

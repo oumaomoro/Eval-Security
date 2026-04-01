@@ -47,7 +47,7 @@ export const identifyUser = (user, profile) => {
 
   const userData = {
     email: user.email,
-    name: profile?.full_name || 'CyberOptimize User',
+    name: profile?.full_name || 'Costloci User',
     company: profile?.company_name || '',
     plan: profile?.plan || 'free',
     role: profile?.role || 'user'

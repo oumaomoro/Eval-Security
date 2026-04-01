@@ -6,8 +6,8 @@ async function createTestAccounts() {
   console.log('🔄 Creating test accounts for user and admin levels...');
 
   const accounts = [
-    { email: 'user@cyberoptimize.io', password: 'password123', role: 'user', tier: 'pro', name: 'Basic User' },
-    { email: 'admin@cyberoptimize.io', password: 'password123', role: 'admin', tier: 'enterprise', name: 'Admin Enterprise' }
+    { email: 'user@costloci.io', password: 'password123', role: 'user', tier: 'pro', name: 'Basic User' },
+    { email: 'admin@costloci.io', password: 'password123', role: 'admin', tier: 'enterprise', name: 'Admin Enterprise' }
   ];
 
   for (const acc of accounts) {
@@ -55,8 +55,8 @@ async function createTestAccounts() {
 
   console.log('\n✅ Setup Complete! You can now log in.');
   console.log('--- TEST CREDENTIALS ---');
-  console.log('1. STANDARD USER: user@cyberoptimize.io / password123 (Tier: pro)');
-  console.log('2. ENTERPRISE ADMIN: admin@cyberoptimize.io / password123 (Tier: enterprise, Role: admin)');
+  console.log('1. STANDARD USER: user@costloci.io / password123 (Tier: pro)');
+  console.log('2. ENTERPRISE ADMIN: admin@costloci.io / password123 (Tier: enterprise, Role: admin)');
   process.exit(0);
 }
 

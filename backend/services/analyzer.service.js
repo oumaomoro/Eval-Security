@@ -10,6 +10,24 @@ import { kv } from '@vercel/kv';
  */
 export class AnalyzerService {
   /**
+   * Resilience Wrapper: Exponential Backoff for transient 429/5xx errors.
+   * High ROI: Prevents expensive large-document crashes from common AI bottlenecks.
+   */
+  static async _withRetry(fn, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        const isRateLimit = err.status === 429 || err.message?.includes('rate_limit');
+        if (i === retries - 1 || !(isRateLimit || err.status >= 500)) throw err;
+        console.warn(`[Retry ${i+1}/${retries}] Pausing for ${delay}ms after:`, err.message);
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2; // Exponential backoff
+      }
+    }
+  }
+
+  /**
    * Main entry point for modular analysis.
    * Performs metadata extraction, categorical clause identification, and vector matching.
    */
@@ -34,6 +52,7 @@ export class AnalyzerService {
     - If DPA: Focus on GDPR Art. 28/KDPA/POPIA (South Africa) compliance, sub-processor liability, and breach notification.
     - If SaaS MSA/FinTech/Insurance: Focus on liability caps, service level agreements (SLAs), and data localization requirements in Sub-Saharan Africa.
     - REGIONAL COMPLIANCE (CRITICAL - EAST, CENTRAL, SOUTH AFRICA): Explicitly flag any missing clauses required by the Insurance Regulatory Authority of Kenya (IRA), Capital Markets Authority (CMA), Central Bank of Kenya (CBK), or regional equivalents in Uganda, Tanzania, Rwanda, and South Africa. Be highly accurate, professional, and innovative in identifying regulatory gaps.
+    - JURISDICTIONAL PINNING: Match analysis strictly against the GOLD STANDARD retrieved for the detected **${jurisdiction}** and **${sector}**.
     - MULTI-LANGUAGE REQUIREMENT: All output string fields (like title, description, and verbatim_text) MUST BE fully translated natively into **${targetLang}**. The JSON keys must remain exact English.
     
     Structure:
@@ -65,7 +84,7 @@ export class AnalyzerService {
     const enrichedFindings = [];
     for (const finding of analysisResult.categorized_findings) {
       if (finding.verbatim_text) {
-        // Find best match with Sector & Jurisdiction filtering
+        // Find best match with Sector & Jurisdiction filtering (Phase 18 Hardening)
         const vectorMatch = await findSimilarGoldStandard(finding.verbatim_text, finding.category, sector, jurisdiction);
         
         if (vectorMatch && vectorMatch.similarity > 0.6) {
@@ -83,8 +102,8 @@ export class AnalyzerService {
           if (cached) {
             console.log(`[Analyzer] 💸 ROI Hit: Served from cache (Saved ${cached.clause_hash.slice(0,8)})`);
             await supabase.from('clause_cache').update({ 
-              times_served: (cached.times_served || 0) + 1,
-              last_hit: new Date().toISOString()
+               times_served: (cached.times_served || 0) + 1,
+               last_hit: new Date().toISOString()
             }).eq('id', cached.id);
             
             finding.gold_standard_alignment = cached.analysis_json;
@@ -109,6 +128,15 @@ export class AnalyzerService {
 
             finding.gold_standard_alignment = alignment;
           }
+        } else {
+          // Option B Implementation: Strict Compliance - No Global Fallbacks
+          finding.gold_standard_alignment = {
+              match: "No specific Gold Standard defined for this market.",
+              similarity: 0,
+              standard: "Review Required",
+              gap_analysis: `⚠️ **Regional Compliance Gap Detected.** No baseline standard exists in our database for the detected jurisdiction: **${jurisdiction}** (${sector}). We strictly recommend assigning a local legal counsel to establish a proprietary standard for this market.`,
+              suggested_redline: "Pending Legal Review. Do not execute without establishing a jurisdictional baseline."
+          };
         }
       }
       enrichedFindings.push(finding);
@@ -197,6 +225,15 @@ export class AnalyzerService {
             gap_analysis: gapAnalysis,
             suggested_redline: suggestedRedline
           };
+        } else {
+          // Deep Scan Option B Implementation
+          finding.gold_standard_alignment = {
+              match: "No specific Gold Standard defined for this market.",
+              similarity: 0,
+              standard: "Critical Review Required",
+              gap_analysis: `⚠️ **Critical Regional Gap.** Our deep scan found no proprietary baseline for **${jurisdiction}** (${sector}). This represents high latent risk. Establish localized SLAs and caps based on East/Central/South African precedents before signing.`,
+              suggested_redline: "Immediate Legal Escalation Recommended."
+          };
         }
       }
       enrichedFindings.push(finding);
@@ -237,12 +274,12 @@ export class AnalyzerService {
       console.warn('[KV Cache Warning] Failed to reach Redis:', e.message); 
     }
 
-    const completion = await openai.chat.completions.create({
+    const completion = await this._withRetry(() => openai.chat.completions.create({
       model: model,
       messages: [{ role: "user", content: prompt }],
       response_format: isJson ? { type: "json_object" } : undefined,
       temperature: complexity === 'high' ? 0.3 : 0.7
-    });
+    }));
 
     const result = completion.choices[0].message.content;
 
@@ -321,10 +358,10 @@ export class AnalyzerService {
     findings.forEach(f => {
       if (f.gold_standard_alignment) {
         map[f.title] = {
-          match: f.gold_standard_alignment.match,
-          similarity: f.gold_standard_alignment.similarity,
-          standard: f.gold_standard_alignment.standard,
-          gap_analysis: f.gold_standard_alignment.gap_analysis
+           match: f.gold_standard_alignment.match,
+           similarity: f.gold_standard_alignment.similarity,
+           standard: f.gold_standard_alignment.standard,
+           gap_analysis: f.gold_standard_alignment.gap_analysis
         };
       }
     });

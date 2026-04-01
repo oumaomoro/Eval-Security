@@ -107,7 +107,7 @@ router.get('/export/audit-pack', authenticateToken, async (req, res) => {
   try {
     const archive = archiver('zip', { zlib: { level: 9 } });
     
-    res.attachment(`CyberOptimize-Audit-Pack-${Date.now()}.zip`);
+    res.attachment(`Costloci-Audit-Pack-${Date.now()}.zip`);
     archive.pipe(res);
 
     // 1. Fetch all documents and metadata

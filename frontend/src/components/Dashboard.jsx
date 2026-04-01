@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Activity, AlertTriangle, FileText, DollarSign, Crown, Rocket, Zap, TrendingUp, ShieldCheck, Target, Banknote, Plus } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../utils/api'
 
@@ -72,10 +73,28 @@ export default function Dashboard() {
 
   const hasData = metrics?.total_contracts > 0;
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  }
+
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="p-8 max-w-7xl mx-auto"
+    >
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <motion.div variants={itemVariants}>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
             Dashboard Overview
             {['pro', 'enterprise'].includes(currentTier) && (
@@ -85,10 +104,10 @@ export default function Dashboard() {
             )}
           </h1>
           <p className="text-slate-500 mt-1">Welcome back. Here's a summary of your automated contract analyses.</p>
-        </div>
+        </motion.div>
         
         {/* Tier Usage Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 shadow-sm min-w-[280px]">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 shadow-sm min-w-[280px]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Plan Usage ({currentTier})</span>
             <span className="text-xs font-bold text-slate-900 dark:text-white">{usageCount} / {currentLimit === 9999 ? '∞' : currentLimit}</span>
@@ -107,16 +126,16 @@ export default function Dashboard() {
               <Zap size={10} /> Boost Your Limit
             </button>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {!hasData ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-12 text-center relative overflow-hidden shadow-xl">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-12 text-center relative overflow-hidden shadow-xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
           
           <div className="relative z-10 max-w-2xl mx-auto">
-            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-8 shadow-inner">
+            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-8 shadow-inner animate-float">
               <Rocket size={40} />
             </div>
             <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Your AI Compliance Journey Starts Here</h2>
@@ -127,13 +146,13 @@ export default function Dashboard() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button 
                 onClick={() => window.location.href = '/upload'}
-                className="w-full sm:w-auto px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-2 animate-pulse-glow"
               >
                 <Plus size={20} /> Analyze First Contract
               </button>
               <button 
                 onClick={() => window.location.href = '/gold-standard'}
-                className="w-full sm:w-auto px-10 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                className="w-full sm:w-auto px-10 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:scale-105"
               >
                 Explore Legal Library
               </button>
@@ -151,12 +170,17 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {statCards.map((stat, i) => (
-              <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-xl hover:border-blue-500/20 transition-all group relative overflow-hidden">
+              <motion.div 
+                key={i} 
+                variants={itemVariants}
+                whileHover={{ scale: 1.02, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}
+                className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 hover:border-blue-500/20 transition-all group relative overflow-hidden"
+              >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-blue-500/10 transition-colors"></div>
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${stat.bg} dark:bg-opacity-10 backdrop-blur-sm`}>
                   <stat.icon className={`h-6 w-6 ${stat.color} dark:opacity-80`} strokeWidth={2.5} />
@@ -166,13 +190,13 @@ export default function Dashboard() {
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1 font-medium">
                   <TrendingUp size={10} className="text-emerald-500" /> {stat.sub}
                 </p>
-              </div>
+              </motion.div>
             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Futuristic Trend Chart */}
-            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+            <motion.div variants={itemVariants} className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h2 className="text-xl font-black text-slate-900 dark:text-white">Compliance Velocity</h2>
@@ -203,10 +227,10 @@ export default function Dashboard() {
                 ))}
               </div>
               <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-5 dark:opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-500 via-transparent to-transparent"></div>
-            </div>
+            </motion.div>
 
             {/* Global Readiness Matrix (East, Central, South Africa Focus) */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-950 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl">
+            <motion.div variants={itemVariants} className="bg-gradient-to-br from-slate-900 to-indigo-950 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
               <div className="relative z-10">
                 <h2 className="text-xl font-black mb-1">Regional Readiness</h2>
@@ -239,10 +263,10 @@ export default function Dashboard() {
                   <p className="text-xs leading-relaxed text-indigo-50">"Update your HIPAA Sub-processor addendums to reach 100% readiness across global markets."</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </>
       )}
-    </div>
+    </motion.div>
   )
 }

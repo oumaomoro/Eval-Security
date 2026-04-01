@@ -147,9 +147,14 @@ router.post('/create-order', authenticateToken, async (req, res) => {
        console.warn(`[billing] Stripe configured but no price ID found for ${planId} (${interval}). Falling back to regular intent/paypal.`);
     }
 
-    // ── MOCK FLOW: no credentials configured ───────────────────────
+    // ── MOCK/SAFEGUARD FLOW ──────────────────────────────────────────────────
     if (!CLIENT_ID || !CLIENT_SECRET) {
-      console.warn('[billing] Credentials missing — returning mock order');
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[billing] CRITICAL: Payment credentials missing in production environment.');
+        return res.status(500).json({ error: 'Payment gateway is currently unavailable.' });
+      }
+      
+      console.warn('[billing] Credentials missing (Dev Mode) — returning mock order');
       const mockOrderId = `MOCK-${Date.now()}`;
       return res.json({
         success: true,
@@ -193,49 +198,51 @@ router.post('/create-order', authenticateToken, async (req, res) => {
       return res.status(502).json({ error: 'Failed to authenticate with PayPal.' });
     }
 
-    console.log(`[billing] Creating PayPal order for plan '${plan.name}' ($${plan.price})`);
-    const ppRes = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        intent: 'CAPTURE',
-        purchase_units: [{
-          reference_id: plan.id,
-          description: `CyberOptimize ${plan.name} Plan — ${billing_cycle === 'annual' ? 'Annual' : 'Monthly'}`,
-          amount: {
-            currency_code: plan.currency,
-            value: finalPrice.toFixed(2),
+    const envKey = `PAYPAL_PLAN_${plan.id.toUpperCase()}_${interval.toUpperCase()}`;
+    const paypalPlanId = process.env[envKey] || process.env.PAYPAL_PLAN_PRO_MONTH;
+
+    const { data: profile } = await supabase.from('profiles').select('paypal_subscription_id').eq('id', req.user.id).single();
+    if (profile?.paypal_subscription_id) {
+       console.log(`[billing] Revising existing PayPal subscription ${profile.paypal_subscription_id} to plan ${paypalPlanId}`);
+       const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions/${profile.paypal_subscription_id}/revise`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
-        }],
-        payment_source: {
-          paypal: {
-            experience_context: {
-              brand_name: 'CyberOptimize',
-              landing_page: 'LOGIN',
-              user_action: 'PAY_NOW',
-              payment_method_preference: 'IMMEDIATE_PAYMENT_REQUIRED',
+          body: JSON.stringify({
+            plan_id: paypalPlanId
+          })
+       });
+       const reviseData = await ppRes.json();
+       if (!ppRes.ok) return res.status(ppRes.status).json({ error: 'PayPal revision failed', details: reviseData });
+       const approvalLink = reviseData.links?.find(l => l.rel === 'approve');
+       return res.json({ success: true, order_id: profile.paypal_subscription_id, data: reviseData, approval_url: approvalLink?.href });
+    } else {
+       console.log(`[billing] Creating new PayPal subscription for plan '${plan.name}'`);
+       const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            plan_id: paypalPlanId,
+            custom_id: req.user.id,
+            application_context: {
+              brand_name: 'Costloci',
+              shipping_preference: 'NO_SHIPPING',
+              user_action: 'SUBSCRIBE_NOW',
               return_url: `${frontendUrl}/billing/success`,
-              cancel_url: `${frontendUrl}/billing?cancelled=1`,
-            },
-          },
-        },
-      }),
-    });
-
-    const order = await ppRes.json();
-    if (!ppRes.ok) {
-      console.error('[billing] PayPal order creation failed:', JSON.stringify(order, null, 2));
-      return res.status(ppRes.status).json({ error: order.message || 'PayPal rejected the order', details: order });
+              cancel_url: `${frontendUrl}/billing?cancelled=1`
+            }
+          })
+       });
+       const subData = await ppRes.json();
+       if (!ppRes.ok) return res.status(ppRes.status).json({ error: 'PayPal subscription failed', details: subData });
+       const approvalLink = subData.links?.find(l => l.rel === 'approve');
+       return res.json({ success: true, order_id: subData.id, data: subData, approval_url: approvalLink?.href });
     }
-
-    // Try all possible link relations for approval
-    const approvalLink = order.links?.find(l => l.rel === 'approve' || l.rel === 'payer-action' || l.rel === 'payer-action-url');
-    console.log(`[billing] Order ${order.id} created — approved link: ${approvalLink?.href}`);
-
-    return res.json({ success: true, order_id: order.id, data: order, approval_url: approvalLink?.href });
   } catch (err) {
     console.error('[billing] create-order exception:', err);
     res.status(500).json({ error: 'Failed to create payment order', details: err.message });
@@ -257,43 +264,31 @@ router.post('/capture-order', authenticateToken, async (req, res) => {
 
     // ── REAL PAYPAL FLOW ───────────────────────────────────────────────────
     const token = await getPayPalToken();
-    const ppRes = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${order_id}/capture`, {
-      method: 'POST',
+    const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions/${order_id}`, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
-    const capture = await ppRes.json();
-    console.log(`[billing] Capture response for ${order_id}: status=${capture.status}`);
+    const subData = await ppRes.json();
+    console.log(`[billing] Subscription response for ${order_id}: status=${subData.status}`);
 
-    if (capture.status === 'COMPLETED') {
-      // Find the tier from the reference_id (plan id)
-      const purchaseUnit = capture.purchase_units?.[0];
-      const planId = purchaseUnit?.reference_id;
-      const plan = PLANS.find(p => p.id === planId);
-      const tier = plan?.tier || 'pro';
-
-      await performFulfillment(req.user, tier, supabase, isSupabaseConfigured);
+    if (subData.status === 'ACTIVE' || subData.status === 'APPROVED') {
+      const planId = subData.plan_id;
+      const planTier = PLANS.find(p => process.env[`PAYPAL_PLAN_${p.id.toUpperCase()}_MONTH`] === planId || process.env[`PAYPAL_PLAN_${p.id.toUpperCase()}_YEAR`] === planId)?.tier || 'pro';
       
-      // Generate Corporate Invoice for Auditing (African/MEA Corporate requirement)
-      let invoiceUrl = null;
-      try {
-        const invoice = await PayPalService.createCorporateInvoice(
-          req.user.id,
-          req.user.user_metadata?.company_name || 'CyberOptimize Corporate Client',
-          plan?.name || tier,
-          plan?.price || 0
-        );
-        invoiceUrl = invoice.href; // Front-end can show this link to download the PDF invoice
-      } catch (invErr) {
-        console.error('[billing] Failed to generate corporate invoice:', invErr);
-      }
-
-      return res.json({ success: true, status: 'COMPLETED', data: capture, upgraded: true, tier, invoice_url: invoiceUrl });
+      await performFulfillment(req.user, planTier, supabase, isSupabaseConfigured);
+      
+      await supabase.from('profiles').update({ 
+         paypal_subscription_id: order_id, 
+         billing_provider: 'paypal' 
+      }).eq('id', req.user.id);
+      
+      return res.json({ success: true, status: 'COMPLETED', data: subData, upgraded: true, tier: planTier });
     } else {
-      return res.status(400).json({ success: false, status: capture.status, data: capture });
+      return res.status(400).json({ success: false, status: subData.status, data: subData });
     }
   } catch (err) {
     console.error('[billing] capture-order exception:', err);
@@ -446,6 +441,8 @@ router.post('/webhook/:provider', async (req, res) => {
 
                 await supabase.from('profiles').update({ 
                   stripe_customer_id: stripeCustomerId,
+                  stripe_subscription_id: session.subscription,
+                  billing_provider: 'stripe',
                   tier: targetTier,
                   upgraded_at: new Date().toISOString()
                 }).eq('id', userId);
@@ -455,13 +452,16 @@ router.post('/webhook/:provider', async (req, res) => {
              break;
 
           case 'customer.subscription.updated':
+          case 'customer.subscription.deleted':
           case 'customer.subscription.created':
              const sub = eventBody.data.object;
              // Subscription updates use customer ID for lookups
              if (stripeCustomerId) {
                 const status = sub.status;
-                const tier = status === 'active' ? 'pro' : 'free'; // Simple toggle, can be mapped to price_id
+                const tier = status === 'active' || status === 'trialing' ? 'pro' : 'free'; 
                 await supabase.from('profiles').update({ 
+                  stripe_subscription_id: sub.id,
+                  billing_provider: 'stripe',
                   tier: tier,
                   status_note: `Subscription status: ${status}`
                 }).eq('stripe_customer_id', stripeCustomerId);
@@ -476,7 +476,28 @@ router.post('/webhook/:provider', async (req, res) => {
        const userId = data.metadata?.user_id;
        const targetTier = data.metadata?.tier || 'pro';
        if (userId) {
+          await supabase.from('profiles').update({ billing_provider: 'paystack' }).eq('id', userId);
           await performFulfillment({ id: userId }, targetTier, supabase, isSupabaseConfigured);
+       }
+    }
+
+    // 5. PayPal Webhook Fulfillment
+    if (provider === 'paypal' && eventBody.event_type && eventBody.event_type.startsWith('BILLING.SUBSCRIPTION')) {
+       const subId = eventBody.resource.id;
+       const customId = eventBody.resource.custom_id;
+       if (customId || subId) {
+          const status = eventBody.resource.status;
+          const tier = status === 'ACTIVE' ? 'pro' : 'free'; 
+          const updateData = {
+              paypal_subscription_id: subId,
+              billing_provider: 'paypal',
+              tier: tier,
+              status_note: `Subscription status: ${status}`
+          };
+          if(status === 'CANCELLED' || status === 'EXPIRED') updateData.tier = 'free';
+          
+          if(customId) await supabase.from('profiles').update(updateData).eq('id', customId);
+          else await supabase.from('profiles').update(updateData).eq('paypal_subscription_id', subId);
        }
     }
 

@@ -1,37 +1,29 @@
 version: '3.8'
 
 services:
-  backend:
+  costloci-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cyberoptimize-backend
+    container_name: costloci-backend
     restart: always
+    environment:
+      - NODE_ENV=production
     ports:
       - "3001:3001"
-    env_file:
-      - ./backend/.env
     networks:
-      - cyberoptimize-network
+      - costloci-network
 
-  frontend:
+  costloci-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        # Pass build-time variables from local environment or .env file
-        # In a real CI/CD pipeline, these would be injected by the runner
-        # Defaulting to localhost bridging for the docker-compose test
-        - VITE_API_URL=http://localhost:3001/api
-    container_name: cyberoptimize-frontend
-    restart: always
+    container_name: costloci-frontend
     ports:
-      - "80:80"
-    depends_on:
-      - backend
+      - "5180:5180"
     networks:
-      - cyberoptimize-network
+      - costloci-network
 
 networks:
-  cyberoptimize-network:
+  costloci-network:
     driver: bridge

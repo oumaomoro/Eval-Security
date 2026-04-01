@@ -4,7 +4,7 @@
 
 set -e # Exit immediately if a command exits with a non-zero status
 
-echo "🚀 Starting CyberOptimize Database Migrations Strategy..."
+echo "🚀 Starting Costloci Database Migrations Strategy..."
 
 if [ -z "$SUPABASE_DB_PASSWORD" ]; then
   echo "❌ Error: SUPABASE_DB_PASSWORD environment variable is required."

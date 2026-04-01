@@ -18,10 +18,13 @@ import TrustPanel from './components/TrustPanel'
 import AdminDashboard from './components/AdminDashboard'
 import Clients from './components/Clients'
 import AdminBilling from './components/AdminBilling'
+import Marketplace from './components/Marketplace'
+import ReportBuilder from './components/ReportBuilder'
 import Layout from './components/Layout'
 import ForgotPassword from './components/ForgotPassword'
 import ResetPassword from './components/ResetPassword'
 import VerifyEmail from './components/VerifyEmail'
+import WordTaskpane from './components/WordTaskpane'
 
 function App() {
   return (
@@ -66,8 +69,11 @@ function AppContent() {
         <Route path="/trust" element={user ? <Layout><TrustPanel /></Layout> : <Navigate to="/login" />} />
         <Route path="/upload" element={user ? <Layout><Upload /></Layout> : <Navigate to="/login" />} />
         <Route path="/clients" element={user ? <Layout><Clients /></Layout> : <Navigate to="/login" />} />
+        <Route path="/marketplace" element={user ? <Layout><Marketplace /></Layout> : <Navigate to="/login" />} />
+        <Route path="/reports/builder" element={user ? <Layout><ReportBuilder /></Layout> : <Navigate to="/login" />} />
         <Route path="/admin" element={user ? <Layout><AdminDashboard /></Layout> : <Navigate to="/login" />} />
         <Route path="/admin/billing" element={user ? <Layout><AdminBilling /></Layout> : <Navigate to="/login" />} />
+        <Route path="/addin" element={<WordTaskpane />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

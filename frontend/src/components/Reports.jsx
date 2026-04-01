@@ -73,7 +73,7 @@ export default function Reports() {
         <div className="flex gap-3">
           <button
             onClick={() => {
-              const token = localStorage.getItem('cyberoptimize_token');
+              const token = localStorage.getItem('costloci_token');
               window.open(`${import.meta.env.VITE_API_URL}/reports/export/audit-pack?token=${token}`, '_blank');
             }}
             className="flex items-center gap-2 px-6 py-3 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl hover:bg-blue-100 transition-all font-bold text-sm"
@@ -230,7 +230,7 @@ export default function Reports() {
                   <button 
                     onClick={async () => {
                       if (user?.tier === 'enterprise' || user?.tier === 'pro' || user?.tier === 'admin') {
-                        const token = localStorage.getItem('cyberoptimize_token');
+                        const token = localStorage.getItem('costloci_token');
                         window.open(`${import.meta.env.VITE_API_URL}/reports/${report.id}/strategic-brief?token=${token}`, '_blank');
                         return;
                       }
@@ -241,13 +241,13 @@ export default function Reports() {
                           try {
                             const res = await api.post('/billing/charge-export');
                             if (res.data.allowed) {
-                              const token = localStorage.getItem('cyberoptimize_token');
+                              const token = localStorage.getItem('costloci_token');
                               window.open(`${import.meta.env.VITE_API_URL}/reports/${report.id}/strategic-brief?token=${token}`, '_blank');
                             } else if (res.data.clientSecret) {
                               // In a real app, open Stripe Elements/PayPal here
                               alert("Redirecting to secure payment gateway ($5.00)...");
                               // Mock success for this demo flow
-                              const token = localStorage.getItem('cyberoptimize_token');
+                              const token = localStorage.getItem('costloci_token');
                               window.open(`${import.meta.env.VITE_API_URL}/reports/${report.id}/strategic-brief?token=${token}`, '_blank');
                             }
                           } catch (err) {
@@ -271,7 +271,7 @@ export default function Reports() {
                   </button>
                   <button 
                     onClick={() => {
-                      const branding = JSON.parse(localStorage.getItem('cyberoptimize_branding') || '{}');
+                      const branding = JSON.parse(localStorage.getItem('costloci_branding') || '{}');
                       generateBrandedPdf(report, branding);
                     }}
                     className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white rounded-lg border border-transparent hover:border-slate-100 transition-all text-slate-400 hover:text-blue-600 shadow-sm"

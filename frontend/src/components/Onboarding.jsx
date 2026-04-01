@@ -18,11 +18,15 @@ export default function Onboarding() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-100 px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-             <Shield className="text-white" size={18} />
+        <div className="flex items-center gap-3">
+           <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/10 bg-slate-900 border border-white/5 overflow-hidden">
+             {BrandingConfig.logoUrl ? (
+               <img src={BrandingConfig.logoUrl} alt={BrandingConfig.appName} className="w-full h-full object-cover" />
+             ) : (
+               <Shield className="text-cyan-400" size={16} strokeWidth={2.5} />
+             )}
            </div>
-           <span className="text-xl font-bold text-slate-900 tracking-tight">CyberOptimize</span>
+           <span className="text-xl font-bold text-slate-900 tracking-tight">{BrandingConfig.appName}</span>
         </div>
         <div className="text-sm font-semibold text-slate-500">
            Step {step} of 3
@@ -86,7 +90,7 @@ export default function Onboarding() {
                   <Zap size={24} />
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-3">Connect your toolchain</h2>
-                <p className="text-slate-500 mb-8 text-lg">Integrate CyberOptimize with your existing workflow for automated continuous monitoring.</p>
+                <p className="text-slate-500 mb-8 text-lg">Integrate Costloci with your existing workflow for automated continuous monitoring.</p>
                 
                 <div className="space-y-4">
                   {[

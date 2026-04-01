@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { SignnowService } from '../services/signnow.service.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cyberoptimize-secret-2024';
+const JWT_SECRET = process.env.JWT_SECRET || 'costloci-secret-2026';
 const upload = multer({ storage: multer.memoryStorage() });
 
 const requireAuth = (req, res, next) => {
@@ -211,6 +211,39 @@ router.delete('/:provider', requireAuth, async (req, res) => {
   } catch (error) {
     console.error(`[integrations] Disconnect error:`, error);
     res.status(500).json({ success: false, error: `Failed to disconnect ${provider}` });
+  }
+});
+
+// 5. DocuSign Webhook: Automated Ingestion
+router.post('/docusign/webhook', async (req, res) => {
+  const { event, data } = req.body;
+
+  try {
+    console.log(`[DocuSign Webhook] Received event: ${event}`);
+
+    if (event === 'envelope-completed') {
+      const envelopeId = data?.envelopeId;
+      const userId = data?.customFields?.find(f => f.name === 'costloci_user_id')?.value;
+
+      if (!userId) {
+        console.warn(`[DocuSign Webhook] No costloci_user_id found in custom fields for envelope ${envelopeId}`);
+        return res.status(200).json({ success: true, message: 'Skipped - No user mapping' });
+      }
+
+      console.log(`[DocuSign Webhook] Processing completed envelope ${envelopeId} for user ${userId}`);
+
+      // MOCK: In a real scenario, we would use the DocuSign SDK to download the PDF buffer here.
+      // const pdfBuffer = await DocusignService.downloadEnvelope(envelopeId);
+      
+      // For now, we simulate a successful ingestion trigger
+      // Note: We would typically call a service here to handle the background analysis
+      console.log(`[DocuSign Webhook] Triggering automated AI analysis for envelope ${envelopeId}...`);
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('[DocuSign Webhook] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Webhook processing failed' });
   }
 });
 

@@ -38,13 +38,13 @@ router.post('/embedded', authenticateToken, async (req, res) => {
     doc.on('data', buffers.push.bind(buffers));
     
     // Generate PDF Content
-    doc.fontSize(20).text(`CyberOptimize: E-Signature Request`, { align: 'center' });
+    doc.fontSize(20).text(`Costloci: E-Signature Request`, { align: 'center' });
     doc.moveDown();
     doc.fontSize(14).text(`Vendor: ${contract.vendor_name}`);
     doc.text(`Product/Service: ${contract.product_service}`);
     doc.text(`Annual Cost: $${(contract.annual_cost || 0).toLocaleString()}`);
     doc.moveDown();
-    doc.fontSize(12).text('By signing below, you acknowledge the security and risk analysis performed by CyberOptimize AI.');
+    doc.fontSize(12).text('By signing below, you acknowledge the security and risk analysis performed by Costloci AI.');
     doc.moveDown(4);
     doc.text('_________________________________', { align: 'left' });
     doc.text(`Authorized Signer: ${signer_email}`);

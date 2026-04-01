@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const refreshUser = async () => {
-    const token = localStorage.getItem('cyberoptimize_token')
+    const token = localStorage.getItem('costloci_token')
     if (!token) return
 
     try {
@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }) => {
         return data; // Return directly if verification needed, don't set user session locally
       }
 
-      localStorage.setItem('cyberoptimize_token', data.token)
+      localStorage.setItem('costloci_token', data.token)
       setUser(data.user)
       return data
     } catch (err) {
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
         return { requiresVerification: true, message: 'Please check your email.' };
       }
 
-      localStorage.setItem('cyberoptimize_token', data.session.access_token)
+      localStorage.setItem('costloci_token', data.session.access_token)
       setUser(data.user)
       return data
     }
@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Store token for subsequent API calls
-      localStorage.setItem('cyberoptimize_token', data.token)
+      localStorage.setItem('costloci_token', data.token)
       setUser(data.user)
       
       // Initialize unified analytics profile
@@ -153,14 +153,14 @@ export const AuthProvider = ({ children }) => {
          if (error.message.includes('Email not confirmed')) throw new Error('EMAIL_NOT_CONFIRMED');
          throw error;
       }
-      if (data.session) localStorage.setItem('cyberoptimize_token', data.session.access_token)
+      if (data.session) localStorage.setItem('costloci_token', data.session.access_token)
       setUser(data.user)
       return data
     }
   }
 
   const signOut = async () => {
-    localStorage.removeItem('cyberoptimize_token')
+    localStorage.removeItem('costloci_token')
     await supabase.auth.signOut()
     setUser(null)
     resetAnalyticsUser()
@@ -168,7 +168,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
-    token: localStorage.getItem('cyberoptimize_token'),
+    token: localStorage.getItem('costloci_token'),
     signUp,
     signIn,
     signOut,

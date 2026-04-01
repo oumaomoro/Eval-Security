@@ -55,7 +55,7 @@ export default function Upload() {
     setError('')
 
     try {
-      const localToken = localStorage.getItem('cyberoptimize_token')
+      const localToken = localStorage.getItem('costloci_token')
       
       const formData = new FormData()
       formData.append('file', file)

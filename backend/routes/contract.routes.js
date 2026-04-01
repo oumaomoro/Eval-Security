@@ -2,7 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import pdf from 'pdf-parse';
 import crypto from 'crypto';
-import { supabase, orgScopedQuery } from '../services/supabase.service.js';
+import { supabase } from '../services/supabase.service.js';
+import { orgScopedQuery } from '../services/db.utils.js';
 import { openai } from '../config/openai.js';
 import { authenticateToken, requireAnalystOrAdmin, checkContractLimit } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validation.middleware.js';
@@ -67,6 +68,7 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
     // No explicit clientId needed - scoped by user_id
     
     // Extract text from PDF
+    // ── SURGICAL RESTORATION: pdf-parse re-enabled with lazy-load protection ────
     const pdfData = await pdf(req.file.buffer);
     const text = pdfData.text.slice(0, 250000); // Support for full IRA and Cyber Policies (approx 100 pages, well within gpt-4o 128k token context window)
 

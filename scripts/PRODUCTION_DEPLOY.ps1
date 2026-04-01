@@ -1,5 +1,5 @@
-# CyberOptimize Production Deployment Orchestrator
-Write-Host "Initializing CyberOptimize Production Build..." -ForegroundColor Cyan
+# Costloci Production Deployment Orchestrator
+Write-Host "Initializing Costloci Production Build..." -ForegroundColor Cyan
 
 if (!(Test-Path "backend\.env")) { 
     Write-Host "[X] Backend .env missing!" -ForegroundColor Red
@@ -26,7 +26,7 @@ cd ..
 
 Write-Host "[*] Deploying Frontend to Cloudflare Pages..." -ForegroundColor Teal
 cd frontend
-npx wrangler pages deploy dist --project-name=cyberoptimize --branch=main
+npx wrangler pages deploy dist --project-name=costloci-frontend --branch=main
 if ($LASTEXITCODE -ne 0) { Write-Host "[X] Cloudflare Deployment Failed!" -ForegroundColor Red; exit }
 cd ..
 

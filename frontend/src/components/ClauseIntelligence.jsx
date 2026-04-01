@@ -203,7 +203,7 @@ export default function ClauseIntelligence() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-slate-100 h-fit">
             <h3 className="font-semibold text-slate-900 mb-2">Create Custom Standard</h3>
-            <p className="text-xs text-slate-500 mb-6 leading-relaxed">Add your organization's specific fallback language for rigorous RAG tuning. CyberOptimize will prioritize this over Global standards.</p>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed">Add your organization's specific fallback language for rigorous RAG tuning. Costloci will prioritize this over Global standards.</p>
             
             <div className="space-y-4">
               <div>

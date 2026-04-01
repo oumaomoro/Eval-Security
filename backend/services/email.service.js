@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { supabase } from './supabase.service.js';
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
+export const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
 
 export const EmailService = {
   async sendRenewalAlert(email, contractDetails) {
@@ -10,14 +10,30 @@ export const EmailService = {
       <h2>Contract Renewal Notice</h2>
       <p>Your contract with <strong>${contractDetails.vendor_name}</strong> is scheduled to renew on <strong>${contractDetails.renewal_date}</strong>.</p>
       <p>Total Annual Value: $${contractDetails.annual_cost?.toLocaleString(undefined) || 'N/A'}</p>
-      <p>Review the compliance parameters strictly in your CyberOptimize Dashboard.</p>
+      <p>Review the compliance parameters strictly in your Costloci Dashboard.</p>
     `;
 
     return this.queueEmail(email, subject, html);
   },
   async sendWelcomeEmail(email, fullName) {
     const { WELCOME_EMAIL_TEMPLATE } = await import('./email.templates.js');
-    return this.queueEmail(email, 'Welcome to CyberOptimize! 🚀', WELCOME_EMAIL_TEMPLATE(fullName));
+    return this.queueEmail(email, 'Welcome to Costloci! 🚀', WELCOME_EMAIL_TEMPLATE(fullName));
+  },
+
+  async sendPasswordResetEmail(email, resetLink) {
+    const { PASSWORD_RESET_TEMPLATE } = await import('./email.templates.js');
+    return this.queueEmail(email, 'Reset Your Costloci Password 🔐', PASSWORD_RESET_TEMPLATE(resetLink));
+  },
+
+  async sendAutoProvisionWelcome(email) {
+    const html = `
+      <h2>Welcome to Costloci! 🚀</h2>
+      <p>We received your contract via email and have automatically provisioned a secure account for you.</p>
+      <p>Your contract is actively being analyzed. Once complete, you will receive an alert.</p>
+      <p><strong>Next Steps:</strong> You will receive a separate password-reset email shortly. Click the link in that email to set a secure password and claim your Dashboard.</p>
+      <p>Alternatively, you can access your account anytime using the 'Forgot Password' flow at <a href="https://costloci.com/login">costloci.com/login</a>.</p>
+    `;
+    return this.queueEmail(email, 'Welcome to Costloci! Your account is ready.', html);
   },
 
   async sendOnboardingDay3(email, fullName) {
@@ -44,7 +60,7 @@ export const EmailService = {
     console.log(`[EmailService] Queueing email to ${to}: ${subject}`);
     const { data, error } = await supabase
       .from('email_queue')
-      .insert({ "to": to, subject, html, status: 'pending' })
+      .insert({ "to": to, subject, html, status: 'pending', next_attempt: new Date().toISOString() })
       .select('id')
       .single();
 
@@ -52,6 +68,10 @@ export const EmailService = {
        console.error('[EmailService] Failed to queue email:', error);
        throw error;
     }
+    
+    // Automatically trigger queue processing asynchronously for seamless delivery
+    this.processQueue().catch(e => console.error('[EmailService] Auto-process failed:', e));
+    
     return data;
   },
 
@@ -83,7 +103,7 @@ export const EmailService = {
          } else {
             // Real dispatch
             await resend.emails.send({
-               from: 'CyberOptimize <alerts@costloci.com>',
+               from: 'Costloci <alerts@costloci.com>',
                to: email.to,
                subject: email.subject,
                html: email.html

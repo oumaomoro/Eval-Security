@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Gold Standard Clauses: Reference points for what "good" legal language looks like
 CREATE TABLE IF NOT EXISTS public.gold_standard_clauses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    standard_name TEXT NOT NULL,          -- e.g. "CyberOptimize Enterprise DPA 2026"
+    standard_name TEXT NOT NULL,          -- e.g. "Costloci Enterprise DPA 2026"
     clause_category TEXT NOT NULL,        -- e.g. "data_deletion", "liability", "notification"
     clause_text TEXT NOT NULL,            -- The actual text of the gold standard clause
     embedding VECTOR(1536),              -- OpenAI text-embedding-3-small vector

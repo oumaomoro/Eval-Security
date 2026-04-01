@@ -11,7 +11,7 @@ async function seedAndTest() {
 
   const goldClauses = [
     {
-      standard_name: 'CyberOptimize GDPR Standard v1',
+      standard_name: 'Costloci GDPR Standard v1',
       clause_category: 'data_deletion',
       clause_text: 'The processor shall delete all personal data within 30 days of contract termination and provide a certificate of destruction.'
     },

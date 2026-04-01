@@ -38,12 +38,12 @@ export class PayPalService {
         invoice_number: invoiceNumber,
         invoice_date: new Date().toISOString().split('T')[0],
         currency_code: 'USD',
-        memo: 'Enterprise SaaS Subscription for CyberOptimize Compliance AI'
+        memo: 'Enterprise SaaS Subscription for Costloci Compliance AI'
       },
       invoicer: {
-        name: { given_name: 'CyberOptimize', surname: 'Enterprise' },
-        email_address: 'billing@cyberoptimize.com',
-        website: 'https://cyberoptimize.com'
+        name: { given_name: 'Costloci', surname: 'Enterprise' },
+        email_address: 'billing@costloci.com',
+        website: 'https://costloci.com'
       },
       primary_recipients: [
         {
@@ -54,7 +54,7 @@ export class PayPalService {
       ],
       items: [
         {
-          name: `CyberOptimize ${planTier} License`,
+          name: `Costloci ${planTier} License`,
           description: `Annual subscription covering IRA, CMA, & Global compliance modules.`,
           quantity: '1',
           unit_amount: { currency_code: 'USD', value: amount.toString() }

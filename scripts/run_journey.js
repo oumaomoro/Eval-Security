@@ -1,18 +1,32 @@
 import fetch from 'node-fetch';
 import fs from 'fs';
 import FormData from 'form-data';
-import { supabase } from '../backend/services/supabase.service.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load env from backend BEFORE anything else
+dotenv.config({ path: join(__dirname, '../backend/.env') });
 
 async function runJourney() {
   console.log('🚀 Starting API Verification Journey...');
-  const API_URL = 'http://localhost:3001/api';
+  
+  // Dynamic import to ensure process.env is populated before supabase initialization
+  const { supabase } = await import('../backend/services/supabase.service.js');
+  const IS_PROD = process.env.PROD === 'true';
+  const API_URL = IS_PROD ? 'https://api.costloci.com/api' : 'http://localhost:3001/api';
+
+  console.log(`🌐 Target: ${API_URL}`);
 
   try {
     // 1. Authenticate using Supabase Auth to get a valid JWT
     console.log('1. Authenticating test user...');
     const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
       email: 'file75556@gmail.com',
-      password: 'password123'
+      password: 'password123' // This should match your production user passcode
     });
 
     if (authErr) {

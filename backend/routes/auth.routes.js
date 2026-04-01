@@ -5,7 +5,7 @@ import { authenticateToken } from '../middleware/auth.middleware.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'cyberoptimize-secret-2024';
+const JWT_SECRET = process.env.JWT_SECRET || 'costloci-secret-2026';
 
 router.post('/register', async (req, res) => {
   try {
@@ -20,19 +20,17 @@ router.post('/register', async (req, res) => {
     }
     */
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Create user in Supabase Auth via Admin SDK to bypass broken SMTP
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: { data: { role: 'user' } }
+      email_confirm: true, // Auto-confirm to ensure immediate access
+      user_metadata: { role: 'user' }
     });
-
+ 
     if (authError) throw authError;
-
-    // Check if Email Confirmation is required
-    const requiresVerification = !authData.session;
-
-    // Create profile in database regardless
+ 
+    // Create profile in database
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .insert({
@@ -43,28 +41,25 @@ router.post('/register', async (req, res) => {
       })
       .select()
       .single();
-
+ 
     if (profileError) throw profileError;
-
-    // Trigger Resend Welcome Email
+ 
+    // Trigger Resend Welcome Email (Reliable Bridge)
     import('../services/email.service.js')
       .then(({ EmailService }) => EmailService.sendWelcomeEmail(email, 'Optimizor'))
       .catch(err => console.error('Failed to dispatch welcome email:', err));
-
-    if (requiresVerification) {
-      return res.status(201).json({
-        requiresVerification: true,
-        message: 'Please check your email to confirm your account.',
-        user: { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' }
-      });
-    }
-
-    // Generate JWT token
+ 
+    // Generate JWT token for seamless login
     const token = jwt.sign(
       { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' }, 
       JWT_SECRET, 
       { expiresIn: '7d' }
     );
+ 
+    res.status(201).json({
+      user: { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' },
+      token
+    });
 
     res.json({
       user: { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' },
@@ -146,11 +141,25 @@ router.post('/login', async (req, res) => {
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.FRONTEND_URL}/reset-password`,
+    
+    // Generate an absolute recovery link via Admin SDK
+    const { data, error } = await supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: {
+        redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+      }
     });
+
     if (error) throw error;
-    res.json({ success: true, message: 'Password reset link sent to your email.' });
+
+    const resetLink = data.properties.action_link;
+
+    // Dispatch via Resend (Bypass broken Supabase SMTP)
+    const { EmailService } = await import('../services/email.service.js');
+    await EmailService.sendPasswordResetEmail(email, resetLink);
+
+    res.json({ success: true, message: 'Password reset link sent to your email via Resend.' });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(400).json({ error: error.message });
@@ -177,46 +186,32 @@ router.get('/google/callback', async (req, res) => {
   res.redirect(`${process.env.FRONTEND_URL}/dashboard?auth=sso_sync`);
 });
 
-// POST /api/auth/forgot-password
-router.post('/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.FRONTEND_URL}/reset-password`,
-    });
-    if (error) throw error;
-    res.json({ success: true, message: 'Password reset link sent to your email.' });
-  } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// POST /api/auth/reset-password
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { new_password } = req.body;
-    // In Supabase, the user should be logged in via the token in the link
-    // So we just call updateUser. 
-    const { error } = await supabase.auth.updateUser({ password: new_password });
-    if (error) throw error;
-    res.json({ success: true, message: 'Password updated successfully.' });
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(400).json({ error: error.message });
-  }
-});
+// End duplicate block
 
 // GET /api/auth/google
 router.get('/google', async (req, res) => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${process.env.FRONTEND_URL}/dashboard`,
-    },
-  });
-  if (error) return res.status(500).json({ error: error.message });
-  res.redirect(data.url);
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${process.env.FRONTEND_URL}/dashboard`,
+      },
+    });
+    if (error) {
+       // Catch the missing OAuth secret error proactively
+       if (error.message.includes('missing OAuth secret') || error.status === 400) {
+          console.error('[Auth] Google OAuth Misconfigured: Missing Client Secret in Supabase Dashboard.');
+          return res.status(400).json({ 
+             error: 'OAuth provider misconfigured. Please contact support (missing client secret).',
+             details: 'Admin: Add the Google Client Secret to your Supabase project under Auth > Providers.'
+          });
+       }
+       throw error;
+    }
+    res.redirect(data.url);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/regenerate-api-key', authenticateToken, async (req, res) => {
