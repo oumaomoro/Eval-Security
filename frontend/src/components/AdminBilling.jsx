@@ -89,8 +89,13 @@ export default function AdminBilling() {
                   <span className="text-sm font-black text-slate-900">{count}</span>
                 </div>
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full ${tier === 'enterprise' ? 'bg-blue-600' : tier === 'pro' ? 'bg-indigo-500' : tier === 'starter' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  <div
+                    className={`h-full rounded-full ${tier === 'enterprise' ? 'bg-blue-600' :
+                        tier === 'pro' ? 'bg-indigo-500' :
+                          tier === 'api' ? 'bg-violet-500' :
+                            tier === 'starter' ? 'bg-emerald-500' :
+                              'bg-slate-300'
+                      }`}
                     style={{ width: `${(count / stats?.total_users) * 100}%` }}
                   ></div>
                 </div>
@@ -104,10 +109,10 @@ export default function AdminBilling() {
           <div className="p-6 border-b border-slate-50 flex items-center justify-between">
             <h3 className="font-bold text-slate-900">Portfolio Accounts</h3>
             <div className="flex items-center gap-3">
-               <div className="relative">
-                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                 <input type="text" placeholder="Search accounts..." className="pl-9 pr-4 py-1.5 bg-slate-50 border-none rounded-lg text-xs" />
-               </div>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="text" placeholder="Search accounts..." className="pl-9 pr-4 py-1.5 bg-slate-50 border-none rounded-lg text-xs" />
+              </div>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -128,11 +133,11 @@ export default function AdminBilling() {
                       <p className="text-[10px] text-slate-400 font-mono mt-0.5">{sub.id}</p>
                     </td>
                     <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        sub.tier === 'enterprise' ? 'bg-blue-50 text-blue-700' : 
-                        sub.tier === 'pro' ? 'bg-indigo-50 text-indigo-700' : 
-                        'bg-emerald-50 text-emerald-700'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${sub.tier === 'enterprise' ? 'bg-blue-50 text-blue-700' :
+                          sub.tier === 'pro' ? 'bg-indigo-50 text-indigo-700' :
+                            sub.tier === 'api' ? 'bg-violet-50 text-violet-700' :
+                              'bg-emerald-50 text-emerald-700'
+                        }`}>
                         {sub.tier}
                       </span>
                     </td>
@@ -140,9 +145,9 @@ export default function AdminBilling() {
                       {sub.upgraded_at ? new Date(sub.upgraded_at).toLocaleDateString() : 'Manual Migration'}
                     </td>
                     <td className="p-4 text-right">
-                       <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-lg">
-                         <ExternalLink size={16} />
-                       </button>
+                      <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-lg">
+                        <ExternalLink size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}

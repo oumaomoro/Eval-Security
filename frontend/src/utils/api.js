@@ -1,25 +1,41 @@
 /**
  * Centralized API Client for Costloci
- * Automatically handles Authorization headers and base URL
+ * Automatically handles Authorization headers and base URL.
+ * Falls back to the live Supabase session if localStorage token is absent.
  */
+import { supabase } from '../contexts/AuthContext';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-const getHeaders = () => {
-  const token = localStorage.getItem('costloci_token');
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+const getToken = async () => {
+  // Primary: custom JWT issued by /auth/login
+  let token = localStorage.getItem('costloci_token');
+  if (token) return token;
+
+  // Fallback: live Supabase session (handles page refresh, SSO, etc.)
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      // Persist it so the next call is instant
+      localStorage.setItem('costloci_token', session.access_token);
+      return session.access_token;
+    }
+  } catch (_) { /* swallow */ }
+
+  return null;
+};
+
+const getHeaders = async () => {
+  const token = await getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
 };
 
 export const api = {
   get: async (endpoint) => {
     const res = await fetch(`${BASE_URL}${endpoint}`, {
-      headers: getHeaders(),
+      headers: await getHeaders(),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
@@ -29,8 +45,29 @@ export const api = {
   post: async (endpoint, body) => {
     const res = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: await getHeaders(),
       body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  },
+
+  patch: async (endpoint, body) => {
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'PATCH',
+      headers: await getHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  },
+
+  delete: async (endpoint) => {
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers: await getHeaders(),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
@@ -39,11 +76,9 @@ export const api = {
 
   // Special method for multipart/form-data (uploads)
   upload: async (endpoint, formData) => {
-    const token = localStorage.getItem('costloci_token');
+    const token = await getToken();
     const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
@@ -57,5 +92,5 @@ export const api = {
       throw err;
     }
     return data;
-  }
+  },
 };

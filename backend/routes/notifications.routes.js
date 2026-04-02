@@ -15,7 +15,13 @@ router.get('/', authenticateToken, async (req, res) => {
             .order('created_at', { ascending: false })
             .limit(20);
 
-        if (error) throw error;
+        if (error) {
+            if (error.code === 'PGRST116' || error.message.includes('relation "notifications" does not exist')) {
+                console.warn('[Notifications] Table missing, returning empty array.');
+                return res.json({ success: true, count: 0, data: [] });
+            }
+            throw error;
+        }
         res.json({ success: true, count: data.filter(n => !n.is_read).length, data });
     } catch (err) {
         console.error('[Notifications] Fetch error:', err.message);
@@ -28,16 +34,16 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/mark-read', authenticateToken, async (req, res) => {
     try {
         const { id } = req.body;
-        
+
         let query = supabase.from('notifications').update({ is_read: true }).eq('user_id', req.user.id);
-        
+
         if (id) {
             query = query.eq('id', id);
         }
 
         const { error } = await query;
         if (error) throw error;
-        
+
         res.json({ success: true });
     } catch (err) {
         console.error('[Notifications] Mark read error:', err.message);

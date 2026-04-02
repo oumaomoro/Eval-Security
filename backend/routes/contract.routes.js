@@ -21,7 +21,7 @@ const analyzeSchema = z.object({
 
 // File upload configuration
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 }, // default 10MB
   fileFilter: (req, file, cb) => {
@@ -43,30 +43,30 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
     let isOverage = false;
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
-    startOfMonth.setHours(0,0,0,0);
-    
+    startOfMonth.setHours(0, 0, 0, 0);
+
     const { count: monthCount } = await supabase
-       .from('contracts')
-       .select('*', { count: 'exact', head: true })
-       .eq('user_id', req.user.id)
-       .gte('created_at', startOfMonth.toISOString());
-       
+      .from('contracts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', req.user.id)
+      .gte('created_at', startOfMonth.toISOString());
+
     const { data: profile } = await supabase.from('profiles').select('tier').eq('id', req.user.id).single();
     const tier = profile?.tier || 'free';
-    
-    let limit = 5; 
+
+    let limit = 5;
     if (tier === 'pro') limit = 50;
     if (tier === 'enterprise') limit = 999999;
-    
+
     if ((monthCount || 0) >= limit && tier !== 'enterprise') {
-       isOverage = true;
-       console.log(`[Overage] User ${req.user.id} exceeded limit of ${limit}. Proceeding with overage charge.`);
+      isOverage = true;
+      console.log(`[Overage] User ${req.user.id} exceeded limit of ${limit}. Proceeding with overage charge.`);
     }
 
 
 
     // No explicit clientId needed - scoped by user_id
-    
+
     // Extract text from PDF
     // ── SURGICAL RESTORATION: pdf-parse re-enabled with lazy-load protection ────
     const pdfData = await pdf(req.file.buffer);
@@ -77,27 +77,27 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
     let targetLanguage = 'English';
     let customClauses = [];
     try {
-       const { data: ud } = await supabase.auth.admin.getUserById(req.user.id);
-       targetLanguage = ud?.user?.user_metadata?.global_profile?.target_language || 'English';
-       customClauses = ud?.user?.user_metadata?.custom_clauses || [];
-    } catch(err) { console.error('Error fetching global profile language'); }
-    
+      const { data: ud } = await supabase.auth.admin.getUserById(req.user.id);
+      targetLanguage = ud?.user?.user_metadata?.global_profile?.target_language || 'English';
+      customClauses = ud?.user?.user_metadata?.custom_clauses || [];
+    } catch (err) { console.error('Error fetching global profile language'); }
+
     // Pass target language and user context for custom RAG (Phase 18)
     let analysisResults;
-    if (limitCheck.tier === 'enterprise') {
-        analysisResults = await AnalyzerService.analyzeDeep(text, { 
-           targetLanguage,
-           customClauses,
-           userId: req.user.id 
-        });
+    if (tier === 'enterprise') {
+      analysisResults = await AnalyzerService.analyzeDeep(text, {
+        targetLanguage,
+        customClauses,
+        userId: req.user.id
+      });
     } else {
-        analysisResults = await AnalyzerService.analyze(text, { 
-           targetLanguage,
-           customClauses,
-           userId: req.user.id 
-        });
+      analysisResults = await AnalyzerService.analyze(text, {
+        targetLanguage,
+        customClauses,
+        userId: req.user.id
+      });
     }
-    
+
     let contractInsertData = {
       user_id: req.user.id,
       organization_id: req.user.organization_id || null, // Professional MSP isolation
@@ -112,7 +112,7 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
         .insert([contractInsertData])
         .select()
         .single();
-        
+
       if (contractError) throw contractError;
 
       if (isOverage) {
@@ -134,7 +134,7 @@ router.post('/analyze', authenticateToken, requireAnalystOrAdmin, upload.single(
       try {
         const { data: userData } = await supabase.auth.admin.getUserById(req.user.id);
         const webhookUrl = userData?.user?.user_metadata?.webhook_url;
-        
+
         if (webhookUrl) {
           fetch(webhookUrl, {
             method: 'POST',
@@ -176,7 +176,7 @@ router.get('/', authenticateToken, async (req, res) => {
       const query = orgScopedQuery('contracts', req.user);
       const { data: contracts, error } = await query
         .order('created_at', { ascending: false });
-        
+
       if (error) throw error;
       return res.json({ success: true, data: contracts || [], count: contracts?.length || 0 });
     } catch (err) {

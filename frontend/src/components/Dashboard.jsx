@@ -58,9 +58,9 @@ export default function Dashboard() {
   }
 
   const statCards = [
-    { title: 'Portfolio Maturity', value: `${metrics?.maturity_score || 0}%`, icon: ShieldCheck, color: 'text-indigo-600', bg: 'bg-indigo-50', sub: 'Trust Readiness' },
-    { title: 'Predictive ROI (Time)', value: `${analytics?.predictive_roi?.hours_saved || 0} Hours`, icon: Rocket, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: 'Calculated Savings' },
-    { title: 'Capital Saved', value: `$${(analytics?.predictive_roi?.cost_savings_usd || 0).toLocaleString()}`, icon: Banknote, color: 'text-blue-600', bg: 'bg-blue-50', sub: 'AI Cost-Efficiency' },
+    { title: 'Economic Impact', value: `$${(analytics?.executive_roi?.total_economic_impact || 0).toLocaleString()}`, icon: Banknote, color: 'text-indigo-600', bg: 'bg-indigo-50', sub: 'Total Savings + Risk' },
+    { title: 'Compliance Health', value: `${analytics?.compliance_health?.current_score || 0}%`, icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50', sub: `vs ${analytics?.compliance_health?.benchmark || 75}% Segment` },
+    { title: 'Hours Liberated', value: `${Math.round(analytics?.executive_roi?.hours_liberated || 0)} hrs`, icon: Rocket, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: 'Legal Review Savings' },
     { title: 'Mitigated Exposure', value: `$${(analytics?.total_mitigated_exposure || 0).toLocaleString()}`, icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-50', sub: 'Critical Gaps Resolved' }
   ]
 
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
       opacity: 1,
       transition: { staggerChildren: 0.1 }
     }
@@ -87,7 +87,7 @@ export default function Dashboard() {
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial="hidden"
       animate="visible"
       variants={containerVariants}
@@ -105,7 +105,7 @@ export default function Dashboard() {
           </h1>
           <p className="text-slate-500 mt-1">Welcome back. Here's a summary of your automated contract analyses.</p>
         </motion.div>
-        
+
         {/* Tier Usage Card */}
         <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 shadow-sm min-w-[280px]">
           <div className="flex items-center justify-between mb-2">
@@ -113,13 +113,13 @@ export default function Dashboard() {
             <span className="text-xs font-bold text-slate-900 dark:text-white">{usageCount} / {currentLimit === 9999 ? '∞' : currentLimit}</span>
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
-            <div 
+            <div
               className={`h-full transition-all duration-1000 ${usagePercent > 80 ? 'bg-rose-500' : 'bg-blue-600'}`}
               style={{ width: `${usagePercent}%` }}
             ></div>
           </div>
           {usagePercent >= 80 && currentLimit !== 9999 && (
-            <button 
+            <button
               onClick={() => window.location.href = '/billing'}
               className="w-full py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-bold rounded-lg border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center gap-1"
             >
@@ -133,7 +133,7 @@ export default function Dashboard() {
         <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-12 text-center relative overflow-hidden shadow-xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-          
+
           <div className="relative z-10 max-w-2xl mx-auto">
             <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-8 shadow-inner animate-float">
               <Rocket size={40} />
@@ -142,22 +142,22 @@ export default function Dashboard() {
             <p className="text-slate-500 dark:text-slate-400 text-lg mb-10 leading-relaxed">
               Upload your first vendor agreement to unlock predictive ROI analytics, regional risk heatmaps, and automated legal redlining aligned with IRA and CMA standards.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button 
-                onClick={() => window.location.href = '/upload'}
+              <button
+                onClick={() => navigate('/upload')}
                 className="w-full sm:w-auto px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-2 animate-pulse-glow"
               >
                 <Plus size={20} /> Analyze First Contract
               </button>
-              <button 
-                onClick={() => window.location.href = '/gold-standard'}
+              <button
+                onClick={() => navigate('/gold-standard')}
                 className="w-full sm:w-auto px-10 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:scale-105"
               >
                 Explore Legal Library
               </button>
             </div>
-            
+
             <div className="mt-12 flex items-center justify-center gap-8 grayscale opacity-50">
               <div className="flex items-center gap-2">
                 <ShieldCheck size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">IRA Ready</span>
@@ -175,19 +175,28 @@ export default function Dashboard() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {statCards.map((stat, i) => (
-              <motion.div 
-                key={i} 
+              <motion.div
+                key={i}
                 variants={itemVariants}
-                whileHover={{ scale: 1.02, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}
-                className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 hover:border-blue-500/20 transition-all group relative overflow-hidden"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                whileHover={{
+                  scale: 1.02,
+                  boxShadow: '0 25px 30px -10px rgba(0, 0, 0, 0.15)',
+                  borderColor: 'rgba(59, 130, 246, 0.3)'
+                }}
+                className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 transition-all group relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-blue-500/10 transition-colors"></div>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${stat.bg} dark:bg-opacity-10 backdrop-blur-sm`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${stat.bg} dark:bg-opacity-10 backdrop-blur-sm shadow-sm ring-1 ring-black/5 group-hover:scale-110 transition-transform duration-500`}>
                   <stat.icon className={`h-6 w-6 ${stat.color} dark:opacity-80`} strokeWidth={2.5} />
                 </div>
-                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">{stat.title}</h3>
-                <p className="text-3xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">{stat.value}</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1 font-medium">
+                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">{stat.title}</h3>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{stat.value}</p>
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1 font-black uppercase tracking-tight">
                   <TrendingUp size={10} className="text-emerald-500" /> {stat.sub}
                 </p>
               </motion.div>
@@ -208,21 +217,21 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="h-64 flex items-end justify-between gap-2 px-4 mb-4">
                 {(metrics?.risk_trend || [40, 45, 52, 58, 65, 75, 84]).map((val, i) => (
                   <div key={i} className="flex-1 group relative">
-                    <div 
-                       className="w-full bg-blue-600/10 dark:bg-blue-400/5 group-hover:bg-blue-600/20 rounded-t-lg transition-all duration-1000 origin-bottom"
-                       style={{ height: `${val}%`, minHeight: '10%' }}
+                    <div
+                      className="w-full bg-blue-600/10 dark:bg-blue-400/5 group-hover:bg-blue-600/20 rounded-t-lg transition-all duration-1000 origin-bottom"
+                      style={{ height: `${val}%`, minHeight: '10%' }}
                     >
-                      <div 
+                      <div
                         className="absolute top-0 left-1/2 -translate-x-1/2 -mt-8 opacity-0 group-hover:opacity-100 bg-slate-900 text-white text-[10px] px-2 py-1 rounded-md transition-all shadow-xl font-bold"
                       >
                         {val}%
                       </div>
                     </div>
-                    <div className="mt-3 text-[10px] font-bold text-slate-400 text-center uppercase tracking-tighter">B-{i+1}</div>
+                    <div className="mt-3 text-[10px] font-bold text-slate-400 text-center uppercase tracking-tighter">B-{i + 1}</div>
                   </div>
                 ))}
               </div>
@@ -249,7 +258,7 @@ export default function Dashboard() {
                         <span>{readiness.val}%</span>
                       </div>
                       <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full transition-all duration-1000"
                           style={{ width: `${readiness.val}%` }}
                         ></div>

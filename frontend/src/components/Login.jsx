@@ -11,7 +11,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
   // Handle ?signup=true URL parameter for landing page deep-links
@@ -149,19 +149,33 @@ export default function Login() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + '/dashboard' } });
-                  } catch (err) { setError(err.message); }
-                }}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all mt-4"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                Sign in with Google
-              </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                setLoading(true)
+                await signInWithGoogle()
+              } catch (err) {
+                setError(err.message)
+              } finally {
+                setLoading(false)
+              }
+            }}
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all mt-4 shadow-sm"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+            {isLogin ? 'Sign in with Google' : 'Sign up with Google'}
+          </button>
             </form>
+
+          <div className="mt-6 flex items-center justify-center gap-4 py-2 px-4 rounded-xl bg-slate-50/50 border border-slate-100">
+            <div className="flex -space-x-2">
+               <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-white">✓</div>
+               <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-white">S2</div>
+               <div className="w-6 h-6 rounded-full bg-slate-400 flex items-center justify-center text-[10px] text-white font-bold border-2 border-white">GD</div>
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Grade Security & Compliance</span>
+          </div>
 
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Demo Access</p>

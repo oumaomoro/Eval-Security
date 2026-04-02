@@ -29,7 +29,7 @@ export const authenticateToken = async (req, res, next) => {
   if (isSupabaseConfigured()) {
     try {
       const { data: { user: sbUser }, error: sbError } = await supabase.auth.getUser(token);
-      
+
       if (!sbError && sbUser) {
         // Enforce Email Verification strictly at the middleware level
         if (!sbUser.email_confirmed_at) {
@@ -50,7 +50,7 @@ export const authenticateToken = async (req, res, next) => {
             .select('role, organization_id')
             .eq('id', sbUser.id)
             .single();
-            
+
           if (profile) {
             req.user.role = profile.role || req.user.role;
             req.user.organization_id = profile.organization_id || req.user.organization_id;
@@ -66,9 +66,30 @@ export const authenticateToken = async (req, res, next) => {
     }
   }
 
-  return res.status(403).json({ 
-    error: 'Access Forbidden', 
-    message: 'Invalid or expired security token. Please sign in again.' 
+  // ── Fallback: Legacy Custom JWT Verification ─────────────────────────────
+  // Our /auth/login issues custom JWTs signed with JWT_SECRET.
+  // This fallback ensures they also pass the middleware.
+  try {
+    const decoded = jwt.verify(token, LEGACY_JWT_SECRET);
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role || 'user',
+      tier: decoded.tier || 'free',
+      organization_id: decoded.organization_id || null
+    };
+    return next();
+  } catch (legacyErr) {
+    console.error('[auth-debug] Legacy JWT Verification Failed:', legacyErr.message);
+    console.error('[auth-debug] Token received (first 20 chars):', token.substring(0, 20));
+    console.error('[auth-debug] Using Secret:', LEGACY_JWT_SECRET);
+    // Token is invalid under both systems
+  }
+
+
+  return res.status(403).json({
+    error: 'Access Forbidden',
+    message: 'Invalid or expired security token. Please sign in again.'
   });
 };
 
@@ -100,9 +121,9 @@ export const requireEnterprisePlan = async (req, res, next) => {
       console.error('[auth] Profile plan fetch error:', dbErr);
     }
   }
-  return res.status(403).json({ 
-    error: 'Enterprise Subscription Required', 
-    message: 'This high-token synthesis feature is restricted to Enterprise partners. Please upgrade to unlock.' 
+  return res.status(403).json({
+    error: 'Enterprise Subscription Required',
+    message: 'This high-token synthesis feature is restricted to Enterprise partners. Please upgrade to unlock.'
   });
 };
 
@@ -121,14 +142,14 @@ export const checkContractLimit = async (userId) => {
     if (tier === 'enterprise') return { allowed: true, limit: Infinity, tier };
     if (tier === 'professional' || tier === 'pro') return { allowed: true, limit: 50, tier };
     if (tier === 'starter') return { allowed: true, limit: 10, tier };
-    
+
     // Check 14-day Free Trial
     if (profile.trial_end && new Date(profile.trial_end) > new Date()) {
       return { allowed: true, limit: 5, isTrial: true, tier: 'trial' };
     }
 
     // Default Free Tier (after trial expires or no sub)
-    return { allowed: true, limit: 2, tier: 'expired' }; 
+    return { allowed: true, limit: 2, tier: 'expired' };
   } catch (dbErr) {
     console.error('[auth] Profile limit fetch error:', dbErr);
     return { allowed: true, limit: 5 }; // Fallback

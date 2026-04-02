@@ -119,5 +119,37 @@ export const PASSWORD_RESET_TEMPLATE = (resetLink) => `
   </div>
 </body>
 </html>
+\`;
+
+export const DPO_ALERTS_TEMPLATE = (dpoName, contractVendor, riskLevel, actionRequired) => \`
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: 'Inter', sans-serif; color: #1e293b; line-height: 1.6; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; }
+    .header { background-color: #f1f5f9; padding: 15px; border-radius: 8px 8px 0 0; border-bottom: 2px solid #3b82f6; }
+    .risk-high { color: #dc2626; font-weight: bold; }
+    .button { background-color: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="margin:0; color: #1e293b;">Compliance Alert: DPO Review Required</h2>
+    </div>
+    <p>Hi \${dpoName || 'DPO Officer'},</p>
+    <p>A new high-risk priority has been flagged that requires your regulatory oversight.</p>
+    <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Vendor:</strong> \${contractVendor}</p>
+      <p><strong>Risk Level:</strong> <span class="risk-high">\${riskLevel}</span></p>
+      <p><strong>Action Required:</strong> \${actionRequired}</p>
+    </div>
+    <p>Please log in to the Costloci Compliance Center to review the full clause mapping and initiate remediation.</p>
+    <a href="https://costloci.com/compliance" class="button">Access Compliance Center</a>
+    <p style="margin-top: 30px; font-size: 12px; color: #94a3b8;">This is an automated governance notification from Costloci Enterprise.</p>
+  </div>
+</body>
+</html>
 `;
 

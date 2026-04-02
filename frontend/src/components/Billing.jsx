@@ -12,15 +12,16 @@ import { api } from '../utils/api'
 
 /* ─── Plan metadata ─────────────────────────────────────── */
 const PLAN_META = {
-  Starter:      { Icon: Shield,  accent: 'slate',  badge: null },
-  Professional: { Icon: Star,    accent: 'blue',   badge: 'Most Popular' },
-  Enterprise:   { Icon: Crown,   accent: 'violet', badge: 'Best Value' },
+  Starter: { Icon: Shield, accent: 'slate', badge: null },
+  Professional: { Icon: Star, accent: 'blue', badge: 'Most Popular' },
+  Enterprise: { Icon: Crown, accent: 'violet', badge: 'Best Value' },
+  'API Access': { Icon: Zap, accent: 'indigo', badge: 'Devs Choice' },
 }
 
 /* ─── Small helpers ─────────────────────────────────────── */
 function StatusBanner({ type, children }) {
   const styles = {
-    error:   'bg-rose-50 border-rose-200 text-rose-800',
+    error: 'bg-rose-50 border-rose-200 text-rose-800',
     success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
     loading: 'bg-blue-50 border-blue-200 text-blue-800',
   }
@@ -36,19 +37,19 @@ function StatusBanner({ type, children }) {
 
 /* ─── Main component ────────────────────────────────────── */
 export default function Billing() {
-  const [plans, setPlans]             = useState([])
-  const [currentSub, setCurrentSub]   = useState(null)
-  const [loading, setLoading]         = useState(true)
+  const [plans, setPlans] = useState([])
+  const [currentSub, setCurrentSub] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [checkingOut, setCheckingOut] = useState(null)   // plan.id being processed
-  const [capturing, setCapturing]     = useState(false)
-  const [banner, setBanner]           = useState(null)   // { type, text }
-  const [gateway, setGateway]         = useState('paypal') // 'paypal' | 'paystack'
+  const [capturing, setCapturing] = useState(false)
+  const [banner, setBanner] = useState(null)   // { type, text }
+  const [gateway, setGateway] = useState('paypal') // 'paypal' | 'paystack'
   const [billingInterval, setBillingInterval] = useState('month') // 'month' | 'year'
   const location = useLocation()
   const navigate = useNavigate()
 
   const { user, refreshUser } = useAuth()
-  
+
   /* ── Load plans & subscription status ── */
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -152,13 +153,13 @@ export default function Billing() {
         <div className="h-10 w-64 bg-slate-100 rounded-xl animate-pulse mx-auto mb-3" />
         <div className="h-5 w-96 bg-slate-100 rounded-lg animate-pulse mx-auto mb-12" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map(i => (
             <div key={i} className="rounded-2xl border border-slate-100 p-6 bg-white space-y-4 animate-pulse">
               <div className="w-12 h-12 bg-slate-100 rounded-xl" />
               <div className="h-5 w-32 bg-slate-100 rounded" />
               <div className="h-10 w-24 bg-slate-100 rounded" />
               <div className="space-y-2">
-                {[1,2,3,4].map(j => <div key={j} className="h-3 bg-slate-100 rounded w-4/5" />)}
+                {[1, 2, 3, 4].map(j => <div key={j} className="h-3 bg-slate-100 rounded w-4/5" />)}
               </div>
               <div className="h-11 bg-slate-100 rounded-xl" />
             </div>
@@ -209,13 +210,13 @@ export default function Billing() {
 
         {/* Gateway Selector (Regional Solidity) */}
         <div className="inline-flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner mb-6">
-          <button 
+          <button
             onClick={() => setGateway('paypal')}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${gateway === 'paypal' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <CreditCard size={16} /> Global (PayPal)
           </button>
-          <button 
+          <button
             onClick={() => setGateway('paystack')}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${gateway === 'paystack' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
           >
@@ -258,10 +259,10 @@ export default function Billing() {
           const isCurrentPlan = currentSub?.plan === plan.name
           const isBusy = checkingOut === plan.id
 
-          const accentBg     = isHighlight ? `bg-${accent}-600`  : 'bg-white'
-          const accentText   = isHighlight ? 'text-white'         : `text-${accent}-700`
+          const accentBg = isHighlight ? `bg-${accent}-600` : 'bg-white'
+          const accentText = isHighlight ? 'text-white' : `text-${accent}-700`
           const accentBorder = isHighlight ? `border-${accent}-300` : 'border-slate-200'
-          const btnClass     = isCurrentPlan
+          const btnClass = isCurrentPlan
             ? 'bg-emerald-100 text-emerald-700 cursor-default'
             : isHighlight
               ? `bg-${accent}-600 text-white hover:bg-${accent}-700 shadow-lg shadow-${accent}-200`
@@ -270,11 +271,10 @@ export default function Billing() {
           return (
             <div
               key={plan.id}
-              className={`relative rounded-3xl border ${accentBorder} p-7 flex flex-col transition-all duration-300 bg-white ${
-                isHighlight
+              className={`relative rounded-3xl border ${accentBorder} p-7 flex flex-col transition-all duration-300 bg-white ${isHighlight
                   ? `shadow-2xl shadow-${accent}-100 ring-2 ring-${accent}-400 ring-offset-2 scale-[1.03]`
                   : 'shadow-sm hover:shadow-lg hover:-translate-y-0.5'
-              }`}
+                }`}
             >
               {badge && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
@@ -322,14 +322,14 @@ export default function Billing() {
                 disabled={isCurrentPlan || !!checkingOut}
                 className={`w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${btnClass} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
-                 {isBusy ? (
+                {isBusy ? (
                   <><Loader size={16} className="animate-spin" /> Processing…</>
                 ) : isCurrentPlan ? (
                   <><CheckCircle size={16} /> Current Plan</>
                 ) : (
                   <>
-                    <CreditCard size={16} /> 
-                    {gateway === 'paypal' ? 'Pay with PayPal' : 'Secure Paystack Checkout'} 
+                    <CreditCard size={16} />
+                    {gateway === 'paypal' ? 'Pay with PayPal' : 'Secure Paystack Checkout'}
                     <ArrowRight size={14} />
                   </>
                 )}

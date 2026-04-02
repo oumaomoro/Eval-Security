@@ -118,9 +118,25 @@ router.post('/webhook', async (req, res) => {
   // Fallback payload checking if verification passes or is bypassed during dev mock tests
   const id = payload.id || payload?.data?.email_id;
   const from = payload.from || payload?.data?.from;
+  const to = payload.to || payload?.data?.to || [];
   const subject = payload.subject || payload?.data?.subject || 'Email Ingestion';
   const originalMessageId = payload?.data?.message_id || id;
   
+  // Custom contact form forwarding logic
+  const toArray = Array.isArray(to) ? to : [to];
+  const isContactEmail = toArray.some(e => typeof e === 'string' && e.toLowerCase().includes('contact@costloci.com'));
+  if (isContactEmail) {
+      console.log('[EmailBridge] Contact Email Detected. Forwarding to costloci1@gmail.com');
+      const emailContent = payload?.text || payload?.data?.text || 'No text content provided.';
+      await resend.emails.send({
+        from: 'Costloci Alerts <alerts@costloci.com>',
+        to: 'costloci1@gmail.com',
+        subject: `FWD: ${subject}`,
+        html: `<p><strong>From:</strong> ${from}</p><hr/><p>${emailContent}</p>`
+      });
+      return res.status(200).send('Contact email forwarded');
+  }
+
   if (!id && !originalMessageId) {
       console.warn('[EmailBridge] Skipping malformed webhook structure.');
       return res.status(200).send('OK');

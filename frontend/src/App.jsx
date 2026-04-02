@@ -25,6 +25,7 @@ import ForgotPassword from './components/ForgotPassword'
 import ResetPassword from './components/ResetPassword'
 import VerifyEmail from './components/VerifyEmail'
 import WordTaskpane from './components/WordTaskpane'
+import GoldStandard from './components/GoldStandard'
 
 function App() {
   return (
@@ -74,6 +75,7 @@ function AppContent() {
         <Route path="/admin" element={user ? <Layout><AdminDashboard /></Layout> : <Navigate to="/login" />} />
         <Route path="/admin/billing" element={user ? <Layout><AdminBilling /></Layout> : <Navigate to="/login" />} />
         <Route path="/addin" element={<WordTaskpane />} />
+        <Route path="/gold-standard" element={<GoldStandard />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

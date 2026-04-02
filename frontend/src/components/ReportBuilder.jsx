@@ -30,7 +30,7 @@ export default function ReportBuilder({ templateId, onSave }) {
       .select('scope')
       .eq('id', templateId)
       .single();
-    
+
     if (report?.scope) {
       setLayout(report.scope.layout || []);
       setWidgets(report.scope.widgets || []);
@@ -40,12 +40,12 @@ export default function ReportBuilder({ templateId, onSave }) {
   const addWidget = (type) => {
     const id = `widget-${Date.now()}`;
     const newWidget = { id, type: type.id, label: type.label };
-    const newLayoutItem = { 
-      i: id, 
-      x: (layout.length * 2) % 12, 
-      y: Infinity, 
-      w: type.minW, 
-      h: type.minH 
+    const newLayoutItem = {
+      i: id,
+      x: (layout.length * 2) % 12,
+      y: Infinity,
+      w: type.minW,
+      h: type.minH
     };
 
     setWidgets([...widgets, newWidget]);
@@ -110,7 +110,7 @@ export default function ReportBuilder({ templateId, onSave }) {
               <p className="text-sm text-slate-400 mt-1 font-inter">Drag and resize widgets to create your intelligence dashboard.</p>
             </div>
             <div className="flex gap-4">
-               {/* Controls if needed */}
+              {/* Controls if needed */}
             </div>
           </div>
 
@@ -126,26 +126,29 @@ export default function ReportBuilder({ templateId, onSave }) {
                 onLayoutChange={(currentLayout) => setLayout(currentLayout)}
                 draggableHandle=".widget-handle"
               >
-                {widgets.map(widget => (
-                  <div key={widget.id} className="group relative bg-slate-900 border border-white/5 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl">
-                    <div className="widget-handle absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4 bg-slate-800/80 cursor-move opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{widget.label}</span>
-                      <button onClick={() => removeWidget(widget.id)} className="p-1 hover:text-rose-400">
-                        <Trash2 size={14} />
-                      </button>
+                {widgets.map(widget => {
+                  const Icon = WIDGET_TYPES.find(t => t.id === widget.type)?.icon;
+                  return (
+                    <div key={widget.id} className="group relative bg-slate-900 border border-white/5 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl">
+                      <div className="widget-handle absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4 bg-slate-800/80 cursor-move opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{widget.label}</span>
+                        <button onClick={() => removeWidget(widget.id)} className="p-1 hover:text-rose-400">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-3 pt-4">
+                        <div className="w-16 h-16 rounded-full bg-slate-800/50 border border-white/5 flex items-center justify-center">
+                          {Icon && <Icon size={24} />}
+                        </div>
+                        <p className="text-xs font-inter font-medium uppercase tracking-tight">Live Preview Pending</p>
+                      </div>
                     </div>
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-3 pt-4">
-                       <div className="w-16 h-16 rounded-full bg-slate-800/50 border border-white/5 flex items-center justify-center">
-                         {WIDGET_TYPES.find(t => t.id === widget.type)?.icon({ size: 24 })}
-                       </div>
-                       <p className="text-xs font-inter font-medium uppercase tracking-tight">Live Preview Pending</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </ResponsiveGridLayout>
             )}
           </div>
-          
+
           {widgets.length === 0 && (
             <div className="h-[500px] border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-slate-600 gap-4">
               <Maximize2 size={48} className="opacity-20 translate-y-2" />

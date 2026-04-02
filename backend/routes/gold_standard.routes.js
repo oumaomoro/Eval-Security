@@ -24,7 +24,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { standard_name, clause_category, clause_text } = req.body;
-    
+
     if (!standard_name || !clause_category || !clause_text) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -41,9 +41,48 @@ router.post('/', authenticateToken, async (req, res) => {
       }])
       .select()
       .single();
-    
+
     if (error) throw error;
     return res.json({ success: true, data, message: 'Gold Standard clause added with embedding.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/gold-standard/sync - Pre-warm embeddings for seeded clauses
+// High-tech utility to ensure RAG is "instant-on" without waiting for first analysis.
+router.post('/sync', authenticateToken, async (req, res) => {
+  try {
+    const { data: missing, error: fetchError } = await supabase
+      .from('gold_standard_clauses')
+      .select('*')
+      .is('embedding', null);
+
+    if (fetchError) throw fetchError;
+    if (!missing || missing.length === 0) {
+      return res.json({ success: true, message: 'All gold standards are already embedded.' });
+    }
+
+    console.log(`[RAG-Sync] Pre-warming ${missing.length} embeddings...`);
+    const results = [];
+
+    for (const clause of missing) {
+      try {
+        const embedding = await generateEmbedding(clause.clause_text);
+        const { error: updateError } = await supabase
+          .from('gold_standard_clauses')
+          .update({ embedding })
+          .eq('id', clause.id);
+
+        if (updateError) throw updateError;
+        results.push({ id: clause.id, status: 'synced' });
+      } catch (err) {
+        console.error(`[RAG-Sync] Failed for ${clause.id}:`, err.message);
+        results.push({ id: clause.id, status: 'failed', error: err.message });
+      }
+    }
+
+    return res.json({ success: true, synced: results.filter(r => r.status === 'synced').length, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

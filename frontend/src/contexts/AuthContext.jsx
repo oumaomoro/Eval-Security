@@ -59,29 +59,58 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const refreshUser = async () => {
-    const token = localStorage.getItem('costloci_token')
-    if (!token) return
-
     try {
+      let token = localStorage.getItem('costloci_token')
+      let sessionUser = null
+
+      if (!token) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          setUser(null)
+          setLoading(false)
+          return
+        }
+        token = session.access_token
+        sessionUser = session.user
+        localStorage.setItem('costloci_token', token)
+      } else {
+        // Even if we have a token, we need a base user object for route guards
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) sessionUser = session.user
+      }
+
+      // Proactively set user info so route guards (user ? <App/> : <Login/>) don't bounce the user
+      // while we're fetching high-latency metadata like billing/tier.
+      if (sessionUser) {
+        setUser(prev => prev || sessionUser)
+      }
+
       const res = await fetch(`${import.meta.env.VITE_API_URL}/billing/status`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
-      const { data } = await res.json()
-      if (data) {
-        setUser(prev => ({
-          ...prev,
-          tier: data.tier,
-          plan: data.plan,
-          email: prev?.email || data.email
-        }))
-        // Seed telemetry profiling
-        identifyUser(
-          { id: data?.user?.id || data?.id || 'unknown', email: data.email }, 
-          data
-        )
+
+      if (res.ok) {
+        const { data } = await res.json()
+        if (data) {
+          setUser(prev => ({
+            ...sessionUser,
+            ...prev,
+            id: data.user?.id || data.id || sessionUser?.id,
+            tier: data.tier,
+            plan: data.plan,
+            email: data.email || sessionUser?.email || prev?.email
+          }))
+          identifyUser(
+            { id: data?.user?.id || data?.id || sessionUser?.id || 'unknown', email: data.email || sessionUser?.email },
+            data
+          )
+        }
+      } else {
+        console.warn(`Billing status returned ${res.status}. Proceeding with session-only user.`);
       }
     } catch (err) {
       console.error('Failed to refresh user data:', err)
+      // Keep session alive even if billing check fails
     } finally {
       setLoading(false)
     }
@@ -89,33 +118,29 @@ export const AuthProvider = ({ children }) => {
 
   const signUp = async (email, password) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api.costloci.com/api';
+      const res = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
-      
-      if (data.requiresVerification) {
-        return data; // Return directly if verification needed, don't set user session locally
-      }
 
-      localStorage.setItem('costloci_token', data.token)
-      setUser(data.user)
+      if (data.token) {
+        localStorage.setItem('costloci_token', data.token)
+        setUser(data.user)
+      }
       return data
     } catch (err) {
-      console.warn('API registration failed, checking Supabase...', err.message)
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) throw error
-      
-      if (!data.session) {
-        return { requiresVerification: true, message: 'Please check your email.' };
+      console.error('[AuthContext] Registration failed:', err.message);
+      // Only fall back if specifically needed for local development, but in prod we want the backend to handle it
+      if (import.meta.env.DEV) {
+        const { data, error } = await supabase.auth.signUp({ email, password })
+        if (error) throw error
+        return data
       }
-
-      localStorage.setItem('costloci_token', data.session.access_token)
-      setUser(data.user)
-      return data
+      throw err;
     }
   }
 
@@ -128,34 +153,54 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       })
       const data = await res.json()
-      
+
       if (!res.ok) {
         if (data.requiresVerification) {
-           throw new Error('EMAIL_NOT_CONFIRMED');
+          throw new Error('EMAIL_NOT_CONFIRMED');
         }
         throw new Error(data.error || 'Login failed')
       }
-      
+
       // Store token for subsequent API calls
       localStorage.setItem('costloci_token', data.token)
       setUser(data.user)
-      
+
       // Initialize unified analytics profile
       identifyUser(data.user, data.user)
-      
+
       return data
     } catch (err) {
       if (err.message === 'EMAIL_NOT_CONFIRMED') throw err;
-      
+
       console.warn('API login failed, checking Supabase...', err.message)
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
-         if (error.message.includes('Email not confirmed')) throw new Error('EMAIL_NOT_CONFIRMED');
-         throw error;
+        if (error.message.includes('Email not confirmed')) throw new Error('EMAIL_NOT_CONFIRMED');
+        throw error;
       }
       if (data.session) localStorage.setItem('costloci_token', data.session.access_token)
       setUser(data.user)
       return data
+    }
+  }
+
+  const signInWithGoogle = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+      if (error) throw error
+      return data
+    } catch (err) {
+      console.error('[AuthContext] Google SSO failed:', err.message)
+      throw err
     }
   }
 
@@ -171,6 +216,7 @@ export const AuthProvider = ({ children }) => {
     token: localStorage.getItem('costloci_token'),
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     refreshUser,
     loading

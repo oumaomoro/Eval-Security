@@ -87,8 +87,8 @@ async function performFulfillment(user, planTier, supabase, isSupabaseConfigured
   try {
     const { error: dbErr } = await supabase
       .from('profiles')
-      .update({ 
-        tier: targetTier, 
+      .update({
+        tier: targetTier,
         upgraded_at: new Date().toISOString(),
         trial_used: true
       })
@@ -124,27 +124,27 @@ router.post('/create-order', authenticateToken, async (req, res) => {
 
     // ── STRIPE FLOW ──────────────────────────────────────────────────────────
     if (stripe) {
-       console.log(`[billing] Creating Stripe Session for ${plan.name} (${interval})`);
-       
-       let stripePriceId;
-       if (planId === 'starter') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_STARTER_YEAR : process.env.STRIPE_PRICE_STARTER_MONTH;
-       else if (planId === 'pro') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_PRO_YEAR : process.env.STRIPE_PRICE_PRO_MONTH;
-       else if (planId === 'enterprise') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_ENTERPRISE_YEAR : process.env.STRIPE_PRICE_ENTERPRISE_MONTH;
-       else if (planId === 'api') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_API_YEAR : process.env.STRIPE_PRICE_API_MONTH;
+      console.log(`[billing] Creating Stripe Session for ${plan.name} (${interval})`);
 
-       if (stripePriceId) {
-         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            mode: 'subscription',
-            customer_email: req.user.email,
-            client_reference_id: req.user.id,
-            line_items: [{ price: stripePriceId, quantity: 1 }],
-            success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${frontendUrl}/billing?cancelled=1`
-         });
-         return res.json({ success: true, approval_url: session.url });
-       }
-       console.warn(`[billing] Stripe configured but no price ID found for ${planId} (${interval}). Falling back to regular intent/paypal.`);
+      let stripePriceId;
+      if (planId === 'starter') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_STARTER_YEAR : process.env.STRIPE_PRICE_STARTER_MONTH;
+      else if (planId === 'pro') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_PRO_YEAR : process.env.STRIPE_PRICE_PRO_MONTH;
+      else if (planId === 'enterprise') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_ENTERPRISE_YEAR : process.env.STRIPE_PRICE_ENTERPRISE_MONTH;
+      else if (planId === 'api') stripePriceId = interval === 'year' ? process.env.STRIPE_PRICE_API_YEAR : process.env.STRIPE_PRICE_API_MONTH;
+
+      if (stripePriceId) {
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          mode: 'subscription',
+          customer_email: req.user.email,
+          client_reference_id: req.user.id,
+          line_items: [{ price: stripePriceId, quantity: 1 }],
+          success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${frontendUrl}/billing?cancelled=1`
+        });
+        return res.json({ success: true, approval_url: session.url });
+      }
+      console.warn(`[billing] Stripe configured but no price ID found for ${planId} (${interval}). Falling back to regular intent/paypal.`);
     }
 
     // ── MOCK/SAFEGUARD FLOW ──────────────────────────────────────────────────
@@ -153,7 +153,7 @@ router.post('/create-order', authenticateToken, async (req, res) => {
         console.error('[billing] CRITICAL: Payment credentials missing in production environment.');
         return res.status(500).json({ error: 'Payment gateway is currently unavailable.' });
       }
-      
+
       console.warn('[billing] Credentials missing (Dev Mode) — returning mock order');
       const mockOrderId = `MOCK-${Date.now()}`;
       return res.json({
@@ -170,26 +170,26 @@ router.post('/create-order', authenticateToken, async (req, res) => {
 
     // ── PAYSTACK FLOW (PROVISION) ──────────────────────────────────────────
     if (planId && process.env.PAYSTACK_SECRET_KEY) {
-       console.log(`[billing] Initializing Paystack for ${plan.name}`);
-       const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
-         method: 'POST',
-         headers: {
-           'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-           'Content-Type': 'application/json'
-         },
-         body: JSON.stringify({
-           email: req.user.email,
-           amount: Math.round(finalPrice * 100), // Paystack expects kobo/cents
-           currency: plan.currency === 'KES' ? 'KES' : 'USD', // Support regional currency
-           metadata: { user_id: req.user.id, tier: plan.tier, plan_id: plan.id },
-           callback_url: `${frontendUrl}/billing/success`
-         })
-       });
-       
-       const paystackData = await paystackRes.json();
-       if (paystackData.status) {
-         return res.json({ success: true, approval_url: paystackData.data.authorization_url, reference: paystackData.data.reference });
-       }
+      console.log(`[billing] Initializing Paystack for ${plan.name}`);
+      const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: req.user.email,
+          amount: Math.round(finalPrice * 100), // Paystack expects kobo/cents
+          currency: plan.currency === 'KES' ? 'KES' : 'USD', // Support regional currency
+          metadata: { user_id: req.user.id, tier: plan.tier, plan_id: plan.id },
+          callback_url: `${frontendUrl}/billing/success`
+        })
+      });
+
+      const paystackData = await paystackRes.json();
+      if (paystackData.status) {
+        return res.json({ success: true, approval_url: paystackData.data.authorization_url, reference: paystackData.data.reference });
+      }
     }
 
     // ── REAL PAYPAL FLOW ────────────────────────────────────────────────────
@@ -199,49 +199,57 @@ router.post('/create-order', authenticateToken, async (req, res) => {
     }
 
     const envKey = `PAYPAL_PLAN_${plan.id.toUpperCase()}_${interval.toUpperCase()}`;
-    const paypalPlanId = process.env[envKey] || process.env.PAYPAL_PLAN_PRO_MONTH;
+    const paypalPlanId = process.env[envKey];
+
+    if (!paypalPlanId && process.env.NODE_ENV === 'production') {
+      console.error(`[billing] CRITICAL: Missing PayPal Plan ID for ${envKey}`);
+      return res.status(500).json({ error: `Payment plan configuration for ${plan.name} is missing. Please contact support.` });
+    }
+
+    // Fallback only for non-production environments to allow testing
+    const finalPaypalId = paypalPlanId || process.env.PAYPAL_PLAN_PRO_MONTH;
 
     const { data: profile } = await supabase.from('profiles').select('paypal_subscription_id').eq('id', req.user.id).single();
     if (profile?.paypal_subscription_id) {
-       console.log(`[billing] Revising existing PayPal subscription ${profile.paypal_subscription_id} to plan ${paypalPlanId}`);
-       const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions/${profile.paypal_subscription_id}/revise`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            plan_id: paypalPlanId
-          })
-       });
-       const reviseData = await ppRes.json();
-       if (!ppRes.ok) return res.status(ppRes.status).json({ error: 'PayPal revision failed', details: reviseData });
-       const approvalLink = reviseData.links?.find(l => l.rel === 'approve');
-       return res.json({ success: true, order_id: profile.paypal_subscription_id, data: reviseData, approval_url: approvalLink?.href });
+      console.log(`[billing] Revising existing PayPal subscription ${profile.paypal_subscription_id} to plan ${paypalPlanId}`);
+      const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions/${profile.paypal_subscription_id}/revise`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan_id: finalPaypalId
+        })
+      });
+      const reviseData = await ppRes.json();
+      if (!ppRes.ok) return res.status(ppRes.status).json({ error: 'PayPal revision failed', details: reviseData });
+      const approvalLink = reviseData.links?.find(l => l.rel === 'approve');
+      return res.json({ success: true, order_id: profile.paypal_subscription_id, data: reviseData, approval_url: approvalLink?.href });
     } else {
-       console.log(`[billing] Creating new PayPal subscription for plan '${plan.name}'`);
-       const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            plan_id: paypalPlanId,
-            custom_id: req.user.id,
-            application_context: {
-              brand_name: 'Costloci',
-              shipping_preference: 'NO_SHIPPING',
-              user_action: 'SUBSCRIBE_NOW',
-              return_url: `${frontendUrl}/billing/success`,
-              cancel_url: `${frontendUrl}/billing?cancelled=1`
-            }
-          })
-       });
-       const subData = await ppRes.json();
-       if (!ppRes.ok) return res.status(ppRes.status).json({ error: 'PayPal subscription failed', details: subData });
-       const approvalLink = subData.links?.find(l => l.rel === 'approve');
-       return res.json({ success: true, order_id: subData.id, data: subData, approval_url: approvalLink?.href });
+      console.log(`[billing] Creating new PayPal subscription for plan '${plan.name}'`);
+      const ppRes = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan_id: finalPaypalId,
+          custom_id: req.user.id,
+          application_context: {
+            brand_name: 'Costloci',
+            shipping_preference: 'NO_SHIPPING',
+            user_action: 'SUBSCRIBE_NOW',
+            return_url: `${frontendUrl}/billing/success`,
+            cancel_url: `${frontendUrl}/billing?cancelled=1`
+          }
+        })
+      });
+      const subData = await ppRes.json();
+      if (!ppRes.ok) return res.status(ppRes.status).json({ error: 'PayPal subscription failed', details: subData });
+      const approvalLink = subData.links?.find(l => l.rel === 'approve');
+      return res.json({ success: true, order_id: subData.id, data: subData, approval_url: approvalLink?.href });
     }
   } catch (err) {
     console.error('[billing] create-order exception:', err);
@@ -278,14 +286,14 @@ router.post('/capture-order', authenticateToken, async (req, res) => {
     if (subData.status === 'ACTIVE' || subData.status === 'APPROVED') {
       const planId = subData.plan_id;
       const planTier = PLANS.find(p => process.env[`PAYPAL_PLAN_${p.id.toUpperCase()}_MONTH`] === planId || process.env[`PAYPAL_PLAN_${p.id.toUpperCase()}_YEAR`] === planId)?.tier || 'pro';
-      
+
       await performFulfillment(req.user, planTier, supabase, isSupabaseConfigured);
-      
-      await supabase.from('profiles').update({ 
-         paypal_subscription_id: order_id, 
-         billing_provider: 'paypal' 
+
+      await supabase.from('profiles').update({
+        paypal_subscription_id: order_id,
+        billing_provider: 'paypal'
       }).eq('id', req.user.id);
-      
+
       return res.json({ success: true, status: 'COMPLETED', data: subData, upgraded: true, tier: planTier });
     } else {
       return res.status(400).json({ success: false, status: subData.status, data: subData });
@@ -311,7 +319,7 @@ router.post('/paystack/initialize', authenticateToken, async (req, res) => {
       finalPrice = (plan.price * 12) * 0.80;
     }
 
-    console.log(`[billing] Initializing Paystack for plan '${plan.name}' (${billing_cycle || 'monthly'})`);
+    console.log(`[billing] Initializing Paystack for plan '${plan.name}' (${interval || 'monthly'})`);
     const data = await paystackService.initializeTransaction({
       email: req.user.email,
       amount: finalPrice,
@@ -361,31 +369,41 @@ router.get('/status', authenticateToken, async (req, res) => {
       });
     }
 
+    // Use maybeSingle() to prevent 500 crashes if profile is missing
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('tier')
+      .select('tier, plan')
       .eq('id', req.user.id)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
-    const tier = profile?.tier || 'free';
-    const plan = PLANS.find(p => p.tier === tier) || { name: 'Free', price: 0, currency: 'USD' };
+    // Reconciliation: handles legacy 'plan' vs new 'tier' column naming
+    const tier = profile?.tier || profile?.plan || 'free';
+
+    // Find matching plan metadata
+    let planMatch = PLANS.find(p => p.tier === tier || p.id === tier);
+
+    // Fallback if tier not in PLANS (e.g. 'free')
+    if (!planMatch) {
+      planMatch = { name: tier.charAt(0).toUpperCase() + tier.slice(1), price: 0, currency: 'USD' };
+      if (tier === 'free') planMatch.name = 'Free';
+    }
 
     res.json({
       success: true,
       data: {
-        plan: plan.name,
+        plan: planMatch.name,
         tier: tier,
         status: 'active',
-        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        amount: plan.price,
-        currency: plan.currency
+        next_billing_date: profile?.trial_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        amount: planMatch.price,
+        currency: planMatch.currency
       }
     });
   } catch (err) {
-    console.error('[billing] Status error:', err);
-    res.status(500).json({ error: 'Failed to fetch subscription status' });
+    console.error('[billing] Status failure:', err.message);
+    res.status(500).json({ error: 'Failed to fetch subscription status', details: err.message });
   }
 });
 
@@ -398,16 +416,16 @@ router.post('/webhook/:provider', async (req, res) => {
   try {
     // 1. Stripe Webhook Cryptographic Verification
     if (provider === 'stripe' && process.env.STRIPE_WEBHOOK_SECRET && stripe) {
-       const sig = req.headers['stripe-signature'];
-       try {
-         // Verifies the event origin using the raw request body
-         const event = stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
-         eventBody = event;
-       } catch (err) {
-         console.error(`[billing] Stripe Webhook Signature Error: ${err.message}`);
-         Sentry.captureException(err, { tags: { category: 'webhook_auth_failure' } });
-         return res.status(400).send(`Webhook Signature Error: ${err.message}`);
-       }
+      const sig = req.headers['stripe-signature'];
+      try {
+        // Verifies the event origin using the raw request body
+        const event = stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        eventBody = event;
+      } catch (err) {
+        console.error(`[billing] Stripe Webhook Signature Error: ${err.message}`);
+        Sentry.captureException(err, { tags: { category: 'webhook_auth_failure' } });
+        return res.status(400).send(`Webhook Signature Error: ${err.message}`);
+      }
     }
 
     // 2. Audit Trail: Log the incoming verified event
@@ -425,90 +443,90 @@ router.post('/webhook/:provider', async (req, res) => {
 
     // 3. Automated Tier Fulfillment (Stripe)
     if (provider === 'stripe') {
-       const session = eventBody.data.object;
-       const userId = session.client_reference_id;
-       const stripeCustomerId = session.customer;
+      const session = eventBody.data.object;
+      const userId = session.client_reference_id;
+      const stripeCustomerId = session.customer;
 
-       switch (eventBody.type) {
-          case 'checkout.session.completed':
-             if (userId) {
-                // Map session amount to tier logic
-                const amount = session.amount_total;
-                let targetTier = 'pro';
-                if (amount >= 99900) targetTier = 'enterprise';
-                else if (amount >= 39900) targetTier = 'pro';
-                else if (amount >= 14900) targetTier = 'starter';
+      switch (eventBody.type) {
+        case 'checkout.session.completed':
+          if (userId) {
+            // Map session amount to tier logic
+            const amount = session.amount_total;
+            let targetTier = 'pro';
+            if (amount >= 99900) targetTier = 'enterprise';
+            else if (amount >= 39900) targetTier = 'pro';
+            else if (amount >= 14900) targetTier = 'starter';
 
-                await supabase.from('profiles').update({ 
-                  stripe_customer_id: stripeCustomerId,
-                  stripe_subscription_id: session.subscription,
-                  billing_provider: 'stripe',
-                  tier: targetTier,
-                  upgraded_at: new Date().toISOString()
-                }).eq('id', userId);
-                
-                await performFulfillment({ id: userId }, targetTier, supabase, isSupabaseConfigured);
-             }
-             break;
+            await supabase.from('profiles').update({
+              stripe_customer_id: stripeCustomerId,
+              stripe_subscription_id: session.subscription,
+              billing_provider: 'stripe',
+              tier: targetTier,
+              upgraded_at: new Date().toISOString()
+            }).eq('id', userId);
 
-          case 'customer.subscription.updated':
-          case 'customer.subscription.deleted':
-          case 'customer.subscription.created':
-             const sub = eventBody.data.object;
-             // Subscription updates use customer ID for lookups
-             if (stripeCustomerId) {
-                const status = sub.status;
-                const tier = status === 'active' || status === 'trialing' ? 'pro' : 'free'; 
-                await supabase.from('profiles').update({ 
-                  stripe_subscription_id: sub.id,
-                  billing_provider: 'stripe',
-                  tier: tier,
-                  status_note: `Subscription status: ${status}`
-                }).eq('stripe_customer_id', stripeCustomerId);
-             }
-             break;
-       }
+            await performFulfillment({ id: userId }, targetTier, supabase, isSupabaseConfigured);
+          }
+          break;
+
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted':
+        case 'customer.subscription.created':
+          const sub = eventBody.data.object;
+          // Subscription updates use customer ID for lookups
+          if (stripeCustomerId) {
+            const status = sub.status;
+            const tier = status === 'active' || status === 'trialing' ? 'pro' : 'free';
+            await supabase.from('profiles').update({
+              stripe_subscription_id: sub.id,
+              billing_provider: 'stripe',
+              tier: tier,
+              status_note: `Subscription status: ${status}`
+            }).eq('stripe_customer_id', stripeCustomerId);
+          }
+          break;
+      }
     }
 
     // 4. Paystack Webhook Fulfillment
     if (provider === 'paystack' && eventBody.event === 'charge.success') {
-       const data = eventBody.data;
-       const userId = data.metadata?.user_id;
-       const targetTier = data.metadata?.tier || 'pro';
-       if (userId) {
-          await supabase.from('profiles').update({ billing_provider: 'paystack' }).eq('id', userId);
-          await performFulfillment({ id: userId }, targetTier, supabase, isSupabaseConfigured);
-       }
+      const data = eventBody.data;
+      const userId = data.metadata?.user_id;
+      const targetTier = data.metadata?.tier || 'pro';
+      if (userId) {
+        await supabase.from('profiles').update({ billing_provider: 'paystack' }).eq('id', userId);
+        await performFulfillment({ id: userId }, targetTier, supabase, isSupabaseConfigured);
+      }
     }
 
     // 5. PayPal Webhook Fulfillment
     if (provider === 'paypal' && eventBody.event_type && eventBody.event_type.startsWith('BILLING.SUBSCRIPTION')) {
-       const subId = eventBody.resource.id;
-       const customId = eventBody.resource.custom_id;
-       if (customId || subId) {
-          const status = eventBody.resource.status;
-          const tier = status === 'ACTIVE' ? 'pro' : 'free'; 
-          const updateData = {
-              paypal_subscription_id: subId,
-              billing_provider: 'paypal',
-              tier: tier,
-              status_note: `Subscription status: ${status}`
-          };
-          if(status === 'CANCELLED' || status === 'EXPIRED') updateData.tier = 'free';
-          
-          if(customId) await supabase.from('profiles').update(updateData).eq('id', customId);
-          else await supabase.from('profiles').update(updateData).eq('paypal_subscription_id', subId);
-       }
+      const subId = eventBody.resource.id;
+      const customId = eventBody.resource.custom_id;
+      if (customId || subId) {
+        const status = eventBody.resource.status;
+        const tier = status === 'ACTIVE' ? 'pro' : 'free';
+        const updateData = {
+          paypal_subscription_id: subId,
+          billing_provider: 'paypal',
+          tier: tier,
+          status_note: `Subscription status: ${status}`
+        };
+        if (status === 'CANCELLED' || status === 'EXPIRED') updateData.tier = 'free';
+
+        if (customId) await supabase.from('profiles').update(updateData).eq('id', customId);
+        else await supabase.from('profiles').update(updateData).eq('paypal_subscription_id', subId);
+      }
     }
 
     // 5. Finalize Audit Logging
     if (eventId) {
-      await supabase.from('webhook_events').update({ 
-        processed: true, 
-        processed_at: new Date().toISOString() 
+      await supabase.from('webhook_events').update({
+        processed: true,
+        processed_at: new Date().toISOString()
       }).eq('id', eventId);
     }
-    
+
     res.status(200).json({ received: true });
   } catch (err) {
     console.error(`[billing] Webhook processing exception: ${err.message}`);
@@ -559,7 +577,7 @@ router.get('/admin/stats', authenticateToken, async (req, res) => {
 
     // 2. Aggregate stats
     const { data: profiles } = await supabase.from('profiles').select('tier, created_at');
-    
+
     const stats = {
       total_users: profiles.length,
       tier_breakdown: {
@@ -567,12 +585,14 @@ router.get('/admin/stats', authenticateToken, async (req, res) => {
         starter: profiles.filter(p => p.tier === 'starter').length,
         pro: profiles.filter(p => p.tier === 'pro').length,
         enterprise: profiles.filter(p => p.tier === 'enterprise').length,
+        api: profiles.filter(p => p.tier === 'api').length,
         admin: profiles.filter(p => p.tier === 'admin').length
       },
-      estimated_mrr: 
+      estimated_mrr:
         (profiles.filter(p => p.tier === 'starter').length * 149) +
         (profiles.filter(p => p.tier === 'pro').length * 399) +
-        (profiles.filter(p => p.tier === 'enterprise').length * 999)
+        (profiles.filter(p => p.tier === 'enterprise').length * 999) +
+        (profiles.filter(p => p.tier === 'api').length * 299)
     };
 
     res.json({ success: true, data: stats });
@@ -592,7 +612,7 @@ router.get('/admin/subscriptions', authenticateToken, async (req, res) => {
       .select('id, email, tier, upgraded_at, trial_used')
       .neq('tier', 'free')
       .order('upgraded_at', { ascending: false });
-    
+
     if (error) throw error;
     res.json({ success: true, data: subscriptions || [] });
   } catch (err) {

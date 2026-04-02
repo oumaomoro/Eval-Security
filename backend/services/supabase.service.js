@@ -6,31 +6,31 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim();
+const anonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
-// Use service role key if available (full DB access + bypasses RLS)
-// Fall back to anon key for limited read access
-const supabaseKey = (serviceRoleKey && serviceRoleKey !== 'YOUR_SERVICE_ROLE_KEY_FROM_SUPABASE_DASHBOARD')
-  ? serviceRoleKey
-  : (anonKey || 'MISSING_KEY');
+// Priority: Service Role (for Admin SDK) > Anon
+const supabaseKey = serviceRoleKey || anonKey;
 
-if (!supabaseUrl) {
-  console.warn('⚠️  Supabase URL is missing. Ensure SUPABASE_URL is set.');
-} else {
-  const isSvc = supabaseKey === serviceRoleKey;
-  const obfuscatedUrl = supabaseUrl.replace(/(https:\/\/).*(.supabase.co)/, '$1***$2');
-  console.log(`✅ Supabase context: ${isSvc ? 'Administrative' : 'Public'} | Endpoint: ${obfuscatedUrl}`);
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('[Supabase] Missing configuration. Auth and DB features will be degraded.');
 }
-
 
 export const supabase = createClient(supabaseUrl || 'https://missing-url.supabase.co', supabaseKey, {
   auth: {
     autoRefreshToken: false,
-    persistSession: false
+    persistSession: false,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: { 'x-application-name': 'costloci-backend' }
   }
 });
+
+export const isSupabaseConfigured = () => {
+  return !!supabaseUrl && supabaseUrl !== 'https://missing-url.supabase.co';
+};
 
 export default supabase;
 

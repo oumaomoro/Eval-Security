@@ -56,7 +56,13 @@ export const EmailService = {
     return this.queueEmail(email, 'Unlock Your hidden savings 💸', DAY_3_ACTIVATION_TEMPLATE(fullName));
   },
 
-  async queueEmail(to, subject, html) {
+  async sendDpoComplianceAlert(email, dpoName, contractVendor, riskLevel, actionRequired) {
+    const { DPO_ALERTS_TEMPLATE } = await import('./email.templates.js');
+    const subject = `⚠️ Compliance Alert: ${contractVendor} (${riskLevel})`;
+    return this.queueEmail(email, subject, DPO_ALERTS_TEMPLATE(dpoName, contractVendor, riskLevel, actionRequired));
+  },
+
+  async queueEmail(to, subject, html, autoProcess = true) {
     console.log(`[EmailService] Queueing email to ${to}: ${subject}`);
     const { data, error } = await supabase
       .from('email_queue')
@@ -65,13 +71,16 @@ export const EmailService = {
       .single();
 
     if (error) {
-       console.error('[EmailService] Failed to queue email:', error);
-       throw error;
+      console.error('[EmailService] Failed to queue email:', error);
+      throw error;
     }
-    
-    // Automatically trigger queue processing asynchronously for seamless delivery
-    this.processQueue().catch(e => console.error('[EmailService] Auto-process failed:', e));
-    
+
+    // Automatically trigger queue processing for seamless delivery
+    if (autoProcess) {
+      // In serverless (Vercel), we MUST await the process to ensure the Lambda doesn't exit prematurely.
+      await this.processQueue().catch(e => console.error('[EmailService] Auto-process failed:', e));
+    }
+
     return data;
   },
 
@@ -85,44 +94,44 @@ export const EmailService = {
       .limit(10); // Batch size to respect free tiers
 
     if (error) {
-       console.error('[EmailService] Queue fetch error:', error);
-       return { success: false, error: error.message };
+      console.error('[EmailService] Queue fetch error:', error);
+      return { success: false, error: error.message };
     }
 
     if (!pending || pending.length === 0) {
-       return { success: true, processed: 0 };
+      return { success: true, processed: 0 };
     }
 
     let processedCount = 0;
     for (const email of pending) {
-       try {
-         if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 're_mock_key') {
-            // Mock processing
-            console.log(`[EmailService] Mock dispatch for queued email ${email.id}`);
-            await supabase.from('email_queue').update({ status: 'sent' }).eq('id', email.id);
-         } else {
-            // Real dispatch
-            await resend.emails.send({
-               from: 'Costloci <alerts@costloci.com>',
-               to: email.to,
-               subject: email.subject,
-               html: email.html
-            });
-            await supabase.from('email_queue').update({ status: 'sent' }).eq('id', email.id);
-         }
-         processedCount++;
-       } catch (dispatchErr) {
-         console.error(`[EmailService] Dispatch failed for ${email.id}:`, dispatchErr.message);
-         const attempts = (email.attempts || 0) + 1;
-         let status = 'pending';
-         let next_attempt = new Date(Date.now() + Math.pow(2, attempts) * 60000).toISOString(); // Exponential backoff in minutes
-         
-         if (attempts >= 5) { // Max 5 retries
-            status = 'failed';
-         }
+      try {
+        if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 're_mock_key') {
+          // Mock processing
+          console.log(`[EmailService] Mock dispatch for queued email ${email.id}`);
+          await supabase.from('email_queue').update({ status: 'sent' }).eq('id', email.id);
+        } else {
+          // Real dispatch
+          await resend.emails.send({
+            from: 'Costloci <alerts@costloci.com>',
+            to: email.to,
+            subject: email.subject,
+            html: email.html
+          });
+          await supabase.from('email_queue').update({ status: 'sent' }).eq('id', email.id);
+        }
+        processedCount++;
+      } catch (dispatchErr) {
+        console.error(`[EmailService] Dispatch failed for ${email.id}:`, dispatchErr.message);
+        const attempts = (email.attempts || 0) + 1;
+        let status = 'pending';
+        let next_attempt = new Date(Date.now() + Math.pow(2, attempts) * 60000).toISOString(); // Exponential backoff in minutes
 
-         await supabase.from('email_queue').update({ attempts, status, next_attempt }).eq('id', email.id);
-       }
+        if (attempts >= 5) { // Max 5 retries
+          status = 'failed';
+        }
+
+        await supabase.from('email_queue').update({ attempts, status, next_attempt }).eq('id', email.id);
+      }
     }
 
     return { success: true, processed: processedCount };

@@ -21,14 +21,27 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
     try {
       const { data, error } = await orgScopedQuery('risk_register', req.user);
-      if (!error) risks = data || [];
-    } catch (e) { console.warn('[analytics] risk_register fetch skipped'); }
+      if (error) {
+        if (error.message.includes('relation "risk_register" does not exist')) {
+          console.warn('[analytics] risk_register table missing');
+        } else {
+          throw error;
+        }
+      }
+      risks = data || [];
+    } catch (e) { console.warn('[analytics] risk_register fetch skipped due to error'); }
 
-    const totalContracts = contracts.length;
-    
-    // Predictive ROI Calculation (assuming 2.5 hours saved per review, at $350/hour internal legal rate)
+    // Executive ROI Calculation (Higher Accuracy)
+    // 1. Efficiency: 2.5 hours saved per review at $350/hour internal legal rate
+    // 2. Risk Mitigation: $2,500 average avoided data breach penalty/legal cost per identified gap
     const hoursSaved = totalContracts * 2.5;
-    const costSavings = hoursSaved * 350;
+    const efficiencySavings = hoursSaved * 350;
+
+    let totalIdentifiedGaps = 0;
+    contracts.forEach(c => {
+      totalIdentifiedGaps += (c.ai_analysis?.categorized_findings?.length || 0);
+    });
+    const riskMitigationValue = totalIdentifiedGaps * 2500;
 
     // Heatmap Aggregation (count failed compliance areas)
     const riskHeatmap = {
@@ -40,31 +53,45 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     };
 
     let totalFinancialExposure = 0;
+    let avgComplianceScore = 0;
+    let sectorBenchmark = 75; // Industry average baseline
+
+    if (totalContracts > 0) {
+      const totalScore = contracts.reduce((acc, c) => acc + (c.ai_analysis?.compliance_readiness || 0), 0);
+      avgComplianceScore = Math.round(totalScore / totalContracts);
+    }
 
     risks.forEach(risk => {
-       if (risk.severity === 'critical' || risk.severity === 'high') {
-          if (risk.risk_category === 'privacy' || risk.risk_category === 'compliance') riskHeatmap['Data Privacy (GDPR/KDPA)']++;
-          else if (risk.risk_category === 'security') riskHeatmap['Security (ISO27001)']++;
-          else if (risk.risk_category === 'strategic' || risk.risk_category === 'compliance') riskHeatmap['Regulatory (IRA/CMA)']++;
-          else if (risk.risk_category === 'financial') riskHeatmap['Financial (Liability)']++;
-          else riskHeatmap['Operational (SLA)']++;
-          
-          if (risk.financial_exposure && typeof risk.financial_exposure === 'object') {
-             totalFinancialExposure += (risk.financial_exposure.max_estimate || 0);
-          }
-       }
+      if (risk.severity === 'critical' || risk.severity === 'high') {
+        if (risk.risk_category === 'privacy' || risk.risk_category === 'compliance') riskHeatmap['Data Privacy (GDPR/KDPA)']++;
+        else if (risk.risk_category === 'security') riskHeatmap['Security (ISO27001)']++;
+        else if (risk.risk_category === 'strategic' || risk.risk_category === 'compliance') riskHeatmap['Regulatory (IRA/CMA)']++;
+        else if (risk.risk_category === 'financial') riskHeatmap['Financial (Liability)']++;
+        else riskHeatmap['Operational (SLA)']++;
+
+        if (risk.financial_exposure && typeof risk.financial_exposure === 'object') {
+          totalFinancialExposure += (risk.financial_exposure.max_estimate || 0);
+        }
+      }
     });
 
     res.json({
       success: true,
       data: {
-        predictive_roi: {
-          contracts_analyzed: totalContracts,
-          hours_saved: hoursSaved,
-          cost_savings_usd: costSavings,
+        executive_roi: {
+          total_economic_impact: efficiencySavings + riskMitigationValue,
+          efficiency_savings: efficiencySavings,
+          risk_mitigation_value: riskMitigationValue,
+          hours_liberated: hoursSaved
+        },
+        compliance_health: {
+          current_score: avgComplianceScore,
+          benchmark: sectorBenchmark,
+          delta: avgComplianceScore - sectorBenchmark
         },
         risk_heatmap: riskHeatmap,
-        total_mitigated_exposure: totalFinancialExposure
+        total_mitigated_exposure: totalFinancialExposure,
+        contracts_analyzed: totalContracts
       }
     });
   } catch (error) {

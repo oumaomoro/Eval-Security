@@ -158,7 +158,7 @@ router.patch('/dpo/tasks/:id', authenticateToken, async (req, res) => {
 router.post('/matrix/:contractId', authenticateToken, async (req, res) => {
   try {
     const { framework } = req.body; // e.g., 'GDPR', 'CCPA'
-    
+
     // 1. Fetch raw contract text
     const { data: contract, error: fetchErr } = await supabase
       .from('contracts')
@@ -166,9 +166,9 @@ router.post('/matrix/:contractId', authenticateToken, async (req, res) => {
       .eq('id', req.params.contractId)
       .eq('user_id', req.user.id)
       .single();
-      
+
     if (fetchErr || !contract) return res.status(404).json({ error: 'Contract not found' });
-    
+
     // 2. Check cache (do we already have this mapped?)
     let matrices = contract.regulatory_matrices || {};
     if (matrices[framework]) {
@@ -192,6 +192,23 @@ router.post('/matrix/:contractId', authenticateToken, async (req, res) => {
 
   } catch (err) {
     console.error('[Compliance] DPO Matrix Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/compliance/dpo/alert
+router.post('/dpo/alert', authenticateToken, async (req, res) => {
+  try {
+    const { dpoEmail, dpoName, vendorName, riskLevel, actionRequired } = req.body;
+
+    const { EmailService } = await import('../services/email.service.js');
+    await EmailService.sendDpoComplianceAlert(dpoEmail, dpoName, vendorName, riskLevel, actionRequired);
+
+    await logAuditAction(req.user.id, null, 'DPO_ALERT_SENT', `Compliance alert dispatched to ${dpoEmail} for ${vendorName}`, req);
+
+    res.json({ success: true, message: 'DPO alert dispatched successfully' });
+  } catch (err) {
+    console.error('[Compliance] DPO Alert Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

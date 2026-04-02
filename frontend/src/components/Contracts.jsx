@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { Search, Filter, ShieldAlert, CheckCircle2, ChevronRight, X, Clock, FileText, Activity, Zap, Download, CheckCircle } from 'lucide-react'
 import { api } from '../utils/api'
+import { useAuth } from '../contexts/AuthContext'
 import { generateRiskScorecardPdf } from '../utils/pdfService'
 import { exportRedlinesToWord, getWordBlob } from '../utils/wordService'
 import ClauseDiffViewer from './ClauseDiffViewer'
 
 export default function Contracts() {
+  const { user } = useAuth()
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -61,7 +63,7 @@ export default function Contracts() {
         contract_id: contract.id,
         signer_email: email
       });
-      
+
       if (res.data?.embedded_url) {
         setSignnowUrl(res.data.embedded_url);
         setIsSignnowModalOpen(true);
@@ -84,7 +86,7 @@ export default function Contracts() {
     )
   }
 
-  const filteredContracts = contracts.filter(c => 
+  const filteredContracts = contracts.filter(c =>
     c.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.product_service?.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -108,9 +110,9 @@ export default function Contracts() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search vendor or service..." 
+          <input
+            type="text"
+            placeholder="Search vendor or service..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
@@ -144,8 +146,8 @@ export default function Contracts() {
                 </tr>
               ) : (
                 filteredContracts.map((c) => (
-                  <tr 
-                    key={c.id} 
+                  <tr
+                    key={c.id}
                     onClick={() => handleSelectContract(c)}
                     className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors cursor-pointer group"
                   >
@@ -234,19 +236,19 @@ export default function Contracts() {
             <div className="p-8 space-y-8">
               {/* Action Bar */}
               <div className="flex gap-2 w-full">
-                <button 
+                <button
                   onClick={() => generateRiskScorecardPdf(selectedContract)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                 >
                   <Download size={14} /> Board Scorecard
                 </button>
-                <button 
+                <button
                   onClick={() => exportRedlinesToWord(selectedContract)}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                 >
                   <FileText size={14} /> Export to Word
                 </button>
-                <button 
+                <button
                   onClick={() => handleSignNowInvite(selectedContract)}
                   disabled={sendingSignnow || selectedContract.status === 'pending'}
                   className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg ml-auto disabled:opacity-50"
@@ -255,7 +257,7 @@ export default function Contracts() {
                   {sendingSignnow ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   ) : (
-                    <CheckCircle size={14} /> 
+                    <CheckCircle size={14} />
                   )}
                   {sendingSignnow ? 'Preparing Session...' : 'Request Signature'}
                 </button>
@@ -273,7 +275,7 @@ export default function Contracts() {
                     </div>
                   </div>
                   {user?.role === 'admin' && (
-                    <button 
+                    <button
                       onClick={async () => {
                         try {
                           await api.patch(`/contracts/${selectedContract.id}`, { status: 'active' });
@@ -296,8 +298,8 @@ export default function Contracts() {
                   <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{selectedContract.ai_analysis?.compliance_readiness || 0}%</span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-blue-600 h-full transition-all duration-1000" 
+                  <div
+                    className="bg-blue-600 h-full transition-all duration-1000"
                     style={{ width: `${selectedContract.ai_analysis?.compliance_readiness || 0}%` }}
                   ></div>
                 </div>
@@ -308,20 +310,20 @@ export default function Contracts() {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-2">
                   <ShieldAlert size={16} /> Categorical Risk Analysis
                 </h3>
-                
+
                 {selectedContract.ai_analysis?.categorized_findings?.length > 0 ? (
                   <div className="space-y-6">
                     {['security', 'legal', 'compliance', 'financial'].map(cat => {
                       const catFindings = selectedContract.ai_analysis.categorized_findings.filter(f => f.category === cat);
                       if (catFindings.length === 0) return null;
-                      
+
                       return (
                         <div key={cat} className="space-y-4">
                           <div className="flex items-center gap-2">
-                             <div className={`w-2 h-2 rounded-full ${cat === 'legal' ? 'bg-blue-500' : cat === 'security' ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                             <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{cat}</span>
+                            <div className={`w-2 h-2 rounded-full ${cat === 'legal' ? 'bg-blue-500' : cat === 'security' ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{cat}</span>
                           </div>
-                          
+
                           {catFindings.map((f, i) => (
                             <div key={i} className="group relative bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all">
                               <div className="flex justify-between items-start mb-2">
@@ -331,7 +333,7 @@ export default function Contracts() {
                                 </span>
                               </div>
                               <p className="text-sm text-slate-500 leading-relaxed mb-4">{f.description}</p>
-                              
+
                               {/* Original extracted verbatim moved to diff viewer block if there's a redline */}
                               {f.verbatim_text && !f.gold_standard_alignment?.suggested_redline && (
                                 <div className="mt-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -339,28 +341,28 @@ export default function Contracts() {
                                   <p className="text-xs text-slate-700 dark:text-slate-300 italic leading-relaxed font-mono">"{f.verbatim_text}"</p>
                                 </div>
                               )}
-                              
+
                               {f.gold_standard_alignment && (
                                 <div className="mt-4 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
-                                   <div className="flex items-center justify-between mb-2">
-                                     <span className="text-[10px] font-bold text-indigo-500 uppercase">Vector Match: {f.gold_standard_alignment.standard}</span>
-                                     <span className="text-[10px] font-bold text-indigo-600">{f.gold_standard_alignment.similarity}%</span>
-                                   </div>
-                                   <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
-                                     <span className="font-bold">Gap Analysis:</span> {f.gold_standard_alignment.gap_analysis}
-                                   </p>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold text-indigo-500 uppercase">Vector Match: {f.gold_standard_alignment.standard}</span>
+                                    <span className="text-[10px] font-bold text-indigo-600">{f.gold_standard_alignment.similarity}%</span>
+                                  </div>
+                                  <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+                                    <span className="font-bold">Gap Analysis:</span> {f.gold_standard_alignment.gap_analysis}
+                                  </p>
 
-                                   {f.gold_standard_alignment.suggested_redline && (
-                                      <ClauseDiffViewer 
-                                        originalText={f.verbatim_text} 
-                                        redlineText={f.gold_standard_alignment.suggested_redline} 
-                                      />
-                                   )}
-                                   {f.gold_standard_alignment.suggested_redline && (
-                                      <button className="mt-4 w-full py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors">
-                                        Adopt Mitigation into Library
-                                      </button>
-                                   )}
+                                  {f.gold_standard_alignment.suggested_redline && (
+                                    <ClauseDiffViewer
+                                      originalText={f.verbatim_text}
+                                      redlineText={f.gold_standard_alignment.suggested_redline}
+                                    />
+                                  )}
+                                  {f.gold_standard_alignment.suggested_redline && (
+                                    <button className="mt-4 w-full py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors">
+                                      Adopt Mitigation into Library
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -381,7 +383,7 @@ export default function Contracts() {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-2">
                   <Activity size={16} /> Immutable Audit Trail (Chain of Custody)
                 </h3>
-                
+
                 {loadingAudits ? (
                   <div className="animate-pulse space-y-4">
                     <div className="h-16 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
@@ -400,7 +402,7 @@ export default function Contracts() {
                         <div key={log.id} className="relative pl-6">
                           {/* Dot marker */}
                           <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${isRecent ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                          
+
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <span className={`text-xs font-black tracking-widest uppercase ${isRecent ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
@@ -441,8 +443,8 @@ export default function Contracts() {
               </button>
             </div>
             <div className="flex-1 bg-slate-50 dark:bg-slate-950 p-2">
-              <iframe 
-                src={signnowUrl} 
+              <iframe
+                src={signnowUrl}
                 className="w-full h-full border-none rounded-2xl bg-white shadow-inner"
                 title="SignNow Embedded Signature"
               />

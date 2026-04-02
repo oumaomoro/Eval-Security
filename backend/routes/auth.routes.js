@@ -1,5 +1,6 @@
 import express from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabase } from '../services/supabase.service.js';
+import { EmailService } from '../services/email.service.js';
 import jwt from 'jsonwebtoken';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import crypto from 'crypto';
@@ -10,59 +11,71 @@ const JWT_SECRET = process.env.JWT_SECRET || 'costloci-secret-2026';
 router.post('/register', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // DEV BYPASS: Allow test user registration bypass
-    /*
-    if (email === 'test@example.com' || email === 'demo@example.com') {
-      const mockUser = { id: '00000000-0000-0000-0000-000000000000', email, role: 'user', tier: 'free' };
-      const token = jwt.sign(mockUser, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ user: mockUser, token });
-    }
-    */
 
-    // Create user in Supabase Auth via Admin SDK to bypass broken SMTP
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    // Create user via Admin SDK to bypass SMTP confirmation requirement
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm to ensure immediate access
+      email_confirm: true,
       user_metadata: { role: 'user' }
     });
- 
+
     if (authError) throw authError;
- 
-    // Create profile in database
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .insert({
+
+    // Two-pass resilient profile upsert
+    let profileData = null;
+    let profileError = null;
+
+    // Pass 1: include email column
+    const pass1 = await supabase.from('profiles').upsert({
+      id: authData.user.id,
+      email: authData.user.email,
+      role: 'user',
+      tier: 'free',
+      updated_at: new Date().toISOString()
+    }).select().maybeSingle();
+
+    if (pass1.error) {
+      console.warn('[Auth] Profile pass-1 failed:', pass1.error.message);
+      // Pass 2: without email column (handles schema cache mismatch)
+      const pass2 = await supabase.from('profiles').upsert({
         id: authData.user.id,
-        email: authData.user.email,
         role: 'user',
-        tier: 'free'
-      })
-      .select()
-      .single();
- 
-    if (profileError) throw profileError;
- 
-    // Trigger Resend Welcome Email (Reliable Bridge)
-    import('../services/email.service.js')
-      .then(({ EmailService }) => EmailService.sendWelcomeEmail(email, 'Optimizor'))
-      .catch(err => console.error('Failed to dispatch welcome email:', err));
- 
-    // Generate JWT token for seamless login
+        tier: 'free',
+        updated_at: new Date().toISOString()
+      }).select().maybeSingle();
+      profileData = pass2.data;
+      profileError = pass2.error;
+    } else {
+      profileData = pass1.data;
+    }
+
+    if (profileError) {
+      console.error('[Auth] Profile creation both passes failed:', profileError.message);
+      // Non-fatal — user still gets auth token
+    }
+
+    // Send welcome email via Resend
+    await EmailService.sendWelcomeEmail(email, 'Optimizor')
+      .catch(err => console.error('Failed to send welcome email:', err));
+
     const token = jwt.sign(
-      { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' }, 
-      JWT_SECRET, 
+      { id: authData.user.id, email: authData.user.email, role: profileData?.role || 'user', tier: profileData?.tier || 'free' },
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
- 
-    res.status(201).json({
-      user: { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' },
-      token
-    });
 
-    res.json({
-      user: { id: authData.user.id, email: authData.user.email, role: 'user', tier: 'free' },
+    res.status(201).json({
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        role: profileData?.role || 'user',
+        tier: profileData?.tier || 'free'
+      },
       token
     });
   } catch (error) {
@@ -70,6 +83,7 @@ router.post('/register', async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
+
 
 router.post('/login', async (req, res) => {
   try {
@@ -112,24 +126,34 @@ router.post('/login', async (req, res) => {
       throw authError;
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
+    // Get user profile — use maybeSingle() to handle missing profiles gracefully
+    const { data: profile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', authData.user.id)
-      .single();
+      .maybeSingle();
 
-    if (profileError) throw profileError;
+    // Auto-provision profile if missing (happens when registration crashed mid-way)
+    if (!profile) {
+      await supabase.from('profiles').upsert({
+        id: authData.user.id,
+        role: 'analyst',
+        plan: 'starter'
+      });
+    }
+
+    const role = profile?.role || 'user';
+    const tier = profile?.tier || profile?.plan || 'free';
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: authData.user.id, email: authData.user.email, role: profile.role, tier: profile.tier }, 
+      { id: authData.user.id, email: authData.user.email, role, tier }, 
       JWT_SECRET, 
       { expiresIn: '7d' }
     );
 
     res.json({
-      user: { id: authData.user.id, email: authData.user.email, role: profile.role, tier: profile.tier },
+      user: { id: authData.user.id, email: authData.user.email, role, tier },
       token
     });
   } catch (error) {

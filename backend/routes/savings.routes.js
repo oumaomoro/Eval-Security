@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { supabase, isSupabaseConfigured } from '../services/supabase.service.js';
+import { CostOptimizerService } from '../services/costOptimizer.service.js';
 
 const router = express.Router();
 
@@ -16,6 +17,33 @@ const MOCK_BENCHMARKS = [
   { id: 'bm-2', vendor_name: 'Splunk SIEM', category: 'Security Information & Event Management', your_annual_cost: 110000, market_annual_median: 85000, peers_count: 18, pricing_percentile: 82, status: 'significantly_above', recommendation: 'Use benchmark data to renegotiate. Consider Microsoft Sentinel as alternative.' },
   { id: 'bm-3', vendor_name: 'Datadog APM', category: 'Application Performance Monitoring', your_cost_per_seat: 63, market_median: 70, market_low: 55, market_high: 95, peers_count: 31, pricing_percentile: 38, status: 'below_market', recommendation: 'Good pricing. Maintain current agreement.' }
 ];
+
+// GET /api/savings/summary — aggregated dashboard data (used by frontend CostOptimization)
+router.get('/summary', authenticateToken, async (req, res) => {
+  try {
+    let data = MOCK_SAVINGS;
+    if (isSupabaseConfigured()) {
+      const { data: rows, error } = await supabase
+        .from('savings_opportunities')
+        .select('*')
+        .eq('user_id', req.user.id);
+      if (!error && rows?.length) data = rows;
+    }
+    const total = data.reduce((a, s) => a + (s.potential_savings || 0), 0);
+    res.json({
+      success: true,
+      data: {
+        total_potential_savings: total,
+        quick_wins: data.filter(s => s.effort === 'low').length,
+        approved: data.filter(s => s.status === 'approved').length,
+        opportunities: data.length,
+        top_opportunity: [...data].sort((a, b) => b.potential_savings - a.potential_savings)[0] || null,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/savings/opportunities
 router.get('/opportunities', authenticateToken, async (req, res) => {
@@ -55,7 +83,6 @@ router.get('/opportunities', authenticateToken, async (req, res) => {
 
 // GET /api/savings/benchmarks
 router.get('/benchmarks', authenticateToken, async (req, res) => {
-  // Benchmarks are static market data — served from mock
   res.json({ success: true, data: MOCK_BENCHMARKS });
 });
 
@@ -79,10 +106,6 @@ router.patch('/opportunities/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-import { CostOptimizerService } from '../services/costOptimizer.service.js';
-
-// ... (existing code) ...
 
 // POST /api/savings/recalculate
 router.post('/recalculate', authenticateToken, async (req, res) => {

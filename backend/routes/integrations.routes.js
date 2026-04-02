@@ -36,11 +36,11 @@ router.post('/signnow/upload', requireAuth, upload.single('file'), async (req, r
 
     // Attempt to grab token from header, body, or User Metadata
     let token = req.body.token;
-    
+
     // If not overtly provided, lookup the user DB profile to see if they saved it in settings
     if (!token) {
-       const { data: userData } = await supabase.auth.admin.getUserById(req.user.id);
-       token = userData?.user?.user_metadata?.signnow_token;
+      const { data: userData } = await supabase.auth.admin.getUserById(req.user.id);
+      token = userData?.user?.user_metadata?.signnow_token;
     }
 
     if (!token) {
@@ -72,11 +72,26 @@ router.get('/', requireAuth, async (req, res) => {
       .single();
 
     if (error) throw error;
-    
+
     // Fallback if the JSONB column isn't created yet or is null
     res.json({ success: true, integrations: profile?.integrations || {} });
   } catch (error) {
     console.error('[integrations] Error fetching integrations:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch integrations status' });
+  }
+});
+
+// /status alias — frontend uses /integrations/status
+router.get('/status', requireAuth, async (req, res) => {
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('integrations')
+      .eq('id', req.user.id)
+      .single();
+    if (error) throw error;
+    res.json({ success: true, integrations: profile?.integrations || {} });
+  } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch integrations status' });
   }
 });
@@ -86,7 +101,7 @@ router.get('/', requireAuth, async (req, res) => {
 router.get('/:provider/auth-url', requireAuth, (req, res) => {
   const { provider } = req.params;
   const validProviders = ['docusign', 'slack', 'jira', 'ironclad'];
-  
+
   if (!validProviders.includes(provider)) {
     return res.status(400).json({ error: 'Unsupported integration provider' });
   }
@@ -94,14 +109,14 @@ router.get('/:provider/auth-url', requireAuth, (req, res) => {
   const clientId = process.env[`${provider.toUpperCase()}_CLIENT_ID`];
   // Redirect back to the frontend settings page
   const redirectUri = `${process.env.FRONTEND_URL || 'http://127.0.0.1:5180'}/settings`;
-  
+
   // We use state to prevent CSRF and pass the provider back safely
-  const state = JSON.stringify({ 
-    provider, 
+  const state = JSON.stringify({
+    provider,
     uid: req.user.id,
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
-  
+
   // Base64 encode state for URL safety
   const safeState = Buffer.from(state).toString('base64');
 
@@ -159,7 +174,7 @@ router.post('/callback', requireAuth, async (req, res) => {
     if (readError) throw readError;
 
     const currentIntegrations = profile?.integrations || {};
-    
+
     // Add/Update provider tokens
     currentIntegrations[provider] = tokenData;
 
@@ -193,7 +208,7 @@ router.delete('/:provider', requireAuth, async (req, res) => {
     if (readError) throw readError;
 
     const currentIntegrations = profile?.integrations || {};
-    
+
     if (currentIntegrations[provider]) {
       delete currentIntegrations[provider];
     } else {
@@ -234,7 +249,7 @@ router.post('/docusign/webhook', async (req, res) => {
 
       // MOCK: In a real scenario, we would use the DocuSign SDK to download the PDF buffer here.
       // const pdfBuffer = await DocusignService.downloadEnvelope(envelopeId);
-      
+
       // For now, we simulate a successful ingestion trigger
       // Note: We would typically call a service here to handle the background analysis
       console.log(`[DocuSign Webhook] Triggering automated AI analysis for envelope ${envelopeId}...`);

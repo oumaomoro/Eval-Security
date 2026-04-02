@@ -18,7 +18,12 @@ router.get('/', async (req, res) => {
     if (error) throw error;
     res.json({ success: true, count: data.length, clients: data });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const isMissing = err.message?.includes('does not exist') || err.code === 'PGRST116' || err.message?.includes('schema cache');
+    res.status(isMissing ? 404 : 500).json({
+      error: err.message,
+      code: isMissing ? 'ERR_TABLE_MISSING' : 'ERR_SERVER_FAIL',
+      suggestion: isMissing ? 'Please run the Master Infrastructure Patch in Supabase SQL Editor.' : null
+    });
   }
 });
 
@@ -26,18 +31,18 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { company_name, industry, contact_name, contact_email, contact_phone, annual_budget } = req.body;
-    
+
     if (!company_name) return res.status(400).json({ error: "company_name is strictly required" });
 
     const { data, error } = await supabase.from('clients').insert([{
-        user_id: req.user.id,
-        company_name,
-        industry,
-        contact_name,
-        contact_email,
-        contact_phone,
-        annual_budget,
-        status: 'active'
+      user_id: req.user.id,
+      company_name,
+      industry,
+      contact_name,
+      contact_email,
+      contact_phone,
+      annual_budget,
+      status: 'active'
     }]).select().single();
 
     if (error) throw error;
@@ -53,9 +58,9 @@ router.delete('/:id', async (req, res) => {
       .delete()
       .eq('id', req.params.id)
       .eq('user_id', req.user.id);
-      
+
     if (error) throw error;
-    res.json({ success: true, message: 'Client profile detached.'});
+    res.json({ success: true, message: 'Client profile detached.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
