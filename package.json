@@ -8,7 +8,12 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "deploy": "node deploy_all.js",
+    "deploy:frontend": "npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true"
+  },
+  "engines": {
+    "node": "22.x"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
