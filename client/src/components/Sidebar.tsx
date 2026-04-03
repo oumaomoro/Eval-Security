@@ -58,6 +58,19 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border/50">
+        <div className="mb-4 px-2">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Compliance Hub</div>
+          <div className="flex flex-col gap-1">
+            <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between">
+              <span>Region:</span>
+              <span className="font-mono text-primary/70">EU-Central (AWS)</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between">
+              <span>Frameworks:</span>
+              <span className="font-mono text-primary/70">GDPR / KDPA</span>
+            </div>
+          </div>
+        </div>
         <button
           onClick={() => logout()}
           className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
