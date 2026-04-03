@@ -98,8 +98,20 @@ export default function Rulesets() {
             if (!res.ok) throw new Error("Failed to generate pack");
             return res.json();
         },
-        onSuccess: () => {
-            toast({ title: "Evidence Pack Generated", description: "The compliance evidence is ready for review." });
+        onSuccess: (data) => {
+            if (data?.evidence) {
+                // Trigger an automatic download of the JSON evidence file
+                const blob = new Blob([JSON.stringify(data.evidence, null, 2)], { type: "application/json" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `SOC2_Evidence_Pack_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+            toast({ title: "Evidence Pack Downloaded", description: "The compliance evidence JSON has been saved." });
         }
     });
 
