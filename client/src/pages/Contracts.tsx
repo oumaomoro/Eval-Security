@@ -3,13 +3,14 @@ import { Layout } from "@/components/Layout";
 import { useContracts, useCreateContract, useUploadContractFile } from "@/hooks/use-contracts";
 import { Link } from "wouter";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Search, UploadCloud, Loader2 } from "lucide-react";
+import { Plus, Search, UploadCloud, Loader2, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { InsertContract } from "@shared/schema";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function Contracts() {
   const [search, setSearch] = useState("");
@@ -86,9 +87,11 @@ export default function Contracts() {
               </tbody>
             </table>
             {filteredContracts?.length === 0 && (
-              <div className="p-12 text-center text-muted-foreground">
-                No contracts found. Upload one to get started.
-              </div>
+              <EmptyState 
+                icon={FileText} 
+                title="No Contracts Detected" 
+                description="Your enterprise workspace is currently pristine. Upload master service agreements, NDAs, or vendor contracts to initialize autonomic AI ingestion and auditing."
+              />
             )}
           </div>
         </div>

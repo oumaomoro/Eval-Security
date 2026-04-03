@@ -24,9 +24,9 @@ export function Layout({ children, header }: LayoutProps) {
                 <span className="text-sm text-muted-foreground">Logged in as</span>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold border border-primary/30">
-                    {user.firstName?.[0] || user.username?.[0] || "U"}
+                    {user.firstName?.[0] || user.email?.[0] || "U"}
                   </div>
-                  <span className="font-medium">{user.firstName || user.username}</span>
+                  <span className="font-medium">{user.firstName || user.email}</span>
                 </div>
               </div>
             )}

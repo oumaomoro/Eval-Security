@@ -2,10 +2,24 @@ import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, double
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 export * from "./models/auth";
 export * from "./models/chat";
 
+import { users } from "./models/auth";
+
 // === TABLE DEFINITIONS ===
+
+export const workspaces = pgTable("workspaces", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  plan: text("plan").notNull().default("enterprise"),
+  webhookUrl: text("webhook_url"),
+  webhookEnabled: boolean("webhook_enabled").default(false),
+  apiUsageCount: integer("api_usage_count").default(0),
+  apiUsageResetDate: timestamp("api_usage_reset_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -35,7 +49,7 @@ export const contracts = pgTable("contracts", {
   paymentFrequency: text("payment_frequency"), // monthly, quarterly, annual
   fileUrl: text("file_url"),
   status: text("status").default("active"), // active, expired, reviewing
-  
+
   // Structured AI analysis results
   aiAnalysis: jsonb("ai_analysis").$type<{
     extractedDates?: Record<string, string>;
@@ -47,7 +61,7 @@ export const contracts = pgTable("contracts", {
     riskFlags?: string[];
     summary?: string;
   }>(),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -80,7 +94,7 @@ export const complianceAudits = pgTable("compliance_audits", {
   }>(),
   status: text("status").notNull().default("in_progress"), // in_progress, completed, failed
   overallComplianceScore: doublePrecision("overall_compliance_score"), // 0-100
-  
+
   // Detailed findings
   findings: jsonb("findings").$type<Array<{
     severity: "critical" | "high" | "medium" | "low";
@@ -90,11 +104,11 @@ export const complianceAudits = pgTable("compliance_audits", {
     section?: string;
     ruleId?: string;
   }>>(),
-  
+
   complianceByStandard: jsonb("compliance_by_standard").$type<Record<string, number>>(),
   systemicIssues: jsonb("systemic_issues").$type<string[]>(),
   executiveSummary: text("executive_summary"),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -109,18 +123,18 @@ export const risks = pgTable("risks", {
   impact: text("impact").notNull(), // very_high, high, medium, low, very_low
   riskScore: integer("risk_score"), // 0-100
   mitigationStatus: text("mitigation_status").notNull().default("identified"), // identified, mitigation_planned, in_progress, mitigated, accepted
-  
+
   mitigationStrategies: jsonb("mitigation_strategies").$type<Array<{
     strategy: string;
     priority: string;
     cost?: string;
     timeline?: string;
   }>>(),
-  
+
   financialExposureMin: doublePrecision("financial_exposure_min"),
   financialExposureMax: doublePrecision("financial_exposure_max"),
   aiConfidence: integer("ai_confidence"), // 0-100
-  
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -163,6 +177,93 @@ export const reports = pgTable("reports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vendorScorecards = pgTable("vendor_scorecards", {
+  id: serial("id").primaryKey(),
+  contractId: integer("contract_id").references(() => contracts.id).notNull(),
+  vendorName: text("vendor_name").notNull(),
+  complianceScore: integer("compliance_score"), // 0-100
+  riskScore: integer("risk_score"), // 0-100
+  securityScore: integer("security_score"), // 0-100
+  slaPerformance: integer("sla_performance"), // 0-100
+  overallGrade: text("overall_grade"), // A, B, C, D, F
+  lastAssessmentDate: timestamp("last_assessment_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // maps to users.id which is varchar
+  contractId: integer("contract_id").references(() => contracts.id),
+  auditId: integer("audit_id").references(() => complianceAudits.id),
+  content: text("content").notNull(),
+  resolved: boolean("resolved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const contractComparisons = pgTable("contract_comparisons", {
+  id: serial("id").primaryKey(),
+  contractId: integer("contract_id").notNull(),
+  comparisonType: text("comparison_type").notNull(), // standard_library, peer_comparison
+  overallScore: integer("overall_score"),
+  clauseAnalysis: jsonb("clause_analysis"), // Detailed breakdown
+  missingClauses: jsonb("missing_clauses"),
+  keyRecommendations: jsonb("key_recommendations"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const infrastructureLogs = pgTable("infrastructure_logs", {
+  id: serial("id").primaryKey(),
+  component: text("component").notNull(), // api, database, ai_engine, storage
+  event: text("event").notNull(), // downtime, latency_spike, data_inconsistency
+  status: text("status").notNull().default("detected"), // detected, resolving, healed, failed
+  actionTaken: text("action_taken"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const billingTelemetry = pgTable("billing_telemetry", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  metricType: text("metric_type").notNull(), // api_usage, storage_usage, ai_token_usage
+  value: doublePrecision("value").notNull(),
+  cost: doublePrecision("cost"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  action: text("action").notNull(), // CONTRACT_UPLOAD, AUDIT_RUN, RULESET_UPDATE, INFRA_HEAL
+  resourceType: text("resource_type"), // contract, audit, ruleset, system
+  resourceId: text("resource_id"),
+  details: text("details"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const remediationSuggestions = pgTable("remediation_suggestions", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: integer("contract_id").references(() => contracts.id).notNull(),
+  originalClause: text("original_clause").notNull(),
+  suggestedClause: text("suggested_clause").notNull(),
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected
+  createdAt: timestamp("created_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+});
+
+export const playbooks = pgTable("playbooks", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // financial_services, healthcare, etc.
+  rules: jsonb("rules").notNull(),
+  isActive: boolean("is_active").default(true),
+});
+
+export const userPlaybooks = pgTable("user_playbooks", {
+  userId: text("user_id").references(() => users.id).notNull(),
+  playbookId: integer("playbook_id").references(() => playbooks.id).notNull(),
+  activatedAt: timestamp("activated_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -177,6 +278,7 @@ export const contractsRelations = relations(contracts, ({ one, many }) => ({
   risks: many(risks),
   savingsOpportunities: many(savingsOpportunities),
   audits: many(complianceAudits),
+  scorecards: many(vendorScorecards),
 }));
 
 export const auditRulesetsRelations = relations(auditRulesets, ({ many }) => ({
@@ -208,6 +310,32 @@ export const savingsRelations = relations(savingsOpportunities, ({ one }) => ({
   }),
 }));
 
+export const vendorScorecardsRelations = relations(vendorScorecards, ({ one }) => ({
+  contract: one(contracts, {
+    fields: [vendorScorecards.contractId],
+    references: [contracts.id],
+  }),
+}));
+
+export const workspacesRelations = relations(workspaces, ({ many }) => ({
+  // add relations if necessary
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  user: one(users, {
+    fields: [comments.userId],
+    references: [users.id],
+  }),
+  contract: one(contracts, {
+    fields: [comments.contractId],
+    references: [contracts.id],
+  }),
+  audit: one(complianceAudits, {
+    fields: [comments.auditId],
+    references: [complianceAudits.id],
+  }),
+}));
+
 // === INSERTS & TYPES ===
 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
@@ -218,6 +346,20 @@ export const insertRiskSchema = createInsertSchema(risks).omit({ id: true, creat
 export const insertClauseSchema = createInsertSchema(clauseLibrary).omit({ id: true });
 export const insertSavingsSchema = createInsertSchema(savingsOpportunities).omit({ id: true, createdAt: true });
 export const insertReportSchema = createInsertSchema(reports).omit({ id: true, createdAt: true });
+export const insertVendorScorecardSchema = createInsertSchema(vendorScorecards).omit({ id: true, createdAt: true });
+export const regulatoryAlerts = pgTable("regulatory_alerts", {
+  id: serial("id").primaryKey(),
+  standard: text("standard").notNull(), // GDPR, POPIA, KDPA
+  alertTitle: text("alert_title").notNull(),
+  alertDescription: text("alert_description").notNull(),
+  publishedDate: timestamp("published_date").defaultNow(),
+  status: text("status").notNull().default("pending_rescan"), // pending_rescan, rescanned
+});
+
+export const insertWorkspaceSchema = createInsertSchema(workspaces).omit({ id: true, createdAt: true });
+export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true, resolved: true });
+export const insertRegulatoryAlertSchema = createInsertSchema(regulatoryAlerts).omit({ id: true });
+
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -242,3 +384,43 @@ export type InsertSavings = z.infer<typeof insertSavingsSchema>;
 
 export type Report = typeof reports.$inferSelect;
 export type InsertReport = z.infer<typeof insertReportSchema>;
+
+export type VendorScorecard = typeof vendorScorecards.$inferSelect;
+export type InsertVendorScorecard = z.infer<typeof insertVendorScorecardSchema>;
+
+export type Workspace = typeof workspaces.$inferSelect;
+export type InsertWorkspace = z.infer<typeof insertWorkspaceSchema>;
+
+export type Comment = typeof comments.$inferSelect;
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+
+export const insertContractComparisonSchema = createInsertSchema(contractComparisons);
+export type ContractComparison = typeof contractComparisons.$inferSelect;
+export type InsertContractComparison = z.infer<typeof insertContractComparisonSchema>;
+
+export const insertInfrastructureLogSchema = createInsertSchema(infrastructureLogs).omit({ id: true, timestamp: true });
+export type InfrastructureLog = typeof infrastructureLogs.$inferSelect;
+export type InsertInfrastructureLog = z.infer<typeof insertInfrastructureLogSchema>;
+
+export const insertBillingTelemetrySchema = createInsertSchema(billingTelemetry).omit({ id: true, timestamp: true });
+export type BillingTelemetry = typeof billingTelemetry.$inferSelect;
+export type InsertBillingTelemetry = z.infer<typeof insertBillingTelemetrySchema>;
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export const insertRemediationSuggestionSchema = createInsertSchema(remediationSuggestions).omit({ id: true, createdAt: true });
+export type RemediationSuggestion = typeof remediationSuggestions.$inferSelect;
+export type InsertRemediationSuggestion = z.infer<typeof insertRemediationSuggestionSchema>;
+
+export const insertPlaybookSchema = createInsertSchema(playbooks).omit({ id: true, isActive: true });
+export type Playbook = typeof playbooks.$inferSelect;
+export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
+
+export const insertUserPlaybookSchema = createInsertSchema(userPlaybooks).omit({ activatedAt: true });
+export type UserPlaybook = typeof userPlaybooks.$inferSelect;
+export type InsertUserPlaybook = z.infer<typeof insertUserPlaybookSchema>;
+
+export type RegulatoryAlert = typeof regulatoryAlerts.$inferSelect;
+export type InsertRegulatoryAlert = z.infer<typeof insertRegulatoryAlertSchema>;

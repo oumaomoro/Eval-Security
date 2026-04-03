@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type InsertContract } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
+import { type InsertContract } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useContracts(filters?: { clientId?: string; status?: string }) {

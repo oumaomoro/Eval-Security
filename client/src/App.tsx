@@ -12,6 +12,16 @@ import ContractDetail from "@/pages/ContractDetail";
 import Compliance from "@/pages/Compliance";
 import Risks from "@/pages/Risks";
 import Clauses from "@/pages/Clauses";
+import Vendors from "@/pages/Vendors";
+import Reports from "@/pages/Reports";
+import Rulesets from "@/pages/Rulesets";
+import SystemHealth from "@/pages/SystemHealth";
+import AuditLog from "@/pages/AuditLog";
+import Billing from "@/pages/Billing";
+import Settings from "@/pages/Settings";
+import Marketplace from "@/pages/Marketplace";
+import AuthPage from "@/pages/AuthPage";
+import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
 
 function PrivateRouter() {
@@ -23,9 +33,24 @@ function PrivateRouter() {
       <Route path="/compliance" component={Compliance} />
       <Route path="/risks" component={Risks} />
       <Route path="/clauses" component={Clauses} />
+      <Route path="/vendors" component={Vendors} />
+      <Route path="/policies" component={Rulesets} />
+      <Route path="/system" component={SystemHealth} />
+      <Route path="/audit" component={AuditLog} />
+      <Route path="/reports" component={Reports} />
+      <Route path="/billing" component={Billing} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/marketplace" component={Marketplace} />
       <Route component={NotFound} />
     </Switch>
   );
+}
+
+import { useAnalytics } from "@/hooks/use-analytics";
+
+function AnalyticsWrapper() {
+  useAnalytics();
+  return null;
 }
 
 function AuthWrapper() {
@@ -33,7 +58,7 @@ function AuthWrapper() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-950">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
       </div>
     );
@@ -41,20 +66,10 @@ function AuthWrapper() {
 
   if (!user) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-          CyberOptimize
-        </h1>
-        <p className="text-muted-foreground mb-8 max-w-md">
-          Advanced SaaS contract intelligence and compliance platform.
-        </p>
-        <a 
-          href="/api/login"
-          className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity"
-        >
-          Sign In with Replit
-        </a>
-      </div>
+      <Switch>
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route component={AuthPage} />
+      </Switch>
     );
   }
 
@@ -65,6 +80,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <AnalyticsWrapper />
         <Toaster />
         <AuthWrapper />
       </TooltipProvider>

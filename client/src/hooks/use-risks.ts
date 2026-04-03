@@ -1,13 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type InsertRisk } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
+import { type InsertRisk } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useRisks(filters?: { contractId?: string }) {
   return useQuery({
     queryKey: [api.risks.list.path, filters],
     queryFn: async () => {
-      const url = filters 
-        ? `${api.risks.list.path}?${new URLSearchParams(filters as any).toString()}`
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters || {}).filter(([_, v]) => v != null)
+      );
+      
+      const url = Object.keys(cleanFilters).length 
+        ? `${api.risks.list.path}?${new URLSearchParams(cleanFilters as Record<string, string>).toString()}`
         : api.risks.list.path;
       
       const res = await fetch(url, { credentials: "include" });

@@ -1,13 +1,14 @@
 import { z } from 'zod';
-import { 
-  insertClientSchema, 
-  insertContractSchema, 
+import {
+  insertClientSchema,
+  insertContractSchema,
   insertAuditRulesetSchema,
-  insertComplianceAuditSchema, 
-  insertRiskSchema, 
+  insertComplianceAuditSchema,
+  insertRiskSchema,
   insertClauseSchema,
   insertSavingsSchema,
   insertReportSchema,
+  insertVendorScorecardSchema,
   clients,
   contracts,
   auditRulesets,
@@ -15,7 +16,14 @@ import {
   risks,
   clauseLibrary,
   savingsOpportunities,
-  reports
+  reports,
+  vendorScorecards,
+  workspaces,
+  comments,
+  contractComparisons,
+  infrastructureLogs,
+  billingTelemetry,
+  auditLogs
 } from './schema';
 
 // === SHARED ERROR SCHEMAS ===
@@ -110,6 +118,37 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    comparisons: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/contracts/:id/comparisons' as const,
+        responses: {
+          200: z.array(z.custom<typeof contractComparisons.$inferSelect>()),
+        },
+      },
+      compare: {
+        method: "POST" as const,
+        path: "/api/contracts/:id/compare" as const,
+        input: z.object({
+          comparisonType: z.string(),
+        }),
+        responses: {
+          201: z.custom<typeof contractComparisons.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      multi: {
+        method: "POST" as const,
+        path: "/api/contracts/:id/compare/multi" as const,
+        input: z.object({
+          standards: z.array(z.string()),
+        }),
+        responses: {
+          201: z.array(z.custom<typeof contractComparisons.$inferSelect>()),
+          400: errorSchemas.validation,
+        },
+      },
+    },
   },
   compliance: {
     rulesets: {
@@ -167,6 +206,63 @@ export const api = {
       },
     },
   },
+  auditRulesets: {
+    list: {
+      method: "GET" as const,
+      path: "/api/audit-rulesets" as const,
+      responses: {
+        200: z.array(z.custom<typeof auditRulesets.$inferSelect>()),
+      },
+    },
+    create: {
+      method: "POST" as const,
+      path: "/api/audit-rulesets" as const,
+      input: z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        standard: z.string(),
+        rules: z.array(z.object({
+          id: z.string(),
+          requirement: z.string(),
+          description: z.string(),
+          severity: z.enum(["critical", "high", "medium", "low"]),
+        })),
+        isCustom: z.boolean().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof auditRulesets.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: "PUT" as const,
+      path: "/api/audit-rulesets/:id" as const,
+      input: z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+        standard: z.string().optional(),
+        rules: z.array(z.object({
+          id: z.string(),
+          requirement: z.string(),
+          description: z.string(),
+          severity: z.enum(["critical", "high", "medium", "low"]),
+        })).optional(),
+      }),
+      responses: {
+        200: z.custom<typeof auditRulesets.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: "DELETE" as const,
+      path: "/api/audit-rulesets/:id" as const,
+      responses: {
+        204: z.null(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
   risks: {
     list: {
       method: 'GET' as const,
@@ -208,7 +304,7 @@ export const api = {
         200: z.array(z.custom<typeof clauseLibrary.$inferSelect>()),
       },
     },
-    generate: { // Generate new clause via AI
+    generate: {
       method: 'POST' as const,
       path: '/api/clause-library/generate' as const,
       input: z.object({
@@ -255,6 +351,49 @@ export const api = {
         500: errorSchemas.internal,
       },
     },
+    export: {
+      method: 'GET' as const,
+      path: '/api/reports/:id/export' as const,
+      responses: {
+        200: z.any(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  vendors: {
+    scorecards: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/vendors/scorecards' as const,
+        input: z.object({
+          vendorName: z.string().optional(),
+        }).optional(),
+        responses: {
+          200: z.array(z.custom<typeof vendorScorecards.$inferSelect>()),
+        },
+      },
+      create: {
+        method: 'POST' as const,
+        path: '/api/vendors/scorecards' as const,
+        input: insertVendorScorecardSchema,
+        responses: {
+          201: z.custom<typeof vendorScorecards.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+    },
+    benchmarks: {
+      method: 'GET' as const,
+      path: '/api/vendors/benchmarks' as const,
+      responses: {
+        200: z.array(z.object({
+          vendor: z.string(),
+          avgCompliance: z.number(),
+          avgCost: z.number(),
+          riskScore: z.number(),
+        })),
+      },
+    },
   },
   dashboard: {
     stats: {
@@ -264,12 +403,131 @@ export const api = {
         200: z.object({
           totalContracts: z.number(),
           totalAnnualCost: z.number(),
+          totalPotentialSavings: z.number(),
           avgComplianceScore: z.number(),
           criticalRisks: z.number(),
           upcomingRenewals: z.array(z.custom<typeof contracts.$inferSelect>()),
           costByVendor: z.array(z.object({ vendor: z.string(), cost: z.number() })),
           complianceTrends: z.array(z.object({ month: z.string(), score: z.number() })),
+          riskHeatmap: z.array(z.object({ category: z.string(), count: z.number() })),
+          technicalMetrics: z.object({
+            apiResponseTimeAvgMs: z.number(),
+            aiAccuracyRate: z.number(),
+            systemUptime: z.number(),
+            errorRate: z.number(),
+            userEngagement: z.number(),
+          }).optional(),
+          businessMetrics: z.object({
+            mrr: z.number(),
+            cac: z.number(),
+            ltv: z.number(),
+            churnRate: z.number(),
+            nps: z.number(),
+          }).optional(),
+          userMetrics: z.object({
+            contractsAnalyzedPerMonth: z.number(),
+            complianceScoreImprovement: z.number(),
+            savingsOpportunitiesIdentified: z.number(),
+            risksMitigated: z.number(),
+            timeSavedHours: z.number(),
+          }).optional(),
+          remediationLog: z.array(z.object({
+            id: z.number(),
+            action: z.string(),
+            target: z.string(),
+            status: z.string(),
+            timestamp: z.string()
+          })).optional(),
         }),
+      },
+    },
+  },
+  comments: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/comments' as const,
+      input: z.object({
+        contractId: z.string().optional(),
+        auditId: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(z.custom<typeof comments.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/comments' as const,
+      input: z.object({
+        userId: z.string(),
+        contractId: z.number().optional(),
+        auditId: z.number().optional(),
+        content: z.string(),
+      }),
+      responses: {
+        201: z.custom<typeof complianceAudits.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+  },
+  workspaces: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/workspaces' as const,
+      responses: {
+        200: z.array(z.custom<typeof workspaces.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/workspaces' as const,
+      input: z.object({
+        name: z.string(),
+        description: z.string().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof workspaces.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+  },
+  infrastructure: {
+    logs: {
+      method: 'GET' as const,
+      path: '/api/infrastructure/logs' as const,
+      responses: {
+        200: z.array(z.custom<typeof infrastructureLogs.$inferSelect>()),
+      },
+    },
+    heal: {
+      method: 'POST' as const,
+      path: '/api/infrastructure/heal' as const,
+      input: z.object({
+        logId: z.number(),
+      }),
+      responses: {
+        200: z.custom<typeof infrastructureLogs.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  billing: {
+    telemetry: {
+      method: 'GET' as const,
+      path: '/api/billing/telemetry' as const,
+      input: z.object({
+        clientId: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(z.custom<typeof billingTelemetry.$inferSelect>()),
+      },
+    },
+  },
+  auditLogs: {
+    list: {
+      method: "GET" as const,
+      path: "/api/audit-logs" as const,
+      responses: {
+        200: z.array(z.custom<typeof auditLogs.$inferSelect>()),
       },
     },
   },

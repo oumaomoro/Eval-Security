@@ -2,24 +2,120 @@ import { useRoute, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useContract, useAnalyzeContract } from "@/hooks/use-contracts";
 import { useRisks } from "@/hooks/use-risks";
+import { useComments, useCreateComment } from "@/hooks/use-comments";
+import { useAuth } from "@/hooks/use-auth";
+import { ComparisonView } from "@/components/Intelligence/ComparisonView";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Bot, ShieldCheck, AlertTriangle, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Loader2, ArrowLeft, Bot, ShieldCheck, AlertTriangle, FileText, MessageSquare, Send, Brain, Shield, PenTool } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
+import { RedlineView } from "@/components/Intelligence/RedlineView";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { SignNowModal } from "@/components/SignNowModal";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ContractDetail() {
   const [match, params] = useRoute("/contracts/:id");
   const id = parseInt(params?.id || "0");
+  const { user } = useAuth();
   const { data: contract, isLoading } = useContract(id);
   const { data: risks } = useRisks({ contractId: String(id) });
+  const { data: comments, isLoading: isLoadingComments } = useComments({ contractId: id });
+  const { mutate: postComment, isPending: isPosting } = useCreateComment();
   const { mutate: analyze, isPending: isAnalyzing } = useAnalyzeContract();
+  const [commentText, setCommentText] = useState("");
+  const { toast } = useToast();
+
+  // SignNow State
+  const [isSignNowModalOpen, setIsSignNowModalOpen] = useState(false);
+  const [signNowUrl, setSignNowUrl] = useState<string | null>(null);
+  const [isInitiatingSignNow, setIsInitiatingSignNow] = useState(false);
+  const [activeRedline, setActiveRedline] = useState<{ original: string, suggested: string } | null>(null);
+
+  const handleRemediate = async (risk: any) => {
+    try {
+      const res = await fetch(`/api/contracts/${id}/remediate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          clauseId: risk.id, 
+          originalText: risk.riskDescription, 
+          riskDescription: risk.riskTitle 
+        })
+      });
+      const data = await res.json();
+      setActiveRedline({
+        original: risk.riskDescription,
+        suggested: data.suggestedText
+      });
+    } catch (e) {
+      toast({ title: "Remediation Failed", variant: "destructive" });
+    }
+  };
+
+  const handlePostComment = () => {
+    if (!commentText.trim() || !user) return;
+    postComment({
+      userId: user.id,
+      contractId: id,
+      content: commentText
+    }, {
+      onSuccess: () => setCommentText("")
+    });
+  };
+
+  const handleRequestSignature = async () => {
+    try {
+      setIsInitiatingSignNow(true);
+      const res = await fetch("/api/signnow/embedded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractId: id, signerEmail: user?.email })
+      });
+      
+      if (!res.ok) throw new Error("Signature gateway unavailable");
+      
+      const session = await res.json();
+      setSignNowUrl(session.signingUrl);
+      setIsSignNowModalOpen(true);
+      
+      toast({
+        title: "Signature Session Ready",
+        description: "Secure enterprise gateway initialized successfully.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Gateway Error",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsInitiatingSignNow(false);
+    }
+  };
 
   if (isLoading) return <Layout><div>Loading...</div></Layout>;
   if (!contract) return <Layout><div>Contract not found</div></Layout>;
 
   return (
     <Layout>
+      <Dialog open={!!activeRedline} onOpenChange={() => setActiveRedline(null)}>
+        <DialogContent className="max-w-7xl bg-slate-950 border-slate-900 rounded-3xl overflow-hidden p-0">
+          <div className="p-8">
+            <RedlineView 
+              contractId={Number(id)}
+              originalText={activeRedline?.original || ""}
+              suggestedText={activeRedline?.suggested || ""}
+              onComplete={() => setActiveRedline(null)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="mb-6">
         <Link href="/contracts" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-4">
           <ArrowLeft className="w-4 h-4 mr-1" /> Back to Contracts
@@ -32,25 +128,52 @@ export default function ContractDetail() {
               <StatusBadge status={contract.status || "active"} />
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-muted-foreground uppercase tracking-wide font-semibold">Annual Value</div>
-            <div className="text-3xl font-mono font-bold text-primary">${contract.annualCost?.toLocaleString()}</div>
+          <div className="text-right flex flex-col items-end gap-3">
+            <div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">Annual Value</div>
+                <div className="text-3xl font-mono font-bold text-primary tracking-tighter">${contract.annualCost?.toLocaleString()}</div>
+            </div>
+            <Button 
+                onClick={handleRequestSignature}
+                disabled={isInitiatingSignNow || contract.status === 'signed'}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-tighter text-xs h-10 px-6 rounded-xl border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1 transition-all"
+            >
+                {isInitiatingSignNow ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+                {isInitiatingSignNow ? "Initializing..." : "Request Signature"}
+            </Button>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="bg-card border border-border p-1 rounded-xl h-auto w-full justify-start">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg px-4 py-2 gap-2">
-            <FileText className="w-4 h-4" /> Overview
+        <TabsList className="w-full justify-start h-auto p-1 bg-muted/20 border border-border rounded-xl mb-8 flex-wrap">
+          <TabsTrigger value="overview" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <FileText className="w-4 h-4" />
+            Overview
           </TabsTrigger>
-          <TabsTrigger value="analysis" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg px-4 py-2 gap-2">
-            <Bot className="w-4 h-4" /> AI Analysis
+          <TabsTrigger value="analysis" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <Shield className="w-4 h-4" />
+            AI Analysis
           </TabsTrigger>
-          <TabsTrigger value="risks" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg px-4 py-2 gap-2">
-            <AlertTriangle className="w-4 h-4" /> Risks
-            {risks && risks.length > 0 && (
-              <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{risks.length}</span>
+          <TabsTrigger value="intelligence" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <Brain className="w-4 h-4" />
+            Intelligence
+            <Badge variant="secondary" className="ml-1 text-[10px] bg-cyan-500/20 text-cyan-500 border-cyan-500/20">AI</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="redline" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <PenTool className="w-4 h-4" />
+            Active Redline
+            <Badge variant="secondary" className="ml-1 text-[10px] bg-emerald-500/20 text-emerald-500 border-emerald-500/20">βeta</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="risks" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <AlertTriangle className="w-4 h-4" />
+            Risk Register
+          </TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <MessageSquare className="w-4 h-4" />
+            Collaboration
+            {comments && comments.length > 0 && (
+              <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{comments.length}</span>
             )}
           </TabsTrigger>
         </TabsList>
@@ -90,10 +213,10 @@ export default function ContractDetail() {
                   <dd>{contract.autoRenewal ? "Yes" : "No"}</dd>
                 </div>
               </dl>
-              
+
               <div className="mt-8 pt-6 border-t border-border">
-                <Button 
-                  onClick={() => analyze(id)} 
+                <Button
+                  onClick={() => analyze(id)}
                   disabled={isAnalyzing}
                   className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
                 >
@@ -136,11 +259,19 @@ export default function ContractDetail() {
                     <h4 className="font-bold text-foreground">{risk.riskTitle}</h4>
                     <p className="text-sm text-muted-foreground mt-1">{risk.riskDescription}</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <StatusBadge status={risk.severity} type="risk" />
-                    <StatusBadge status={risk.mitigationStatus} type="risk" className="opacity-70" />
+                    <div className="flex items-center gap-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleRemediate(risk)}
+                        className="bg-slate-900 border-slate-800 text-primary font-black uppercase text-[10px] h-8 px-4 rounded-lg"
+                      >
+                        Remediate
+                      </Button>
+                      <StatusBadge status={risk.severity} type="risk" />
+                      <StatusBadge status={risk.mitigationStatus} type="risk" className="opacity-70" />
+                    </div>
                   </div>
-                </div>
               ))}
               {(!risks || risks.length === 0) && (
                 <p className="text-muted-foreground text-center py-8">No risks identified yet.</p>
@@ -148,7 +279,87 @@ export default function ContractDetail() {
             </div>
           </div>
         </TabsContent>
+        <TabsContent value="intelligence" className="animate-in fade-in slide-in-from-bottom-2">
+          <ComparisonView contractId={id} />
+        </TabsContent>
+        <TabsContent value="redline" className="animate-in fade-in slide-in-from-bottom-2">
+          <Card className="bg-card border border-border rounded-2xl p-8">
+            <div className="flex flex-col items-center justify-center text-center py-12">
+                <PenTool className="w-12 h-12 text-primary/50 mb-4" />
+                <h3 className="text-xl font-bold mb-2">Manual Redlining Hub</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto mb-8">
+                    Trigger AI-assisted remediations from the Risk Register tab to view side-by-side diffs and accept legal modifications.
+                </p>
+                <div className="bg-muted/30 p-6 rounded-2xl border border-border/50 max-w-2xl w-full text-left">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-primary mb-4 flex items-center gap-2">
+                        <Shield className="w-3 h-3" /> Governance Protocol
+                    </h4>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground italic">
+                        All AI suggestions must be reviewed by legal counsel before being incorporated into the master agreement. 
+                        Accepting a redline will generate a remediation asset and log the decision to the immutable audit ledger.
+                    </p>
+                </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="comments" className="animate-in fade-in slide-in-from-bottom-2">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-lg h-[500px] flex flex-col">
+            <h3 className="font-bold mb-6 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-primary" /> Project Discussions</h3>
+            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+              {isLoadingComments ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading discussion...</div>
+              ) : comments?.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
+                  <MessageSquare className="w-12 h-12 mb-4" />
+                  <p>No comments yet. Start the conversation!</p>
+                </div>
+              ) : (
+                comments?.map((comment) => (
+                  <div key={comment.id} className={`flex gap-4 ${comment.userId === user?.id ? "flex-row-reverse" : ""}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${comment.userId === user?.id ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      {(comment.user?.firstName?.[0] || comment.user?.email?.[0] || 'U').toUpperCase()}
+                    </div>
+                    <div className={`p-3 rounded-xl border text-sm max-w-[80%] ${comment.userId === user?.id
+                      ? "bg-primary/10 border-primary/20 text-right rounded-tr-none"
+                      : "bg-muted/30 border-border rounded-tl-none"
+                      }`}>
+                      <span className="font-bold text-xs text-muted-foreground block mb-1">
+                        {comment.user?.firstName || comment.user?.email || "Unknown User"} • {new Date(comment.createdAt).toLocaleTimeString()}
+                      </span>
+                      {comment.content}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-auto flex gap-2">
+              <input
+                type="text"
+                placeholder="Add a comment to the team..."
+                className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
+              />
+              <Button
+                size="icon"
+                className="shrink-0 rounded-xl"
+                onClick={handlePostComment}
+                disabled={isPosting || !commentText.trim()}
+              >
+                {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
+
+      <SignNowModal 
+        isOpen={isSignNowModalOpen} 
+        onClose={() => setIsSignNowModalOpen(false)} 
+        url={signNowUrl} 
+      />
     </Layout>
   );
 }
@@ -156,7 +367,7 @@ export default function ContractDetail() {
 function AnalysisCard({ title, data, list }: { title: string, data?: Record<string, string>, list?: string[] }) {
   if (!data && !list) return null;
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="bg-card border border-border rounded-2xl p-6 shadow-lg hover:border-primary/30 transition-colors"

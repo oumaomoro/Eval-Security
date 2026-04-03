@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, FileText, ShieldCheck, AlertTriangle, BookOpen, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, ShieldCheck, AlertTriangle, BookOpen, Users, BarChart, LogOut, Server, Fingerprint, ShoppingBag, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -10,9 +10,17 @@ export function Sidebar() {
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/" },
     { label: "Contracts", icon: FileText, href: "/contracts" },
-    { label: "Compliance", icon: ShieldCheck, href: "/compliance" },
+    { label: "DPO & Compliance Hub", icon: ShieldCheck, href: "/compliance" },
     { label: "Risk Register", icon: AlertTriangle, href: "/risks" },
     { label: "Clause Library", icon: BookOpen, href: "/clauses" },
+    { label: "Vendor Governance", icon: Users, href: "/vendors" },
+    { label: "Compliance Policies", icon: ShieldCheck, href: "/policies" },
+    { label: "System Health", icon: Server, href: "/system" },
+    { label: "Audit Ledger", icon: Fingerprint, href: "/audit" },
+    { label: "Regulatory Reports", icon: BarChart, href: "/reports" },
+    { label: "Billing & Usage", icon: BarChart, href: "/billing" },
+    { label: "Governance Marketplace", icon: ShoppingBag, href: "/marketplace" },
+    { label: "Platform Settings", icon: Settings, href: "/settings" },
   ];
 
   return (
@@ -50,7 +58,7 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border/50">
-        <button 
+        <button
           onClick={() => logout()}
           className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
         >

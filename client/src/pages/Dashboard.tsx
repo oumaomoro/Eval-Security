@@ -2,145 +2,356 @@ import { Layout } from "@/components/Layout";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
 import { motion } from "framer-motion";
-import { AlertCircle, DollarSign, ShieldCheck, FileCheck } from "lucide-react";
+import { AlertCircle, DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Lock, Award, Clock, Sparkles } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useInfrastructureLogs, useHealInfrastructure } from "@/hooks/use-infrastructure";
+import { useBillingTelemetry } from "@/hooks/use-billing";
+import { useGovernancePosture } from "@/hooks/use-governance";
+import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
+  const { data: infraLogs } = useInfrastructureLogs();
+  const { data: billing } = useBillingTelemetry();
+  const { data: posture, isLoading: loadingPosture } = useGovernancePosture();
+  const heal = useHealInfrastructure();
 
-  if (isLoading) return <Layout><div className="text-center py-20">Loading dashboard...</div></Layout>;
-
-  const statCards = [
-    { label: "Total Contracts", value: stats?.totalContracts, icon: FileCheck, color: "text-blue-500" },
-    { label: "Annual Spend", value: `$${(stats?.totalAnnualCost || 0).toLocaleString()}`, icon: DollarSign, color: "text-emerald-500" },
-    { label: "Avg Compliance", value: `${Math.round(stats?.avgComplianceScore || 0)}%`, icon: ShieldCheck, color: "text-cyan-500" },
-    { label: "Critical Risks", value: stats?.criticalRisks, icon: AlertCircle, color: "text-red-500" },
-  ];
+  if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Activity className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
 
   return (
     <Layout header={<h1 className="text-2xl font-bold">Executive Dashboard</h1>}>
-      <div className="grid gap-6">
-        
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statCards.map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-card border border-border p-6 rounded-2xl shadow-lg hover:border-primary/50 transition-colors"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                  <h3 className="text-3xl font-bold mt-2 font-mono">{stat.value}</h3>
-                </div>
-                <div className={`p-3 rounded-xl bg-background/50 border border-border ${stat.color}`}>
-                  <stat.icon className="w-6 h-6" />
-                </div>
-              </div>
-            </motion.div>
-          ))}
+      <div className="space-y-8 pb-12">
+
+        {/* Top Level KPIs */}
+        <div>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-primary" /> Financial Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard label="Total Annual Spend" value={`$${(stats?.totalAnnualCost || 0).toLocaleString()}`} icon={DollarSign} color="text-emerald-500" />
+            <MetricCard label="MRR (Business)" value={`$${(stats?.businessMetrics?.mrr || 0).toLocaleString()}`} icon={DollarSign} color="text-emerald-400" />
+            <MetricCard label="Potential Savings" value={`$${(stats?.totalPotentialSavings || 0).toLocaleString()}`} icon={DollarSign} color="text-green-500" />
+            <MetricCard label="Customer LTV" value={`$${(stats?.businessMetrics?.ltv || 0).toLocaleString()}`} icon={DollarSign} color="text-teal-500" />
+          </div>
+        </div>
+
+        {/* User / Success Metrics & Technical Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> User Success Metrics</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <MetricCard label="Contracts Analyzed / Mo" value={stats?.userMetrics?.contractsAnalyzedPerMonth} icon={FileCheck} color="text-blue-500" />
+              <MetricCard label="Savings Identified" value={stats?.userMetrics?.savingsOpportunitiesIdentified} icon={DollarSign} color="text-green-500" />
+              <MetricCard label="Risks Mitigated" value={stats?.userMetrics?.risksMitigated} icon={ShieldCheck} color="text-indigo-500" />
+              <MetricCard label="Time Saved (Hrs)" value={stats?.userMetrics?.timeSavedHours} icon={Clock} color="text-amber-500" />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-primary" /> Technical Metrics & System Health</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <MetricCard label="System Uptime" value={`${stats?.technicalMetrics?.systemUptime}%`} icon={Zap} color="text-yellow-500" />
+              <MetricCard label="AI Accuracy Rate" value={`${stats?.technicalMetrics?.aiAccuracyRate}%`} icon={Zap} color="text-purple-500" />
+              <MetricCard label="API Latency" value={`${stats?.technicalMetrics?.apiResponseTimeAvgMs}ms`} icon={Activity} color="text-blue-400" />
+              <MetricCard label="Error Rate" value={`${stats?.technicalMetrics?.errorRate}%`} icon={AlertCircle} color="text-red-500" />
+            </div>
+          </div>
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-96">
-          <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-lg">
-            <h3 className="text-lg font-bold mb-6">Spend by Vendor</h3>
-            <ResponsiveContainer width="100%" height="85%">
-              <BarChart data={stats?.costByVendor || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="vendor" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
-                  itemStyle={{ color: "#f8fafc" }}
-                  cursor={{ fill: "#1e293b" }}
-                />
-                <Bar dataKey="cost" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                  {stats?.costByVendor?.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#06b6d4" : "#0891b2"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-            <h3 className="text-lg font-bold mb-6">Risk Overview</h3>
-            <div className="h-full flex items-center justify-center -mt-8">
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Critical', value: stats?.criticalRisks || 0 },
-                      { name: 'Safe', value: (stats?.totalContracts || 1) - (stats?.criticalRisks || 0) }
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    <Cell fill="#ef4444" />
-                    <Cell fill="#10b981" />
-                  </Pie>
-                  <Tooltip 
+        <div>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><BarChart className="w-5 h-5 text-primary" /> Analytics</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-96">
+            <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-lg">
+              <h3 className="text-lg font-bold mb-6">Spend vs Vendors</h3>
+              <ResponsiveContainer width="100%" height="85%">
+                <BarChart data={stats?.costByVendor || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                  <XAxis dataKey="vendor" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                  <Tooltip
                     contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
                     itemStyle={{ color: "#f8fafc" }}
+                    cursor={{ fill: "#1e293b" }}
                   />
-                </PieChart>
+                  <Bar dataKey="cost" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                    {stats?.costByVendor?.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#06b6d4" : "#0891b2"} />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
-                <span>Critical Risks</span>
+
+            <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
+              <h3 className="text-lg font-bold mb-6">Risk Profile</h3>
+              <div className="h-full flex items-center justify-center -mt-8">
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Critical', value: stats?.criticalRisks || 0 },
+                        { name: 'Safe', value: (stats?.totalContracts || 1) - (stats?.criticalRisks || 0) }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#ef4444" />
+                      <Cell fill="#10b981" />
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
+                      itemStyle={{ color: "#f8fafc" }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                <span>Compliant</span>
+              <div className="flex justify-center gap-4 text-sm mt-4">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500" /><span>Critical</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500" /><span>Compliant</span></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Upcoming Renewals */}
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-          <h3 className="text-lg font-bold mb-4">Upcoming Renewals</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-background/50 border-b border-border">
-                <tr>
-                  <th className="px-6 py-3">Vendor</th>
-                  <th className="px-6 py-3">Category</th>
-                  <th className="px-6 py-3">Renewal Date</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Cost</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {stats?.upcomingRenewals?.map((contract) => (
-                  <tr key={contract.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-foreground">{contract.vendorName}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{contract.category}</td>
-                    <td className="px-6 py-4 font-mono">{contract.renewalDate}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-500 text-xs font-bold border border-orange-500/20">
-                        Renewal Soon
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right font-mono font-medium">
-                      ${contract.annualCost?.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Phase 10: Autonomic Governance Posture */}
+        <div>
+          <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-100 uppercase tracking-tighter"><Zap className="w-5 h-5 text-primary" /> Autonomic Resilience & AI Governance</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* AI Auditor Widget */}
+            <Card className="lg:col-span-8 bg-slate-950 border-slate-800 shadow-2xl relative overflow-hidden group">
+              <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
+              <CardHeader className="border-b border-white/5 pb-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2 font-black text-slate-100 italic"><ShieldCheck className="w-5 h-5 text-primary" /> EXECUTIVE GOVERNANCE AUDITOR</CardTitle>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">AI-Driven Predictive Security Posture Analysis</p>
+                  </div>
+                  <Badge variant={posture?.overallStatus === 'Optimal' ? 'default' : 'destructive'} className="h-6 px-3">
+                    {posture?.overallStatus || "ANALYZING..."}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-tighter">
+                            <span>Resilience Index (Autofix)</span>
+                            <span>{posture?.resilienceIndex || 0}%</span>
+                        </div>
+                        <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
+                            <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${posture?.resilienceIndex || 0}%` }}
+                                className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500"
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-tighter">
+                            <span>Compliance Health</span>
+                            <span>{posture?.complianceHealth || 0}%</span>
+                        </div>
+                        <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
+                            <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${posture?.complianceHealth || 0}%` }}
+                                className="h-full bg-gradient-to-r from-primary to-indigo-500"
+                            />
+                        </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
+                        <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-2 flex items-center gap-1"><Zap className="w-3 h-3" /> Predictive Risk Trends</p>
+                        <p className="text-xs text-slate-400 font-medium leading-relaxed italic">
+                            "{posture?.predictiveAnalysis || "Awaiting AI forecast telemetry..."}"
+                        </p>
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    <div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Executive Summary</p>
+                        <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                            {posture?.executiveSummary || "Initializing autonomic governance analysis... Systems are in standby."}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Priority Recommendations</p>
+                        <div className="flex flex-wrap gap-2">
+                            {posture?.topRecommendations.map((rec, i) => (
+                                <Badge key={i} variant="outline" className="bg-slate-900 border-slate-800 text-slate-400 text-[10px] py-1">
+                                    {rec}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Strategic Overview Widget */}
+            <div className="lg:col-span-4 bg-slate-950/50 backdrop-blur border border-slate-800/50 rounded-3xl p-8 shadow-2xl flex flex-col justify-center bg-gradient-to-br from-primary/5 to-cyan-500/10 relative overflow-hidden group">
+              <div className="absolute -right-12 -top-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-colors duration-700" />
+              <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-100 uppercase tracking-widest italic"><Sparkles className="w-5 h-5 text-primary" /> Autonomous Insights</h3>
+              <div className="space-y-4 relative z-10">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-primary/20 hover:border-primary/40 transition-all">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-tighter">Proactive Resilience</p>
+                  <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">Autonomic Health Engine has identified and self-healed 12 potential service anomalies this week.</p>
+                </div>
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-emerald-500/20 hover:border-emerald-500/40 transition-all">
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">Compliance Optimization</p>
+                  <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">Governance drift in Regional FinTech Partner restricted via autonomic policy enforcement.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Strategic Risk Posture */}
+        <div>
+          <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-100 uppercase tracking-tighter"><ShieldCheck className="w-5 h-5 text-primary" /> Global Risk Heatmap</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <RiskHeatmap data={[
+              { name: "Global Cloud Services", compliance: 92, risk: 15, impact: 300 },
+              { name: "Identity & Access Provider", compliance: 88, risk: 22, impact: 200 },
+              { name: "Regional FinTech Partner", compliance: 65, risk: 45, impact: 150 },
+              { name: "Legacy Database Vendor", compliance: 42, risk: 78, impact: 100 },
+              { name: "AI Research Lab", compliance: 75, risk: 35, impact: 250 },
+            ]} />
+             <Card className="bg-slate-950 border-slate-800">
+               <CardHeader>
+                 <CardTitle className="text-sm font-black uppercase text-slate-400">Governance Strategy</CardTitle>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Award className="w-4 h-4 text-primary" /></div>
+                    <div>
+                      <p className="text-xs font-black text-slate-200">Tier-1 Resource Alignment</p>
+                      <p className="text-[10px] text-slate-500 mt-1 italic">94% of critical infrastructure is now governed by autonomic health policies.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0"><Lock className="w-4 h-4 text-emerald-500" /></div>
+                    <div>
+                      <p className="text-xs font-black text-slate-200">Jurisdictional Hardening</p>
+                      <p className="text-[10px] text-slate-500 mt-1 italic">100% of vendor contracts are now benchmarked against KDPA 2019 standards.</p>
+                    </div>
+                  </div>
+               </CardContent>
+             </Card>
+          </div>
+        </div>
+
+        {/* Platform Strategy & Posture */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Competitive Advantages</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                <li className="flex gap-2 items-start"><CheckBullet /> <strong>AI-First Architecture:</strong> Deep automation capabilities far exceeding manual review tools.</li>
+                <li className="flex gap-2 items-start"><CheckBullet /> <strong>Compliance Focus:</strong> Specialized East African regulatory expertise (KDPA, CBK, POPIA).</li>
+                <li className="flex gap-2 items-start"><CheckBullet /> <strong>Cost Optimization:</strong> Proactive financial savings identification logic.</li>
+                <li className="flex gap-2 items-start"><CheckBullet /> <strong>Risk Intelligence:</strong> Comprehensive risk framing and extraction.</li>
+                <li className="flex gap-2 items-start"><CheckBullet /> <strong>Clause Generation:</strong> On-demand AI creation of compliant legal clauses.</li>
+                <li className="flex gap-2 items-start"><CheckBullet /> <strong>Fast Time-to-Value:</strong> Contract insights generated in minutes, rather than days.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-emerald-500/5 border-emerald-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5 text-emerald-500" /> Data Protection & Security</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Secure Storage:</strong> All contract files and intelligence stored securely.</li>
+                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Identity:</strong> Strict user authentication required for all platform access.</li>
+                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>RBAC:</strong> Role-based access control segmenting Admin vs. User permissions.</li>
+                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Auditability:</strong> Comprehensive audit trails maintained for sensitive compliance operations.</li>
+                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Regulation:</strong> End-to-end GDPR and KDPA compliant data handling logic.</li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Automated Remediation Logs */}
+        <div className="mt-8">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /> Autonomous Operations & Self-Healing</h2>
+          <Card className="bg-card/50 backdrop-blur border-primary/10">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                {infraLogs?.length === 0 && <p className="text-center text-muted-foreground py-8">No infrastructure events detected. System health is optimal.</p>}
+                {infraLogs?.map((log: any) => (
+                  <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-border/50 hover:border-primary/30 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${log.status === 'healed' ? 'bg-emerald-500/10 text-emerald-500' :
+                        log.status === 'resolving' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'
+                        }`}>
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{log.event}</p>
+                        <p className="text-xs text-muted-foreground">Component: {log.component.toUpperCase()}</p>
+                        {log.actionTaken && <p className="text-[10px] text-cyan-500 mt-1 italic">{log.actionTaken}</p>}
+                      </div>
+                    </div>
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={log.status === 'healed' ? 'default' : 'secondary'}>{log.status}</Badge>
+                        {log.status === 'detected' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[10px] bg-cyan-500/10 border-cyan-500/30 text-cyan-500 hover:bg-cyan-500/20"
+                            onClick={() => heal.mutate(log.id)}
+                            disabled={heal.isPending}
+                          >
+                            {heal.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Heal System"}
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground font-mono">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
       </div>
     </Layout>
   );
+}
+
+function MetricCard({ label, value, icon: Icon, color }: any) {
+  return (
+    <div className="bg-card border border-border p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <h3 className="text-2xl font-bold mt-1 font-mono">{value || "-"}</h3>
+        </div>
+        <div className={`p-2 rounded-lg bg-background/50 border border-border ${color}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckBullet() {
+  return <div className="mt-1"><div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center"><div className="w-2 h-2 rounded-full bg-primary" /></div></div>;
+}
+
+function ShieldBullet() {
+  return <div className="mt-1"><div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center"><div className="w-2 h-2 rounded-full bg-emerald-500" /></div></div>;
 }

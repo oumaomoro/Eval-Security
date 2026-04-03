@@ -4,9 +4,11 @@ import { useClauses, useGenerateClause } from "@/hooks/use-clauses";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Sparkles, Copy, Check } from "lucide-react";
+import { Loader2, Sparkles, Copy, Check, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function Clauses() {
   const { data: clauses, isLoading } = useClauses();
@@ -15,7 +17,15 @@ export default function Clauses() {
     <Layout header={<h1 className="text-2xl font-bold">Clause Library</h1>}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {isLoading ? <div>Loading...</div> : clauses?.map((clause) => (
+          {isLoading ? <div>Loading...</div> : clauses?.length === 0 ? (
+            <div className="pt-12">
+              <EmptyState 
+                icon={BookOpen} 
+                title="Library Empty" 
+                description="Your enterprise clause library is currently empty. Use the AI Clause Drafter on the right to generate compliance-ready legal language."
+              />
+            </div>
+          ) : clauses?.map((clause) => (
             <div key={clause.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:border-primary/40 transition-all">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -34,7 +44,7 @@ export default function Clauses() {
             </div>
           ))}
         </div>
-        
+
         <div className="lg:col-span-1">
           <AIGenerator />
         </div>
@@ -46,10 +56,11 @@ export default function Clauses() {
 function AIGenerator() {
   const [category, setCategory] = useState("");
   const [requirements, setRequirements] = useState("");
+  const [jurisdiction, setJurisdiction] = useState("KDPA");
   const { mutate: generate, isPending, data: result } = useGenerateClause();
 
   const handleGenerate = () => {
-    generate({ category, requirements });
+    generate({ category, requirements, jurisdiction });
   };
 
   return (
@@ -58,28 +69,42 @@ function AIGenerator() {
         <Sparkles className="w-5 h-5 text-primary" />
         <h3 className="font-bold text-lg text-primary">AI Clause Drafter</h3>
       </div>
-      
+
       <div className="space-y-4">
         <div>
           <label className="text-sm font-medium mb-1 block">Category</label>
-          <Input 
-            value={category} 
-            onChange={e => setCategory(e.target.value)} 
-            placeholder="e.g. Liability Cap" 
+          <Input
+            value={category}
+            onChange={e => setCategory(e.target.value)}
+            placeholder="e.g. Liability Cap"
             className="bg-background border-primary/20"
           />
         </div>
         <div>
+          <label className="text-sm font-medium mb-1 block">Jurisdiction</label>
+          <Select value={jurisdiction} onValueChange={setJurisdiction}>
+            <SelectTrigger className="bg-background border-primary/20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="KDPA">Kenya (KDPA)</SelectItem>
+              <SelectItem value="POPIA">South Africa (POPIA)</SelectItem>
+              <SelectItem value="GDPR">EU (GDPR)</SelectItem>
+              <SelectItem value="CBK">Kenya (CBK Cyber)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
           <label className="text-sm font-medium mb-1 block">Requirements</label>
-          <Textarea 
-            value={requirements} 
-            onChange={e => setRequirements(e.target.value)} 
-            placeholder="Describe what this clause should cover..." 
+          <Textarea
+            value={requirements}
+            onChange={e => setRequirements(e.target.value)}
+            placeholder="Describe what this clause should cover..."
             className="bg-background border-primary/20 min-h-[100px]"
           />
         </div>
-        <Button 
-          onClick={handleGenerate} 
+        <Button
+          onClick={handleGenerate}
           disabled={isPending || !category || !requirements}
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20"
         >
@@ -89,7 +114,7 @@ function AIGenerator() {
       </div>
 
       {result && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mt-6 pt-6 border-t border-primary/20"
