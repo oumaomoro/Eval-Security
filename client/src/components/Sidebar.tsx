@@ -63,11 +63,17 @@ export function Sidebar() {
           <div className="flex flex-col gap-1">
             <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between">
               <span>Region:</span>
-              <span className="font-mono text-primary/70">EU-Central (AWS)</span>
+              <span className="font-mono text-primary/70">
+                {Intl.DateTimeFormat().resolvedOptions().timeZone.includes('Africa') ? 'AF-South (AWS)' : 
+                 Intl.DateTimeFormat().resolvedOptions().timeZone.includes('America') ? 'US-East (AWS)' : 'EU-Central (AWS)'}
+              </span>
             </div>
             <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between">
               <span>Frameworks:</span>
-              <span className="font-mono text-primary/70">GDPR / KDPA</span>
+              <span className="font-mono text-primary/70">
+                {Intl.DateTimeFormat().resolvedOptions().timeZone.includes('Africa') ? 'KDPA / POPIA' : 
+                 Intl.DateTimeFormat().resolvedOptions().timeZone.includes('America') ? 'CCPA / SOC2' : 'GDPR / SOC2'}
+              </span>
             </div>
           </div>
         </div>
