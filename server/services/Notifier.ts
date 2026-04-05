@@ -43,7 +43,7 @@ export class NotifierService {
               elements: [
                 {
                   type: "mrkdwn",
-                  text: `*CyberOptimize Autonomic Engine* • ${new Date().toISOString()}`
+                  text: `*Costloci Autonomic Engine* • ${new Date().toISOString()}`
                 }
               ]
             }

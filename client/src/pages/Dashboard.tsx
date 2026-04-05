@@ -1,9 +1,9 @@
 import { Layout } from "@/components/Layout";
 import { useDashboardStats } from "@/hooks/use-dashboard";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
 import { motion } from "framer-motion";
-import { AlertCircle, DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Lock, Award, Clock, Sparkles } from "lucide-react";
+import { AlertCircle, DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Lock, Award, Clock, Sparkles, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,21 +13,67 @@ import { useBillingTelemetry } from "@/hooks/use-billing";
 import { useGovernancePosture } from "@/hooks/use-governance";
 import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
 import { AutonomicJurisdictionSync } from "@/components/Intelligence/AutonomicJurisdictionSync";
+import { SEO } from "@/components/SEO";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: infraLogs } = useInfrastructureLogs();
   const { data: billing } = useBillingTelemetry();
   const { data: posture, isLoading: loadingPosture } = useGovernancePosture();
+  const { toast } = useToast();
   const { data: heatmapData, isLoading: loadingHeatmap } = useQuery<any[]>({
     queryKey: ["/api/dashboard/risk-heatmap"],
   });
   const heal = useHealInfrastructure();
 
+  const generateReport = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/reports/evidence-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ standard: 'KDPA', type: 'executive_summary' })
+      });
+      if (!res.ok) throw new Error("Failed to generate report");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.fileBase64) {
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${data.fileBase64}`;
+        link.download = `Costloci_Executive_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      toast({
+        title: "Report Generated",
+        description: "Executive compliance report downloaded successfully."
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Report Failed",
+        description: "Failed to generate executive report.",
+        variant: "destructive"
+      });
+    }
+  });
+
   if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Activity className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
 
   return (
-    <Layout header={<h1 className="text-2xl font-bold">Executive Dashboard</h1>}>
+    <Layout header={
+      <div className="flex w-full items-center justify-between">
+         <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Executive Dashboard</h1>
+         <Button onClick={() => generateReport.mutate()} disabled={generateReport.isPending} className="bg-primary/20 text-primary hover:bg-primary/30 border border-primary/50 shadow-[0_0_15px_rgba(6,182,212,0.15)] flex gap-2">
+            {generateReport.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Generate Intelligence Report
+         </Button>
+      </div>
+    }>
+      <SEO title="Enterprise Dashboard" description="Monitor your cybersecurity posture and contract ROI in real-time." />
+
       <div className="space-y-8 pb-12">
 
         {/* Top Level KPIs */}
@@ -308,7 +354,7 @@ export default function Dashboard() {
                 <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Identity:</strong> Strict user authentication required for all platform access.</li>
                 <li className="flex gap-2 items-start"><ShieldBullet /> <strong>RBAC:</strong> Role-based access control segmenting Admin vs. User permissions.</li>
                 <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Auditability:</strong> Comprehensive audit trails maintained for sensitive compliance operations.</li>
-                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Regulation:</strong> End-to-end GDPR and KDPA compliant data handling logic.</li>
+                <li className="flex gap-2 items-start"><ShieldBullet /> <strong>Regulation:</strong> End-to-end ISO 27001, GDPR and KDPA compliant data handling logic.</li>
               </ul>
             </CardContent>
           </Card>
@@ -366,17 +412,30 @@ export default function Dashboard() {
 
 function MetricCard({ label, value, icon: Icon, color }: any) {
   return (
-    <div className="bg-card border border-border p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start">
+    <motion.div 
+      whileHover={{ y: -5, scale: 1.02 }}
+      className="relative overflow-hidden bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 p-6 rounded-3xl shadow-2xl group transition-all"
+    >
+      <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
+      <div className="flex justify-between items-start relative z-10">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <h3 className="text-2xl font-bold mt-1 font-mono">{value || "-"}</h3>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+          <h3 className="text-2xl font-black mt-1 font-mono tracking-tighter text-white">
+            {typeof value === 'number' && label.toLowerCase().includes('cost') ? `$${value.toLocaleString()}` : value || "0"}
+          </h3>
         </div>
-        <div className={`p-2 rounded-lg bg-background/50 border border-border ${color}`}>
+        <div className={`p-3 rounded-2xl bg-slate-950/50 border border-slate-800 shadow-inner ${color}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
-    </div>
+      <div className="mt-4 h-1 w-full bg-slate-800/30 rounded-full overflow-hidden">
+         <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: '70%' }}
+            className={`h-full bg-current ${color.replace('text-', 'bg-')}`} 
+         />
+      </div>
+    </motion.div>
   );
 }
 

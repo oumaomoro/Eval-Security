@@ -4,26 +4,16 @@ import { Globe, AlertTriangle, ShieldCheck, Zap, Activity } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 
-// Mocking the real-time fetch for this component for demonstration, 
-// in production this would pull from /api/regulatory-alerts/live
+interface SyncData {
+  overallHealth: number;
+  activeRegions: Array<{ region: string; status: string; drift: number }>;
+  recentShifts: Array<{ time: string; law: string; resolution: string }>;
+}
+
 export function AutonomicJurisdictionSync() {
-  const { data: syncData, isLoading } = useQuery({
+  const { data: syncData, isLoading } = useQuery<SyncData>({
     queryKey: ['/api/regulatory-alerts/live'],
-    refetchInterval: 5000,
-    queryFn: async () => {
-      // Simulating the dynamic data fetch based on Costloci's innovative edge
-      return {
-        overallHealth: 98.2,
-        activeRegions: [
-          { region: "East Africa (KDPA/CBK)", status: "optimal", drift: 0 },
-          { region: "EU (GDPR)", status: "monitoring", drift: 2.1 },
-          { region: "US (CCPA)", status: "optimal", drift: 0 }
-        ],
-        recentShifts: [
-          { time: new Date().toISOString(), law: "KDPA Art. 21", resolution: "Autonomically Aligned" }
-        ]
-      };
-    }
+    refetchInterval: 10000, 
   });
 
   if (isLoading) return <div className="animate-pulse bg-slate-900 rounded-2xl h-48"></div>;

@@ -12,6 +12,12 @@ declare module "http" {
   }
 }
 
+import cors from "cors";
+app.use(cors({
+  origin: ["http://localhost:5000", "https://94066dae.costloci-frontend.pages.dev", "https://costloci.com"],
+  credentials: true
+}));
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {

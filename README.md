@@ -1,6 +1,6 @@
-# CyberOptimize: The Enterprise Governance Operating System
+# Costloci: The Enterprise Governance Operating System
 
-![CyberOptimize Platform](https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=2070)
+![Costloci Platform](https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=2070)
 
 > [!IMPORTANT]
 > **Production Status**: Enterprise-Ready (Phase 9 Hardening 100% Completed).
@@ -21,7 +21,7 @@
 - **Clause Library**: A professional-grade, AI-assisted repository for standard legal provisions.
 
 ### 🔌 Cross-Platform Intelligence
-- **Microsoft Word Add-in**: Analyze contracts and identify risks directly within MS Word using the CyberOptimize Intelligence Hub.
+- **Microsoft Word Add-in**: Analyze contracts and identify risks directly within MS Word using the Costloci Intelligence Hub.
 
 ### 🛠️ Infrastructure Resilience
 - **Global Health Console**: Real-time monitoring of system performance, API latency, and uptime.

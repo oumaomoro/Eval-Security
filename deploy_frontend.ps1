@@ -1,6 +1,6 @@
-# CyberOptimize One-Click Frontend Deployment
+# Costloci One-Click Frontend Deployment
 # To run: .\deploy_frontend.ps1
-Write-Host "Launching CyberOptimize Cloudflare Deployment..." -ForegroundColor Cyan
+Write-Host "Launching Costloci Cloudflare Deployment..." -ForegroundColor Cyan
 
 # Cloudflare API Token
 $env:CLOUDFLARE_API_TOKEN = "cfat_9k7BS1r3zyEPoibkc8aOSBrN8hm35cyHIMPk9SUj4f9439f5"

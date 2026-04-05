@@ -16,7 +16,7 @@ import type {
 import { storage } from '../storage';
 
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
-const RP_NAME = 'CyberOptimize Enterprise';
+const RP_NAME = 'Costloci Enterprise';
 const EXPECTED_ORIGINS = [
   `https://${RP_ID}`,
   `http://localhost:5000`,

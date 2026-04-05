@@ -1,12 +1,12 @@
-# CyberOptimize: Enterprise Architecture & Governance Guide
+# Costloci: Enterprise Architecture & Governance Guide
 
-This document provides a comprehensive overview of the CyberOptimize SaaS platform's enterprise architecture, strategic governance framework, and production-ready intelligence engine.
+This document provides a comprehensive overview of the Costloci SaaS platform's enterprise architecture, strategic governance framework, and production-ready intelligence engine.
 
 ---
 
 ## 1. STRATEGIC OVERVIEW
 
-CyberOptimize is a professional, AI-powered cybersecurity contract management and cost optimization SaaS platform. It is designed to bridge the gap between legal document management, jurisdictional compliance (KDPA, GDPR, POPIA), and strategic risk governance.
+Costloci is a professional, AI-powered cybersecurity contract management and cost optimization SaaS platform. It is designed to bridge the gap between legal document management, jurisdictional compliance (KDPA, GDPR, POPIA), and strategic risk governance.
 
 ### Core Value Pillars
 - **AI-Driven Intelligence**: Deep contract analysis, deviation detection, and automated remediation.
@@ -55,8 +55,8 @@ CyberOptimize is a professional, AI-powered cybersecurity contract management an
 
 ### Microsoft Word Add-in Hub
 - **Integration**: Direct document analysis capability within the MS Word taskpane.
-- **Communication**: Secure bridge to the CyberOptimize AI engine via standardized `/api/addin/analyze` endpoint.
-- **Branding**: High-fidelity, CyberOptimize-branded experience for legal and procurement teams.
+- **Communication**: Secure bridge to the Costloci AI engine via standardized `/api/addin/analyze` endpoint.
+- **Branding**: High-fidelity, Costloci-branded experience for legal and procurement teams.
 
 ---
 
@@ -72,6 +72,6 @@ The platform has been strictly validated for enterprise deployment:
 ## 6. PLATFORM MATURITY: PHASE 9 COMPLETED
 
 > [!SUCCESS]
-> **CyberOptimize is now ENTERPRISE-READY.** All 9 phases of the production hardening roadmap have been successfully executed, verified, and sealed.
+> **Costloci is now ENTERPRISE-READY.** All 9 phases of the production hardening roadmap have been successfully executed, verified, and sealed.
 
 *End of Document*

@@ -1,4 +1,4 @@
-name: Deploy CyberOptimize
+name: Deploy Costloci
 
 on:
   push:

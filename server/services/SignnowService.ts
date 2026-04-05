@@ -1,6 +1,6 @@
 /**
  * SignNow API Integration Service
- * Advanced e-Signature workflows for CyberOptimize
+ * Advanced e-Signature workflows for Costloci
  */
 
 const SIGNNOW_API_BASE = 'https://api.signnow.com';

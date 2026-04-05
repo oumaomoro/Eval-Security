@@ -2,28 +2,45 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
 async function fetchUser(): Promise<User | null> {
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
+  const token = localStorage.getItem("costloci_token");
+  if (!token) return null;
 
-  if (response.status === 401) {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const response = await fetch(`${apiUrl}/api/auth/user`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem("costloci_token");
+      return null;
+    }
+
+    if (!response.ok) {
+        // Log Error but don't crash, return null to show Auth Page
+        console.error(`[Auth] Backend responded with ${response.status}: ${response.statusText}`);
+        return null; 
+    }
+
+    const data = await response.json();
+    return data.user || data;
+  } catch (error: any) {
+    // Phase 25 Autofix: Prevent spinner-lock on network/DNS/Infrastructure errors
+    console.error('[Auth] Persistent Spinner Resolution: Caught infrastructure error during fetchUser:', error.message);
     return null;
   }
-
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
 }
 
 async function logout(): Promise<void> {
-  window.location.href = "/api/logout";
+  localStorage.removeItem("costloci_token");
+  window.location.href = "/auth";
 }
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading, isError } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
@@ -40,6 +57,7 @@ export function useAuth() {
   return {
     user,
     isLoading,
+    isError,
     isAuthenticated: !!user,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,

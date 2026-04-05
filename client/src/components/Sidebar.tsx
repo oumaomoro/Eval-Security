@@ -1,3 +1,4 @@
+import { DiamondIcon } from "./DiamondIcon";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, FileText, ShieldCheck, AlertTriangle, BookOpen, Users, BarChart, LogOut, Server, Fingerprint, ShoppingBag, Settings, Globe, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,8 +40,8 @@ export function Sidebar() {
       <div className="p-5 border-b border-[hsl(240,25%,18%)] relative overflow-hidden">
         <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
         <div className="flex items-center gap-3 relative z-10">
-          <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/40 shadow-lg shadow-primary/20">
-            <ShieldCheck className="w-5 h-5 text-primary" />
+          <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center border border-emerald-500/30 shadow-lg shadow-emerald-500/10 relative group-hover:scale-110 transition-transform duration-500">
+            <DiamondIcon className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">

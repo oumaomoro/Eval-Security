@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { ExecutiveSummary } from "@/components/Intelligence/ExecutiveSummary";
 import { useDashboardStats } from "@/hooks/use-dashboard";
+import { SEO } from "@/components/SEO";
+import { AutonomicJurisdictionSync } from "@/components/Intelligence/AutonomicJurisdictionSync";
 
 export default function Compliance() {
   const { data: audits, isLoading } = useComplianceAudits();
@@ -20,6 +22,7 @@ export default function Compliance() {
 
   return (
     <Layout>
+      <SEO title="Compliance Hub" description="Monitor global jurisdictional regulatory updates and enterprise posture." />
       <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
         <div className="flex justify-between items-end">
           <div className="flex flex-col gap-2">
@@ -59,6 +62,9 @@ export default function Compliance() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Autonomic Intelligence Hub */}
+        <AutonomicJurisdictionSync />
 
         {/* Intelligence Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

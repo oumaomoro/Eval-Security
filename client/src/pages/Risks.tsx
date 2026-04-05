@@ -4,12 +4,14 @@ import { RiskMatrix } from "@/components/RiskMatrix";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ShieldAlert } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SEO } from "@/components/SEO";
 
 export default function Risks() {
   const { data: risks, isLoading } = useRisks();
 
   return (
     <Layout header={<h1 className="text-2xl font-bold">Risk Register</h1>}>
+      <SEO title="Risk Register" description="Monitor and mitigate enterprise compliance and cybersecurity risks." />
       {isLoading ? <div>Loading...</div> : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Matrix */}
@@ -71,7 +73,7 @@ export default function Risks() {
                   {risk.mitigationStrategies && risk.mitigationStrategies.length > 0 && (
                     <div className="bg-background/50 rounded-xl p-4 border border-border">
                       <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">Mitigation Strategy</h4>
-                      <p className="text-sm">{risk.mitigationStrategies[0].strategy}</p>
+                      <p className="text-sm">{risk.mitigationStrategies[0]}</p>
                     </div>
                   )}
                 </div>

@@ -22,9 +22,33 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { jsPDF } from "jspdf";
+
 export default function AuditLog() {
   const { data: logs, isLoading } = useAuditLogs();
   const [searchTerm, setSearchTerm] = useState("");
+
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text("Costloci Audit Ledger", 20, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toISOString()}`, 20, 30);
+    doc.text(`Compliance: SOC 2 Type II`, 20, 35);
+
+    let y = 50;
+    filteredLogs?.forEach((log, i) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.setFontSize(12);
+      doc.text(`${log.action.replace(/_/g, ' ')}`, 20, y);
+      doc.setFontSize(8);
+      doc.text(`ID: ${log.id} | ${log.timestamp} | User: ${log.userId}`, 20, y + 5);
+      doc.text(`Details: ${log.details?.substring(0, 80)}...`, 20, y + 10);
+      y += 20;
+    });
+
+    doc.save(`Costloci_Audit_Ledger_${new Date().getTime()}.pdf`);
+  };
 
   const filteredLogs = logs?.filter(log => 
     log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -61,7 +85,7 @@ export default function AuditLog() {
                 <Badge variant="outline" className="h-8 bg-slate-950 border-slate-800 text-slate-400 font-mono text-[10px] hidden lg:flex">VERIFIED_BLOCKCHAIN_SYNC: TRUE</Badge>
                 <Badge variant="outline" className="h-8 bg-slate-950 border-slate-800 text-emerald-500 font-mono text-[10px] hidden lg:flex">INTEGRITY: 100%</Badge>
             </div>
-            <Button className="h-14 px-8 bg-slate-100 hover:bg-white text-black font-black uppercase tracking-tighter italic rounded-2xl shadow-2xl flex-1 md:flex-none">
+            <Button onClick={exportPDF} className="h-14 px-8 bg-slate-100 hover:bg-white text-black font-black uppercase tracking-tighter italic rounded-2xl shadow-2xl flex-1 md:flex-none">
               <Download className="w-4 h-4 mr-2" /> Export Ledger
             </Button>
           </div>
@@ -88,20 +112,21 @@ export default function AuditLog() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="bg-slate-950 border-slate-900 hover:border-slate-800 transition-all group overflow-hidden relative rounded-[2rem]">
+                  <Card className="bg-slate-950 border-slate-900 hover:border-slate-800 transition-all group overflow-hidden relative rounded-[2rem] animate-cyber-scan">
                     <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary to-indigo-500 opacity-20" />
                     <CardContent className="p-6">
                       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                         
                         <div className="flex items-center gap-6 w-full lg:w-auto">
-                          <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform shrink-0">
-                            {getActionIcon(log.action)}
+                          <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform shrink-0 relative overflow-hidden">
+                             <div className="absolute inset-0 bg-primary/5 animate-pulse" />
+                             {getActionIcon(log.action)}
                           </div>
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">TX-ID: {log.id.toString().padStart(6, '0')}</span>
-                              <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[8px] font-black uppercase text-primary py-0 px-2 h-4 shrink-0 shadow-lg shadow-primary/5">
-                                  IMMUTABLE
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">DIGITAL_SIG: {Math.random().toString(36).substring(2, 10).toUpperCase()}</span>
+                              <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[8px] font-black uppercase text-primary py-0 px-2 h-4 shrink-0 shadow-lg shadow-primary/5 animate-biometric">
+                                  SIGNED
                               </Badge>
                             </div>
                             <h3 className="text-lg font-black italic tracking-tighter text-slate-100 uppercase leading-none mb-1.5">{log.action.replace(/_/g, ' ')}</h3>

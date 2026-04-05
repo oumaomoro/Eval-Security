@@ -1,5 +1,5 @@
 @echo off
-echo 🚀 Setting up CyberOptimize local development environment...
+echo 🚀 Setting up Costloci local development environment...
 
 :: Check prerequisites
 echo [INFO] Checking prerequisites...
@@ -11,8 +11,8 @@ if %errorlevel% neq 0 (
 
 :: Create project structure
 echo [INFO] Creating project structure...
-mkdir cyberoptimize-local
-cd cyberoptimize-local
+mkdir Costloci-local
+cd Costloci-local
 mkdir backend frontend scripts shared
 mkdir backend\database backend\services backend\uploads
 mkdir frontend\src frontend\src\components frontend\src\contexts
@@ -22,7 +22,7 @@ echo [INFO] Creating package configuration...
 
 :: Root package.json
 echo {
-echo   "name": "cyberoptimize-local",
+echo   "name": "Costloci-local",
 echo   "version": "1.0.0",
 echo   "scripts": {
 echo     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -38,7 +38,7 @@ echo } > package.json
 
 :: Backend package.json
 echo {
-echo   "name": "cyberoptimize-backend",
+echo   "name": "Costloci-backend",
 echo   "version": "1.0.0",
 echo   "type": "module",
 echo   "scripts": {
@@ -57,7 +57,7 @@ echo } > backend\package.json
 
 :: Frontend package.json
 echo {
-echo   "name": "cyberoptimize-frontend",
+echo   "name": "Costloci-frontend",
 echo   "private": true,
 echo   "version": "1.0.0",
 echo   "type": "module",
@@ -92,6 +92,6 @@ echo [INFO] Setup complete!
 echo [INFO] Start the application with: npm start
 echo [INFO] Frontend: http://localhost:5173
 echo [INFO] Backend: http://localhost:3001
-echo [INFO] Test credentials: test@cyberoptimize.com / password123
+echo [INFO] Test credentials: test@Costloci.com / password123
 
 pause

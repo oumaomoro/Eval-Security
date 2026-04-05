@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# CyberOptimize Local Development Auto-Setup
-echo "🚀 Setting up CyberOptimize local development environment..."
+# Costloci Local Development Auto-Setup
+echo "🚀 Setting up Costloci local development environment..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -55,12 +55,12 @@ check_prerequisites() {
 create_project_structure() {
     print_status "Creating project structure..."
     
-    mkdir -p cyberoptimize-local/{backend,frontend,scripts,shared}
+    mkdir -p Costloci-local/{backend,frontend,scripts,shared}
     mkdir -p backend/{database,services,uploads}
     mkdir -p frontend/src/{components,contexts,pages,utils}
     mkdir -p scripts/{setup,deploy,test}
     
-    cd cyberoptimize-local
+    cd Costloci-local
 }
 
 # Create package.json files
@@ -70,7 +70,7 @@ create_package_files() {
     # Root package.json
     cat > package.json << 'EOF'
 {
-  "name": "cyberoptimize-local",
+  "name": "Costloci-local",
   "version": "1.0.0",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -97,7 +97,7 @@ EOF
     # Backend package.json
     cat > backend/package.json << 'EOF'
 {
-  "name": "cyberoptimize-backend",
+  "name": "Costloci-backend",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -125,7 +125,7 @@ EOF
     # Frontend package.json
     cat > frontend/package.json << 'EOF'
 {
-  "name": "cyberoptimize-frontend",
+  "name": "Costloci-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -274,7 +274,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 CyberOptimize backend running on http://localhost:${PORT}`);
+    console.log(`🚀 Costloci backend running on http://localhost:${PORT}`);
     console.log(`📊 API Health: http://localhost:${PORT}/api/health`);
 });
 
@@ -307,7 +307,7 @@ EOF
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CyberOptimize - Local</title>
+    <title>Costloci - Local</title>
     <style>
       body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; }
     </style>
@@ -341,7 +341,7 @@ export class Database {
 
     async init() {
         this.db = await open({
-            filename: './database/cyberoptimize.db',
+            filename: './database/Costloci.db',
             driver: sqlite3.Database
         });
         await this.createTables();
@@ -397,7 +397,7 @@ export class Database {
             const hashedPassword = await bcrypt.hash('password123', 12);
             await this.db.run(
                 'INSERT INTO users (id, email, password_hash, tier) VALUES (?, ?, ?, ?)',
-                ['test-user-123', 'test@cyberoptimize.com', hashedPassword, 'professional']
+                ['test-user-123', 'test@Costloci.com', hashedPassword, 'professional']
             );
             console.log('✅ Sample data seeded');
         }
@@ -411,7 +411,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 
-const JWT_SECRET = 'cyberoptimize-local-secret-2024';
+const JWT_SECRET = 'Costloci-local-secret-2024';
 
 export class AuthService {
     constructor(db) {
@@ -537,10 +537,10 @@ install_dependencies() {
 
 # Start the application
 start_application() {
-    print_status "Starting CyberOptimize..."
+    print_status "Starting Costloci..."
     print_status "Frontend will be available at: http://localhost:5173"
     print_status "Backend API will be available at: http://localhost:3001"
-    print_status "Test credentials: test@cyberoptimize.com / password123"
+    print_status "Test credentials: test@Costloci.com / password123"
     
     # Start both frontend and backend
     npm run dev
@@ -548,7 +548,7 @@ start_application() {
 
 # Main execution
 main() {
-    print_status "Starting CyberOptimize automated setup..."
+    print_status "Starting Costloci automated setup..."
     
     check_prerequisites
     create_project_structure

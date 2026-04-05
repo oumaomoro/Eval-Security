@@ -18,12 +18,25 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const token = localStorage.getItem("costloci_token");
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL === 'https://api.costloci.com' ? '' : (import.meta.env.VITE_API_URL || ""));
+  const fullUrl = url.startsWith("http") ? url : `${apiUrl}${url.startsWith("/") ? url : `/${url}`}`;
+
+  const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
+
+  if (res.status === 401 || res.status === 403) {
+      if (!url.includes("/api/auth/login")) {
+          localStorage.removeItem("costloci_token");
+      }
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -35,12 +48,21 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
+    const token = localStorage.getItem("costloci_token");
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL === 'https://api.costloci.com' ? '' : (import.meta.env.VITE_API_URL || ""));
+    const path = queryKey.join("/");
+    const fullUrl = path.startsWith("http") ? path : `${apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
+
+    const res = await fetch(fullUrl, {
+      headers: {
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      },
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem("costloci_token");
+      if (unauthorizedBehavior === "returnNull") return null;
     }
 
     await throwIfResNotOk(res);

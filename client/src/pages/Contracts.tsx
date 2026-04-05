@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { InsertContract } from "@shared/schema";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SEO } from "@/components/SEO";
 
 export default function Contracts() {
   const [search, setSearch] = useState("");
@@ -25,6 +26,7 @@ export default function Contracts() {
     <Layout 
       header={
         <div className="flex items-center justify-between w-full">
+          <SEO title="Contract Management" description="Manage and audit your enterprise cybersecurity contracts in one place." />
           <h1 className="text-2xl font-bold">Contract Management</h1>
           <div className="flex gap-4">
             <div className="relative">

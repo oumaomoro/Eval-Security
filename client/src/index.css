@@ -140,9 +140,33 @@
   animation: shimmer 1.8s infinite;
 }
 
-/* --- Smooth page transitions --- */
-.animate-in { animation-duration: 300ms; animation-fill-mode: both; }
-.fade-in { animation-name: fadeIn; }
-.slide-in-from-bottom-2 { animation-name: slideInFromBottom; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideInFromBottom { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* --- Cyber Signature Scanline --- */
+@keyframes scanline {
+  0% { transform: translateY(-100%); opacity: 0; }
+  50% { opacity: 0.5; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+.animate-cyber-scan {
+  position: relative;
+  overflow: hidden;
+}
+.animate-cyber-scan::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+  animation: scanline 3s linear infinite;
+  pointer-events: none;
+}
+
+/* --- Biometric Pulse --- */
+@keyframes biometric-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-biometric { animation: biometric-pulse 2s ease-in-out infinite; }
+

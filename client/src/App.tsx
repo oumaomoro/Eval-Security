@@ -25,6 +25,7 @@ const Risks = React.lazy(() => import("@/pages/Risks"));
 const Rulesets = React.lazy(() => import("@/pages/Rulesets"));
 
 import AuthPage from "@/pages/AuthPage";
+import LandingPage from "@/pages/LandingPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
 
@@ -61,7 +62,7 @@ function AnalyticsWrapper() {
 }
 
 function AuthWrapper() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isError } = useAuth();
 
   if (isLoading) {
     return (
@@ -71,11 +72,23 @@ function AuthWrapper() {
     );
   }
 
-  if (!user) {
+  // Unauthenticated: Marketing vs Auth
+  if (!user || isError) {
     return (
       <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route path="/auth" component={AuthPage} />
         <Route path="/reset-password" component={ResetPassword} />
-        <Route component={AuthPage} />
+        {/* Redirect unknown routes to Landing on auth-fail */}
+        <Route component={() => {
+          // If trying to access protected route while unauth, go to /auth
+          const path = window.location.pathname;
+          if (path !== "/" && path !== "/reset-password") {
+             window.location.href = "/auth";
+             return null;
+          }
+          return <LandingPage />;
+        }} />
       </Switch>
     );
   }

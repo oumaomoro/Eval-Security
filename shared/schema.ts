@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -59,6 +59,7 @@ export const contracts = pgTable("contracts", {
     securityIncidentProvisions?: Record<string, string>;
     kdpaSpecificAnalysis?: Record<string, string>;
     riskFlags?: string[];
+    riskScore?: number;
     summary?: string;
   }>(),
 
@@ -83,7 +84,7 @@ export const auditRulesets = pgTable("audit_rulesets", {
 
 export const complianceAudits = pgTable("compliance_audits", {
   id: serial("id").primaryKey(),
-  contractId: integer("contract_id").references(() => contracts.id), // Can be null if audit covers multiple
+  contractId: integer("contract_id").references(() => contracts.id),
   rulesetId: integer("ruleset_id").references(() => auditRulesets.id),
   auditName: text("audit_name").notNull(),
   auditType: text("audit_type").notNull(), // manual, automated, scheduled, continuous
@@ -97,14 +98,17 @@ export const complianceAudits = pgTable("compliance_audits", {
 
   // Detailed findings
   findings: jsonb("findings").$type<Array<{
-    severity: "critical" | "high" | "medium" | "low";
+    id: string;
+    requirement: string;
     description: string;
-    recommendation: string;
-    standard?: string;
-    section?: string;
-    ruleId?: string;
+    status: "compliant" | "non_compliant" | "not_applicable" | "partial";
+    evidence: string;
+    severity?: "critical" | "high" | "medium" | "low";
+    remediation?: string;
+    jurisdiction?: string;
   }>>(),
 
+  // High-fidelity executive reporting
   complianceByStandard: jsonb("compliance_by_standard").$type<Record<string, number>>(),
   systemicIssues: jsonb("systemic_issues").$type<string[]>(),
   executiveSummary: text("executive_summary"),
@@ -116,24 +120,20 @@ export const risks = pgTable("risks", {
   id: serial("id").primaryKey(),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   riskTitle: text("risk_title").notNull(),
-  riskCategory: text("risk_category").notNull(), // compliance, financial, operational, etc.
+  riskCategory: text("risk_category").notNull(), // security, financial, operational, legal
   riskDescription: text("risk_description"),
-  severity: text("severity").notNull(), // critical, high, medium, low
-  likelihood: text("likelihood").notNull(), // very_high, high, medium, low, very_low
-  impact: text("impact").notNull(), // very_high, high, medium, low, very_low
-  riskScore: integer("risk_score"), // 0-100
-  mitigationStatus: text("mitigation_status").notNull().default("identified"), // identified, mitigation_planned, in_progress, mitigated, accepted
+  severity: text("severity").notNull(), // low, medium, high, critical
+  likelihood: text("likelihood").notNull(), // rare, unlikely, possible, likely, almost_certain
+  impact: text("impact").notNull(), // minimal, minor, moderate, major, very_high
+  riskScore: integer("risk_score"), // Calculated (1-25)
 
-  mitigationStrategies: jsonb("mitigation_strategies").$type<Array<{
-    strategy: string;
-    priority: string;
-    cost?: string;
-    timeline?: string;
-  }>>(),
+  mitigationStatus: text("mitigation_status").notNull().default("identified"), // identified, in_progress, mitigated, accepted
+  mitigationStrategies: jsonb("mitigation_strategies").$type<string[]>(),
 
+  // Advanced Forensic Fields
   financialExposureMin: doublePrecision("financial_exposure_min"),
   financialExposureMax: doublePrecision("financial_exposure_max"),
-  aiConfidence: integer("ai_confidence"), // 0-100
+  aiConfidence: integer("ai_confidence"),
 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -141,11 +141,11 @@ export const risks = pgTable("risks", {
 export const clauseLibrary = pgTable("clause_library", {
   id: serial("id").primaryKey(),
   clauseName: text("clause_name").notNull(),
-  clauseCategory: text("clause_category").notNull(), // data_protection, liability, etc.
+  clauseCategory: text("clause_category").notNull(),
   standardLanguage: text("standard_language").notNull(),
-  jurisdiction: text("jurisdiction"), // kenya, east_africa, international
+  jurisdiction: text("jurisdiction"),
   applicableStandards: jsonb("applicable_standards").$type<string[]>(),
-  riskLevelIfMissing: text("risk_level_if_missing"), // critical, high, medium, low
+  riskLevelIfMissing: text("risk_level_if_missing"),
   isMandatory: boolean("is_mandatory").default(false),
 });
 
@@ -153,27 +153,33 @@ export const savingsOpportunities = pgTable("savings_opportunities", {
   id: serial("id").primaryKey(),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   description: text("description").notNull(),
-  type: text("type").notNull(), // consolidation, pricing, license_optimization
+  type: text("type").notNull(),
   estimatedSavings: doublePrecision("estimated_savings"),
-  status: text("status").default("identified"), // identified, in_progress, realized, dismissed
+  status: text("status").default("identified"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const reports = pgTable("reports", {
   id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  type: text("type").notNull(), // regulatory_compliance, risk_assessment, executive_summary
-  regulatoryBody: text("regulatory_body"), // ODPC, CBK, etc.
-  status: text("status").notNull().default("pending"), // pending, generated, failed
-  content: jsonb("content").$type<{
-    kdpaAdherence?: string;
-    incidentResponse?: string;
-    dpaAnalysis?: string;
-    riskPosture?: string;
-    sections: Array<{ title: string; body: string }>;
+  userId: text("user_id"),
+  organizationId: text("organization_id"),
+  reportName: text("report_name"),
+  title: text("title"), // Keep for compatibility
+  type: text("type").notNull(),
+  regulatoryBody: text("regulatory_body"),
+  status: text("status").notNull().default("pending"),
+  aiAnalysis: jsonb("ai_analysis").$type<{
+    strategic_brief?: string;
+    total_portfolio_risk?: number;
+    contracts_summarized?: number;
+    savings_potential?: number;
+    remediation_confidence?: number;
   }>(),
+  content: jsonb("content"), // Keep for compatibility
   format: text("format").notNull().default("pdf"),
   fileUrl: text("file_url"),
+  generatedBy: text("generated_by"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -181,60 +187,21 @@ export const vendorScorecards = pgTable("vendor_scorecards", {
   id: serial("id").primaryKey(),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   vendorName: text("vendor_name").notNull(),
-  complianceScore: integer("compliance_score"), // 0-100
-  riskScore: integer("risk_score"), // 0-100
-  securityScore: integer("security_score"), // 0-100
-  slaPerformance: integer("sla_performance"), // 0-100
-  overallGrade: text("overall_grade"), // A, B, C, D, F
+  complianceScore: integer("compliance_score"),
+  riskScore: integer("risk_score"),
+  securityScore: integer("security_score"),
+  slaPerformance: integer("sla_performance"),
+  overallGrade: text("overall_grade"),
   lastAssessmentDate: timestamp("last_assessment_date").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const comments = pgTable("comments", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(), // maps to users.id which is varchar
-  contractId: integer("contract_id").references(() => contracts.id),
-  auditId: integer("audit_id").references(() => complianceAudits.id),
-  content: text("content").notNull(),
-  resolved: boolean("resolved").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const contractComparisons = pgTable("contract_comparisons", {
-  id: serial("id").primaryKey(),
-  contractId: integer("contract_id").notNull(),
-  comparisonType: text("comparison_type").notNull(), // standard_library, peer_comparison
-  overallScore: integer("overall_score"),
-  clauseAnalysis: jsonb("clause_analysis"), // Detailed breakdown
-  missingClauses: jsonb("missing_clauses"),
-  keyRecommendations: jsonb("key_recommendations"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const infrastructureLogs = pgTable("infrastructure_logs", {
-  id: serial("id").primaryKey(),
-  component: text("component").notNull(), // api, database, ai_engine, storage
-  event: text("event").notNull(), // downtime, latency_spike, data_inconsistency
-  status: text("status").notNull().default("detected"), // detected, resolving, healed, failed
-  actionTaken: text("action_taken"),
-  timestamp: timestamp("timestamp").defaultNow(),
-});
-
-export const billingTelemetry = pgTable("billing_telemetry", {
-  id: serial("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
-  metricType: text("metric_type").notNull(), // api_usage, storage_usage, ai_token_usage
-  value: doublePrecision("value").notNull(),
-  cost: doublePrecision("cost"),
-  timestamp: timestamp("timestamp").defaultNow(),
-});
-
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id), // Link to organization for data isolation
+  clientId: integer("client_id").references(() => clients.id),
   userId: text("user_id").notNull(),
-  action: text("action").notNull(), 
-  resourceType: text("resource_type"), 
+  action: text("action").notNull(),
+  resourceType: text("resource_type"),
   resourceId: text("resource_id"),
   details: text("details"),
   timestamp: timestamp("timestamp").defaultNow(),
@@ -245,7 +212,7 @@ export const remediationSuggestions = pgTable("remediation_suggestions", {
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   originalClause: text("original_clause").notNull(),
   suggestedClause: text("suggested_clause").notNull(),
-  status: text("status").notNull().default("pending"), // pending, accepted, rejected
+  status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
   acceptedAt: timestamp("accepted_at"),
 });
@@ -254,8 +221,8 @@ export const playbooks = pgTable("playbooks", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  category: text("category").notNull(), // financial_services, healthcare, etc.
-  rules: jsonb("rules").notNull(),
+  category: text("category").notNull(),
+  rules: jsonb("rules").$type<string[]>().notNull(),
   isActive: boolean("is_active").default(true),
 });
 
@@ -265,102 +232,95 @@ export const userPlaybooks = pgTable("user_playbooks", {
   activatedAt: timestamp("activated_at").defaultNow(),
 });
 
-// === RELATIONS ===
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").references(() => users.id).notNull(),
+  contractId: integer("contract_id").references(() => contracts.id),
+  auditId: integer("audit_id").references(() => complianceAudits.id),
+  content: text("content").notNull(),
+  resolved: boolean("resolved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const contractComparisons = pgTable("contract_comparisons", {
+  id: serial("id").primaryKey(),
+  contractId: integer("contract_id").references(() => contracts.id).notNull(),
+  comparisonType: text("comparison_type").notNull(), // market, internal, template
+  overallScore: integer("overall_score"),
+  clauseAnalysis: jsonb("clause_analysis").$type<any>(),
+  missingClauses: jsonb("missing_clauses").$type<string[]>(),
+  keyRecommendations: jsonb("key_recommendations").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const regulatoryAlerts = pgTable("regulatory_alerts", {
+  id: serial("id").primaryKey(),
+  standard: text("standard").notNull(),
+  alertTitle: text("alert_title").notNull(),
+  alertDescription: text("alert_description").notNull(),
+  publishedDate: timestamp("published_date").defaultNow(),
+  status: text("status").notNull().default("pending_rescan"),
+});
+
+export const infrastructureLogs = pgTable("infrastructure_logs", {
+  id: serial("id").primaryKey(),
+  component: text("component").notNull(),
+  event: text("event").notNull(),
+  status: text("status").notNull().default("detected"), // detected, analyzing, self_healing, resolved
+  actionTaken: text("action_taken"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const billingTelemetry = pgTable("billing_telemetry", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  metricType: text("metric_type").notNull(), // api_call, storage_gb, audit_runtime
+  value: doublePrecision("value").notNull(),
+  cost: doublePrecision("cost"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// === DATABASE RELATIONS ===
 
 export const clientsRelations = relations(clients, ({ many }) => ({
   contracts: many(contracts),
+  audits: many(auditLogs),
+  billing: many(billingTelemetry),
 }));
 
 export const contractsRelations = relations(contracts, ({ one, many }) => ({
-  client: one(clients, {
-    fields: [contracts.clientId],
-    references: [clients.id],
-  }),
+  client: one(clients, { fields: [contracts.clientId], references: [clients.id] }),
+  complianceAudits: many(complianceAudits),
   risks: many(risks),
   savingsOpportunities: many(savingsOpportunities),
-  audits: many(complianceAudits),
   scorecards: many(vendorScorecards),
+  comments: many(comments),
+  comparisons: many(contractComparisons),
 }));
 
 export const auditRulesetsRelations = relations(auditRulesets, ({ many }) => ({
   audits: many(complianceAudits),
 }));
 
-export const complianceAuditsRelations = relations(complianceAudits, ({ one }) => ({
-  contract: one(contracts, {
-    fields: [complianceAudits.contractId],
-    references: [contracts.id],
-  }),
-  ruleset: one(auditRulesets, {
-    fields: [complianceAudits.rulesetId],
-    references: [auditRulesets.id],
-  }),
-}));
-
-export const risksRelations = relations(risks, ({ one }) => ({
-  contract: one(contracts, {
-    fields: [risks.contractId],
-    references: [contracts.id],
-  }),
-}));
-
-export const savingsRelations = relations(savingsOpportunities, ({ one }) => ({
-  contract: one(contracts, {
-    fields: [savingsOpportunities.contractId],
-    references: [contracts.id],
-  }),
-}));
-
-export const vendorScorecardsRelations = relations(vendorScorecards, ({ one }) => ({
-  contract: one(contracts, {
-    fields: [vendorScorecards.contractId],
-    references: [contracts.id],
-  }),
-}));
-
-export const workspacesRelations = relations(workspaces, ({ many }) => ({
-  // add relations if necessary
+export const complianceAuditsRelations = relations(complianceAudits, ({ one, many }) => ({
+  contract: one(contracts, { fields: [complianceAudits.contractId], references: [contracts.id] }),
+  ruleset: one(auditRulesets, { fields: [complianceAudits.rulesetId], references: [auditRulesets.id] }),
+  comments: many(comments),
 }));
 
 export const commentsRelations = relations(comments, ({ one }) => ({
-  user: one(users, {
-    fields: [comments.userId],
-    references: [users.id],
-  }),
-  contract: one(contracts, {
-    fields: [comments.contractId],
-    references: [contracts.id],
-  }),
-  audit: one(complianceAudits, {
-    fields: [comments.auditId],
-    references: [complianceAudits.id],
-  }),
+  user: one(users, { fields: [comments.userId], references: [users.id] }),
+  contract: one(contracts, { fields: [comments.contractId], references: [contracts.id] }),
+  audit: one(complianceAudits, { fields: [comments.auditId], references: [complianceAudits.id] }),
 }));
 
-// === INSERTS & TYPES ===
+// === SCHEMA DEFINITIONS ===
 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
 export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAuditRulesetSchema = createInsertSchema(auditRulesets).omit({ id: true, createdAt: true });
 export const insertComplianceAuditSchema = createInsertSchema(complianceAudits).omit({ id: true, createdAt: true });
 export const insertRiskSchema = createInsertSchema(risks).omit({ id: true, createdAt: true });
-export const insertClauseSchema = createInsertSchema(clauseLibrary).omit({ id: true });
-export const insertSavingsSchema = createInsertSchema(savingsOpportunities).omit({ id: true, createdAt: true });
-export const insertReportSchema = createInsertSchema(reports).omit({ id: true, createdAt: true });
-export const insertVendorScorecardSchema = createInsertSchema(vendorScorecards).omit({ id: true, createdAt: true });
-export const regulatoryAlerts = pgTable("regulatory_alerts", {
-  id: serial("id").primaryKey(),
-  standard: text("standard").notNull(), // GDPR, POPIA, KDPA
-  alertTitle: text("alert_title").notNull(),
-  alertDescription: text("alert_description").notNull(),
-  publishedDate: timestamp("published_date").defaultNow(),
-  status: text("status").notNull().default("pending_rescan"), // pending_rescan, rescanned
-});
-
-export const insertWorkspaceSchema = createInsertSchema(workspaces).omit({ id: true, createdAt: true });
-export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true, resolved: true });
-export const insertRegulatoryAlertSchema = createInsertSchema(regulatoryAlerts).omit({ id: true });
-
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -376,6 +336,13 @@ export type InsertComplianceAudit = z.infer<typeof insertComplianceAuditSchema>;
 
 export type Risk = typeof risks.$inferSelect;
 export type InsertRisk = z.infer<typeof insertRiskSchema>;
+
+export const insertClauseSchema = createInsertSchema(clauseLibrary).omit({ id: true });
+export const insertSavingsSchema = createInsertSchema(savingsOpportunities).omit({ id: true, createdAt: true });
+export const insertReportSchema = createInsertSchema(reports).omit({ id: true, createdAt: true });
+export const insertVendorScorecardSchema = createInsertSchema(vendorScorecards).omit({ id: true, createdAt: true });
+export const insertWorkspaceSchema = createInsertSchema(workspaces).omit({ id: true, createdAt: true });
+export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true });
 
 export type Clause = typeof clauseLibrary.$inferSelect;
 export type InsertClause = z.infer<typeof insertClauseSchema>;
@@ -395,7 +362,7 @@ export type InsertWorkspace = z.infer<typeof insertWorkspaceSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 
-export const insertContractComparisonSchema = createInsertSchema(contractComparisons);
+export const insertContractComparisonSchema = createInsertSchema(contractComparisons).omit({ id: true, createdAt: true });
 export type ContractComparison = typeof contractComparisons.$inferSelect;
 export type InsertContractComparison = z.infer<typeof insertContractComparisonSchema>;
 
@@ -423,5 +390,6 @@ export const insertUserPlaybookSchema = createInsertSchema(userPlaybooks).omit({
 export type UserPlaybook = typeof userPlaybooks.$inferSelect;
 export type InsertUserPlaybook = z.infer<typeof insertUserPlaybookSchema>;
 
+export const insertRegulatoryAlertSchema = createInsertSchema(regulatoryAlerts).omit({ id: true, publishedDate: true });
 export type RegulatoryAlert = typeof regulatoryAlerts.$inferSelect;
 export type InsertRegulatoryAlert = z.infer<typeof insertRegulatoryAlertSchema>;

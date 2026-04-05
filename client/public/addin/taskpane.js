@@ -1,5 +1,5 @@
 /* 
- * CyberOptimize Word Add-in Logic
+ * Costloci Word Add-in Logic
  * Handles document analysis and real-time intelligence injection.
  */
 
@@ -17,7 +17,7 @@ async function runAnalysis() {
         const docText = await getDocumentText();
         
         // In a real environment, this would call the production API
-        // For development, we point to the CyberOptimize platform endpoint
+        // For development, we point to the Costloci platform endpoint
         const response = await fetch('/api/integrations/word/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -34,7 +34,7 @@ async function runAnalysis() {
         toggleState('results');
     } catch (error) {
         console.error(error);
-        alert('Critical Error: Could not connect to CyberOptimize Intelligence Hub.');
+        alert('Critical Error: Could not connect to Costloci Intelligence Hub.');
         toggleState('idle');
     }
 }

@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, FileText, Download, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Layout } from "@/components/Layout";
+import { SEO } from "@/components/SEO";
 
 export default function Reports() {
     const { toast } = useToast();
@@ -58,14 +60,16 @@ export default function Reports() {
     }
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Regulatory Reports</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Generate and manage specialized compliance reports (ODPC, CBK, POPIA).
-                    </p>
-                </div>
+        <Layout header={<h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm flex items-center gap-2"><FileText className="w-6 h-6 text-primary" /> Regulatory Reports</h1>}>
+            <SEO title="Regulatory Reports" description="Manage and export specialized compliance reports for ODPC, CBK, and POPIA." />
+            <div className="space-y-8 pb-12">
+                <div className="flex justify-between items-center bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-800/50 shadow-3xl">
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic">Report Generation Hub</h1>
+                        <p className="text-slate-500 font-bold uppercase tracking-tight text-sm mt-2">
+                            Engineered for high-fidelity compliance transparency and jurisdictional verification.
+                        </p>
+                    </div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
                         <Button>
@@ -183,5 +187,6 @@ export default function Reports() {
                 </CardContent>
             </Card>
         </div>
+        </Layout>
     );
 }

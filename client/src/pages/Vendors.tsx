@@ -10,6 +10,8 @@ import {
     ArrowUpRight, DollarSign, Activity, Globe, Loader2 
 } from "lucide-react";
 import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
+import { motion } from "framer-motion";
+import { SEO } from "@/components/SEO";
 
 export default function Vendors() {
     const { data: benchmarks, isLoading: loadingBenchmarks } = useQuery({
@@ -38,45 +40,60 @@ export default function Vendors() {
     const heatmapData = benchmarks?.map((b: any) => ({
         name: b.vendor,
         compliance: b.avgCompliance,
-        risk: b.riskScore,
-        impact: Math.floor(b.avgCost / 1000)
+        risk: b.highestRisk,
+        impact: Math.min(Math.floor((b.totalCost || 0) / 5000), 100)
     })) || [];
 
     return (
-        <Layout header={<h1 className="text-2xl font-bold flex items-center gap-2"><Users className="w-6 h-6 text-primary" /> Vendor Governance Hub</h1>}>
+        <Layout header={
+            <div className="flex w-full items-center justify-between">
+                <SEO title="Vendor Governance Hub" description="Analyze and benchmark vendor compliance and cost ROI in real-time." />
+                <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm flex items-center gap-2">
+                    <Users className="w-6 h-6 text-primary" /> Vendor Governance Hub
+                </h1>
+                <Badge variant="outline" className="bg-slate-900/50 backdrop-blur-md border-primary/20 text-primary py-1 px-3 flex gap-2 items-center text-[10px] font-black uppercase tracking-widest">
+                    <Activity className="w-3 h-3 animate-pulse" /> Real-time Analytics Active
+                </Badge>
+            </div>
+        }>
             <div className="space-y-8 pb-12">
                 
                 {/* Strategic Overview Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <RiskHeatmap data={heatmapData} />
+                    <div className="bg-slate-900/20 backdrop-blur-md rounded-[2.5rem] border border-slate-800/50 p-2 overflow-hidden shadow-2xl">
+                        <RiskHeatmap data={heatmapData} />
+                    </div>
                     
-                    <Card className="bg-slate-950 border-slate-800 shadow-2xl relative overflow-hidden group">
+                    <Card className="bg-slate-950/40 backdrop-blur-xl border-slate-800/60 shadow-3xl relative overflow-hidden group rounded-[2.5rem]">
                         <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
                         <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Governance Intelligence</CardTitle>
-                            <CardDescription>AI-driven cross-vendor compliance and cost benchmarking insights.</CardDescription>
+                            <CardTitle className="text-lg font-black uppercase tracking-widest flex items-center gap-2 text-slate-100"><Shield className="w-5 h-5 text-primary" /> Governance Intelligence</CardTitle>
+                            <CardDescription className="text-xs font-medium text-slate-500 italic">AI-driven cross-vendor compliance and cost benchmarking insights.</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4 relative z-10">
-                            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
-                                <div className="flex justify-between items-center mb-1">
+                        <CardContent className="space-y-6 relative z-10">
+                            <div className="p-6 rounded-[2rem] bg-slate-900/80 border border-slate-800 shadow-inner group-hover:border-primary/20 transition-all">
+                                <div className="flex justify-between items-center mb-2">
                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Risk Exposure</span>
-                                    <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Elevated</Badge>
+                                    <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[10px] font-black uppercase tracking-tighter">Elevated Risk</Badge>
                                 </div>
-                                <p className="text-lg font-black text-slate-100 font-mono">42.5 / 100</p>
+                                <div className="flex items-baseline gap-2">
+                                    <p className="text-4xl font-black text-slate-100 font-mono tracking-tighter">42.5</p>
+                                    <span className="text-xs font-bold text-slate-500 italic">/ 100 Risk Index</span>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
+                                <div className="p-5 rounded-[2rem] bg-slate-900/40 border border-slate-800/50 group-hover:bg-slate-900/60 transition-all">
                                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Cost Variance</p>
                                     <div className="flex items-center gap-2">
                                         <TrendingDown className="w-4 h-4 text-emerald-500" />
-                                        <span className="text-sm font-bold text-emerald-500">-8.4% YoY</span>
+                                        <span className="text-base font-black text-emerald-500 tracking-tighter">-8.4% YoY</span>
                                     </div>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
+                                <div className="p-5 rounded-[2rem] bg-slate-900/40 border border-slate-800/50 group-hover:bg-slate-900/60 transition-all">
                                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Compliance Drift</p>
                                     <div className="flex items-center gap-2">
                                         <TrendingUp className="w-4 h-4 text-red-500" />
-                                        <span className="text-sm font-bold text-red-500">+4.2%</span>
+                                        <span className="text-base font-black text-red-500 tracking-tighter">+4.2%</span>
                                     </div>
                                 </div>
                             </div>
@@ -86,50 +103,64 @@ export default function Vendors() {
 
                 {/* Vendor Benchmarking Grid */}
                 <div>
-                    <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-100 uppercase tracking-tighter"><Activity className="w-5 h-5 text-primary" /> Real-time Vendor Benchmarking</h2>
+                    <h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-slate-100 uppercase tracking-tighter">
+                        <Activity className="w-6 h-6 text-primary" /> Active Vendor Matrix
+                    </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {benchmarks?.map((b: any) => (
-                            <Card key={b.vendor} className="bg-slate-950 border-slate-800 hover:border-primary/50 transition-all duration-300 group">
-                                <CardHeader className="pb-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-primary/30 transition-colors">
-                                            <Globe className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" />
-                                        </div>
-                                        <Badge variant={b.avgCompliance > 85 ? "default" : "destructive"} className={b.avgCompliance > 85 ? "bg-emerald-500 text-white" : ""}>
-                                            {b.avgCompliance}%
-                                        </Badge>
-                                    </div>
-                                    <CardTitle className="mt-4 text-lg text-slate-100">{b.vendor}</CardTitle>
-                                    <CardDescription className="text-[10px] uppercase font-black tracking-widest text-slate-500 mt-1">Enterprise Service Provider</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Risk Score</p>
-                                                <p className={`text-sm font-black font-mono ${b.riskScore > 40 ? 'text-amber-500' : 'text-emerald-500'}`}>{b.riskScore}/100</p>
+                            <motion.div key={b.vendor} whileHover={{ y: -8, scale: 1.02 }} className="h-full">
+                                <Card className="bg-slate-950/60 backdrop-blur-xl border-slate-800 hover:border-primary/50 transition-all duration-300 group rounded-[2.5rem] overflow-hidden h-full shadow-2xl">
+                                    <CardHeader className="pb-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-primary/30 transition-colors shadow-inner relative">
+                                                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                                                <Globe className="w-7 h-7 text-slate-400 group-hover:text-primary transition-colors relative z-10" />
                                             </div>
-                                            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Avg Spend</p>
-                                                <div className="flex items-center gap-1">
-                                                    <DollarSign className="w-3.5 h-3.5 text-slate-500" />
-                                                    <p className="text-sm font-black text-slate-100 font-mono">${Math.floor(b.avgCost / 1000)}k</p>
-                                                </div>
+                                            <div className="text-right">
+                                                <Badge variant={b.avgCompliance > 85 ? "default" : "destructive"} className={b.avgCompliance > 85 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-black text-[10px]" : "font-black text-[10px]"}>
+                                                    {b.avgCompliance}% Health
+                                                </Badge>
+                                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mt-1">SLA Compliance</p>
                                             </div>
                                         </div>
-                                        <div className="pt-4 border-t border-slate-900 flex justify-between items-center text-xs">
-                                            <span className="text-slate-500 font-bold uppercase tracking-tighter">Performance Level</span>
-                                            <Badge variant="outline" className="bg-slate-900 border-emerald-500/20 text-emerald-500 text-[9px] font-black tracking-widest">OPTIMIZED</Badge>
+                                        <CardTitle className="text-xl font-black mt-6 text-slate-100 tracking-tight leading-none">{b.vendor}</CardTitle>
+                                        <CardDescription className="text-xs font-semibold text-slate-500 italic mt-2 uppercase tracking-tighter">Managed Enterprise Asset</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center text-[9px] font-black uppercase text-slate-600 tracking-widest">
+                                                <span>Risk Rating</span>
+                                                <span className={b.highestRisk > 40 ? 'text-amber-500' : 'text-emerald-500'}>{b.highestRisk}/100</span>
+                                            </div>
+                                            <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden shadow-inner">
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${b.avgCompliance}%` }}
+                                                    className={`h-full ${b.avgCompliance > 85 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-red-500'}`}
+                                                />
+                                            </div>
                                         </div>
+                                        <div className="flex justify-between items-center bg-slate-900/60 p-4 rounded-2xl border border-slate-800/40 shadow-inner group-hover:bg-slate-900/80 transition-all">
+                                            <div className="flex items-center gap-2 text-slate-500">
+                                                <DollarSign className="w-5 h-5 text-primary/70" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Annual Spend</span>
+                                            </div>
+                                            <span className="text-base font-black text-white font-mono tracking-tighter">${(b.totalCost || 0).toLocaleString()}</span>
+                                        </div>
+                                    </CardContent>
+                                    <div className="px-6 pb-6">
+                                        <Button variant="outline" className="w-full bg-slate-900/50 border-slate-800 hover:bg-primary hover:text-black hover:border-primary text-[10px] font-black uppercase tracking-widest rounded-2xl h-12 transition-all">
+                                            Execute Performance Audit
+                                        </Button>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </Card>
+                            </motion.div>
                         ))}
                     </div>
                 </div>
 
                 {/* Historical Ledger Card */}
-                <Card className="bg-slate-950 border-slate-800 shadow-2xl">
+                <Card className="bg-slate-950/40 backdrop-blur-md border-slate-800 shadow-3xl rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="border-b border-slate-900 pb-6">
                         <div className="flex justify-between items-center">
                             <div>

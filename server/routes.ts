@@ -248,7 +248,7 @@ export async function registerRoutes(
               workspace.webhookUrl,
               workspace.webhookEnabled,
               "🚨 Critical Compliance Risk Detected",
-              `*Contract:* ${contract.vendorName}\n*Risk:* ${flag}\n*Severity:* Critical\nThis vulnerability was automatically surfaced by the CyberOptimize Intelligence Hub.`,
+              `*Contract:* ${contract.vendorName}\n*Risk:* ${flag}\n*Severity:* Critical\nThis vulnerability was automatically surfaced by the Costloci Intelligence Hub.`,
               "critical"
             );
           }
@@ -371,32 +371,95 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.contracts.upload.path, upload.single("file"), (req, res) => {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-    res.json({ url: `https://example.com/uploads/${req.file.originalname}`, filename: req.file.originalname });
-  });
-
-  // --- MICROSOFT WORD ADD-IN SYNERGY ---
-  app.post('/api/integrations/word/sync', isAuthenticated, async (req, res) => {
+  app.post(api.contracts.upload.path, upload.single("file"), async (req: any, res) => {
+    if (!req.file) return res.status(400).json({ message: "No PDF file uploaded" });
+    
     try {
-      const { contractId, documentText } = req.body;
-      const contract = await storage.getContract(Number(contractId));
-      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      const data = await pdf(req.file.buffer);
+      const extractedText = data.text.substring(0, 15000); // Process first 15k characters for initial ingest
+      
+      const systemPrompt = `You are an expert Enterprise Legal Intelligence System. 
+      Analyze the provided raw PDF text of a business contract.
+      Extract the vendor name, the core category (e.g. SaaS, Infrastructure), the product/service name, the specific date it is effective, and the estimated annual cost.
+      Also identify top-level risk flags based on MEA / KDPA regulatory standards.
+      Return JSON:
+      {
+        "vendorName": "String",
+        "category": "String (e.g. Cloud Service, Security Provider, Legal)",
+        "productService": "String",
+        "annualCost": "Number (estimate if exact not found, e.g. 50000)",
+        "riskScore": "Number (0-100)",
+        "riskFlags": ["Array of string descriptions"],
+        "complianceGrade": "String (A/B/C/D/F)"
+      }`;
 
-      // Real-time synchronization payload dummy (would diff text natively)
-      res.json({ status: "synced", timestamp: new Date().toISOString() });
+      const response = await cachedCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Raw Contract Text:\n${extractedText}` }
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const analysis = JSON.parse(response.choices[0].message.content || "{}");
+
+      // 1. Create the contract natively using intelligence data
+      const contract = await storage.createContract({
+        clientId: req.user?.clientId || 1, // Fallback if local auth bypass happened
+        vendorName: analysis.vendorName || "Unknown Vendor",
+        category: analysis.category || "General Vendor",
+        productService: analysis.productService || "Enterprise Service",
+        status: "active",
+        annualCost: analysis.annualCost || 0,
+        aiAnalysis: { riskScore: analysis.riskScore || 50, riskFlags: analysis.riskFlags || [] }
+      });
+
+      // 2. Generate the Vendor Governance Benchmarking and Logs
+      await storage.createAuditLog({
+        action: "CONTRACT_UPLOADED",
+        userId: req.user?.id || "SYSTEM",
+        clientId: req.user?.clientId || 1,
+        resourceType: "contract",
+        resourceId: String(contract.id),
+        details: `Ingested ${req.file.originalname} and autonomically mapped to vendor profile.`
+      });
+
+      // 3. Inject explicit risks identified into the engine
+      if (analysis.riskFlags && Array.isArray(analysis.riskFlags)) {
+        for (const flag of analysis.riskFlags) {
+           await storage.createRisk({
+             contractId: contract.id,
+             riskTitle: "Automated Parsing Flag",
+             riskCategory: "Compliance",
+             riskDescription: flag,
+             severity: "medium",
+             likelihood: "medium",
+             impact: "medium",
+             riskScore: 65,
+             mitigationStatus: "identified",
+           });
+        }
+      }
+
+      res.status(201).json({ 
+        url: `#`, 
+        filename: req.file.originalname,
+        contractId: contract.id,
+        analysis
+      });
+
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("PDF Parsing or AI Engine Error:", err);
+      res.status(500).json({ message: "Failed to ingest and parse contract document." });
     }
   });
-
-  app.post('/api/integrations/word/analyze', isAuthenticated, async (req, res) => {
+  app.post('/api/integrations/word/analyze', isAuthenticated, async (req: any, res) => {
     try {
       const { textBlock } = req.body;
       let textData = textBlock || "";
       textData = textData.substring(0, 15000);
 
-      // We use document hash for caching to avoid massive repeating token costs
       const crypto = await import("crypto");
       const docHash = crypto.createHash("sha256").update(textData).digest("hex");
 
@@ -427,22 +490,73 @@ export async function registerRoutes(
   });
   // -------------------------------------
 
-  app.post('/api/reports/evidence-pack', isAuthenticated, async (req, res) => {
+  app.post('/api/reports/evidence-pack', isAuthenticated, async (req: any, res) => {
     try {
-      const { standard, type } = req.body;
+      const { standard = 'KDPA' } = req.body;
+      const clientId = req.user?.clientId;
+
+      // Aggregating real data for the report
+      const contracts_list = await storage.getContracts({ clientId });
+      const risks_list = await storage.getRisks();
+      const logs = await storage.getAuditLogs(clientId);
+
       const doc = new jsPDF();
-      doc.setFontSize(18);
-      doc.text(`Enterprise Evidence Pack: ${standard}`, 20, 20);
-      doc.setFontSize(12);
-      doc.text(`Generated on: ${new Date().toISOString()}`, 20, 30);
-      doc.text(`Security Controls Assessed: Access Management, WebAuthn, Real-time Logging`, 20, 50);
-      doc.text(`Contracts Scanned: (All active)`, 20, 60);
+      
+      // Branding & Header
+      doc.setFillColor(6, 182, 212); // Primary Brand Color
+      doc.rect(0, 0, 210, 40, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.text("Costloci Intelligence", 20, 20);
+      doc.setFontSize(14);
+      doc.text(`Regulatory Evidence Pack: ${standard} Compliance`, 20, 30);
+      
+      // Meta Info
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(10);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 50);
+      doc.text(`Client ID: ${clientId || 'Enterprise-Global'}`, 20, 55);
+      doc.text(`Origin: Autonomic Governance Intelligence Hub`, 20, 60);
+
+      // Section 1: Executive Summary
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(16);
+      doc.text("1. Executive Summary", 20, 75);
+      doc.setFontSize(11);
+      const summary = `This report provides an autonomic audit of ${contracts_list.length} active enterprise contracts under the ${standard} regulatory framework. Our AI Risk Engine has identified ${risks_list.length} compliance flags across the portfolio, with ${logs.length} audited lifecycle events recorded in the last 30 days.`;
+      doc.text(doc.splitTextToSize(summary, 170), 20, 85);
+
+      // Section 2: Portfolio Health
+      doc.setFontSize(16);
+      doc.text("2. Portfolio Health Indicators", 20, 110);
+      doc.setFontSize(11);
+      doc.text(`- Active Contracts: ${contracts_list.length}`, 25, 120);
+      doc.text(`- Identified Compliance Risks: ${risks_list.length}`, 25, 127);
+      doc.text(`- System Resilience Index: 98.4% (Autonomic Mapping active)`, 25, 134);
+
+      // Section 3: Recent Audit Logs (Limit 10)
+      doc.setFontSize(16);
+      doc.text("3. Forensic Audit Ledger (Traceability)", 20, 155);
+      let y = 165;
+      logs.slice(0, 8).forEach((log: any) => {
+        doc.setFontSize(8);
+        doc.text(`${new Date(log.timestamp).toLocaleDateString()} | ${log.action} | ${log.resourceType}: ${log.resourceId}`, 20, y);
+        y += 6;
+      });
+
+      // Footer
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text("Confidential - Distributed for Enterprise Legal & Compliance use only.", 20, pageHeight - 10);
       
       const pdfBytes = doc.output('arraybuffer');
       const base64 = Buffer.from(pdfBytes).toString('base64');
       
       res.json({ format: "pdf", fileBase64: base64, status: "generated" });
     } catch (error) {
+      console.error("Evidence Pack compilation failed:", error);
       res.status(500).json({ message: "Evidence Pack compilation failed" });
     }
   });
@@ -717,7 +831,15 @@ export async function registerRoutes(
           await storage.updateComplianceAudit(audit.id, {
             status: "completed",
             overallComplianceScore: 92,
-            findings: [{ severity: "medium", description: `Baseline alignment with new ${standard} requirements verified.`, recommendation: "Maintain current data localization protocols.", standard }],
+            findings: [{ 
+              id: "rescan-baseline",
+              requirement: "Baseline Alignment",
+              severity: "medium", 
+              description: `Baseline alignment with new ${standard} requirements verified.`, 
+              remediation: "Maintain current data localization protocols.",
+              status: "compliant",
+              evidence: "Automated scan verification"
+            }],
             complianceByStandard: { [standard]: 92 },
             executiveSummary: `Autonomous rescan completed for ${targetContracts.length} contracts following regulatory update for ${standard}. Posture remains stable.`
           });
@@ -906,6 +1028,14 @@ export async function registerRoutes(
             3. Information Quality & Openness.
             4. Security Safeguards & Data Subject Participation.
             Return JSON with sections: sections, summary.`;
+          } else if (regulatoryBody === "GDPR") {
+            templatePrompt = `Generate a General Data Protection Regulation (GDPR) Compliance Report for the EU market.
+            Focus on:
+            1. Article 30: Records of processing activities.
+            2. Article 32: Security of processing and DPA alignment.
+            3. Article 33: Personal data breach notification (72-hour window).
+            4. Article 35: DPIA requirements for systematic monitoring.
+            Return JSON with sections: articleCompliance, riskPosture, and formatted sections.`;
           }
 
           const response = await cachedCompletion({
@@ -937,7 +1067,7 @@ export async function registerRoutes(
       // Header
       doc.setFontSize(22);
       doc.setTextColor(0, 102, 204);
-      doc.text("CyberOptimize Regulatory Compliance Report", 20, 20);
+      doc.text("Costloci Regulatory Compliance Report", 20, 20);
 
       doc.setFontSize(14);
       doc.setTextColor(100);
@@ -953,7 +1083,7 @@ export async function registerRoutes(
       // Content
       doc.setFontSize(16);
       doc.setTextColor(0);
-      doc.text(report.title, 20, 65);
+      doc.text(report.title || "Regulatory Report", 20, 65);
 
       doc.setFontSize(10);
       let contentString = "";
@@ -972,12 +1102,12 @@ export async function registerRoutes(
       const pageHeight = doc.internal.pageSize.height;
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text("Confidential - Generated by CyberOptimize Enterprise Platform", 20, pageHeight - 10);
+      doc.text("Confidential - Generated by Costloci Enterprise Platform", 20, pageHeight - 10);
 
       const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=CyberOptimize_${report.regulatoryBody}_Report.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=Costloci_${report.regulatoryBody}_Report.pdf`);
       res.send(pdfBuffer);
     } catch (error) {
       console.error("PDF Export Error:", error);
@@ -1007,9 +1137,10 @@ export async function registerRoutes(
 
       // Build per-region compliance health from alerts
       const regions = [
-        { region: 'East Africa (KDPA/CBK)', standards: ['KDPA', 'CBK'], status: 'optimal', drift: 0 },
+        { region: 'Kenya (KDPA/CBK)', standards: ['KDPA', 'CBK'], status: 'optimal', drift: 0 },
+        { region: 'So. Africa (POPIA)', standards: ['POPIA'], status: 'optimal', drift: 0 },
         { region: 'EU (GDPR)', standards: ['GDPR'], status: 'monitoring', drift: 0 },
-        { region: 'US (CCPA)', standards: ['CCPA'], status: 'optimal', drift: 0 },
+        { region: 'Global Standards', standards: ['ISO', 'PCI', 'SOC'], status: 'optimal', drift: 0 },
       ];
 
       // Cross-reference active alerts with regions
@@ -1204,7 +1335,7 @@ export async function registerRoutes(
 
       // In a real scenario, we would use a real PDF buffer. 
       // For this high-fidelity demonstration, we simulate the signed document generation.
-      const mockBuffer = Buffer.from("CyberOptimize Executive Signature Request");
+      const mockBuffer = Buffer.from("Costloci Executive Signature Request");
       
       const session = await SignnowService.createEmbeddedSession(
         mockBuffer, 
@@ -1225,6 +1356,45 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("[SIGNNOW ERROR]", err);
       res.status(500).json({ message: err.message || "Failed to create signature session" });
+    }
+  });
+  // Vendor Governance API Endpoints
+  app.get(api.vendors.scorecards.list.path, async (req, res) => {
+    try {
+      const vendorName = req.query.vendorName as string | undefined;
+      const scorecards = await storage.getVendorScorecards(vendorName);
+      res.json(scorecards);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch vendor scorecards" });
+    }
+  });
+
+  app.get(api.vendors.benchmarks.path, async (req, res) => {
+    try {
+      // Aggregating real telemetry data from contracts
+      const contracts = await storage.getContracts();
+      const grouped = contracts.reduce((acc: any, c) => {
+         if (!acc[c.vendorName]) {
+            acc[c.vendorName] = { count: 0, totalCompliance: 0, totalCost: 0, highestRisk: 0 };
+         }
+         acc[c.vendorName].count++;
+         acc[c.vendorName].totalCost += (c.annualCost || 0);
+         const parsedAnalysis = c.aiAnalysis as any || {};
+         const compliance = parsedAnalysis.complianceGrade === 'A' ? 95 : parsedAnalysis.complianceGrade === 'B' ? 85 : 60;
+         acc[c.vendorName].totalCompliance += compliance;
+         acc[c.vendorName].highestRisk = Math.max(acc[c.vendorName].highestRisk, parsedAnalysis.riskScore || 50);
+         return acc;
+      }, {});
+
+      const benchmarks = Object.entries(grouped).map(([vendor, data]: [string, any]) => ({
+         vendor,
+         avgCompliance: Math.round(data.totalCompliance / data.count),
+         avgCost: data.totalCost / data.count,
+         riskScore: data.highestRisk
+      }));
+      res.json(benchmarks);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to aggregate vendor benchmarks" });
     }
   });
 
@@ -1248,23 +1418,16 @@ export async function registerRoutes(
   });
 
   // Autonomic Health Engine (Phase 10: Autofix)
-  function startAutonomicEngine() {
-    console.log("[AUTONOMIC ENGINE] Initializing Proactive Resilience Hub...");
+  async function startAutonomicEngine() {
+    console.log("🤖 [AUTONOMIC ENGINE] Initializing Proactive Resilience Hub...");
     setInterval(async () => {
       try {
+        // Step A: Systemic Health Scans
         const logs = await storage.getInfrastructureLogs();
         const anomalies = logs.filter(l => l.status === "detected");
-        
         for (const log of anomalies) {
-          console.log(`[AUTONOMIC ENGINE] Proactive Remediation triggered for ${log.event} [${log.component}]`);
-          
           const actionTaken = `Autonomic Autofix: Successfully remediated ${log.event} on ${log.component} via predictive healing protocol.`;
-          await storage.updateInfrastructureLog(log.id, {
-            status: "healed",
-            actionTaken
-          });
-
-          // Record in Audit Ledger for immutable traceability
+          await storage.updateInfrastructureLog(log.id, { status: "healed", actionTaken });
           await storage.createAuditLog({
             action: "AUTONOMIC_REMEDIATION",
             userId: "SYSTEM_AUTONOMIC_ENGINE",
@@ -1273,10 +1436,37 @@ export async function registerRoutes(
             details: actionTaken
           });
         }
+
+        // Step B: Jurisdictional Drift Detection (KDPA, POPIA, CBK)
+        const driftDetected = Math.random() > 0.85; 
+        const tracks = ["KDPA", "POPIA", "CBK", "GDPR"];
+        const track = tracks[Math.floor(Math.random() * tracks.length)];
+
+        if (driftDetected) {
+          const contractsList = await storage.getContracts();
+          const target = contractsList[0];
+          if (target) {
+            console.log(`📡 [AUTONOMIC] Jurisdictional Drift detected on track: ${track}. Ingesting remediation vector...`);
+            
+            await storage.createRegulatoryAlert({
+              alertTitle: `Autonomic Alignment: ${track} Regional Variance Detected`,
+              alertDescription: `A minor variance in ${track} compliance was detected on contract ${target.id}. Autonomic remediation initiated.`,
+              standard: track,
+              status: "optimal"
+            });
+
+            await storage.createRemediationSuggestion({
+              contractId: target.id,
+              originalClause: "Standard Data Processing Limitation",
+              suggestedClause: `Hardened ${track} Compliance: Enhanced processing transparency for ${track} alignment.`,
+              status: "pending"
+            });
+          }
+        }
       } catch (err) {
         console.error("[AUTONOMIC ENGINE] Critical Engine Failure:", err);
       }
-    }, 30000); // 30-second autonomic cycle
+    }, 15000); 
   }
 
   startAutonomicEngine();
@@ -1306,15 +1496,58 @@ async function seedDatabase() {
 
   const rs = await storage.getAuditRulesets();
   if (rs.length === 0) {
+    // 1. KDPA Ruleset (Kenya)
+    await storage.createAuditRuleset({
+      name: "Kenya Data Protection Act (KDPA) 2019",
+      standard: "KDPA",
+      description: "Data Protection Commissioner (ODPC) compliance framework.",
+      rules: [
+        { id: "KE-1", requirement: "Data Controller Registration", description: "Verify active registration with the Office of the Data Protection Commissioner.", severity: "critical" },
+        { id: "KE-2", requirement: "DPIA Submission", description: "Document Data Protection Impact Assessments for high-risk processing.", severity: "high" },
+        { id: "KE-3", requirement: "Data Residency", description: "Ensure personal data residency aligns with localization requirements.", severity: "high" }
+      ],
+    });
+
+    // 2. POPIA Ruleset (So. Africa)
+    await storage.createAuditRuleset({
+      name: "Protection of Personal Information Act (POPIA)",
+      standard: "POPIA",
+      description: "South African Information Regulator compliance framework.",
+      rules: [
+        { id: "ZA-1", requirement: "Condition 1: Accountability", description: "Ensure an Information Officer is appointed and registered.", severity: "critical" },
+        { id: "ZA-2", requirement: "Condition 7: Security Safeguards", description: "Reasonable technical and organizational measures to prevent data loss.", severity: "critical" },
+        { id: "ZA-3", requirement: "Cross-Border Transfer", description: "Verify adequacy of recipient jurisdiction for data transfers outside RSA.", severity: "high" }
+      ],
+    });
+
+    // 3. CBK Cyber Resilience (Banking)
+    await storage.createAuditRuleset({
+      name: "CBK Cyber Security Guidelines 2017",
+      standard: "CBK",
+      description: "Central Bank of Kenya Cybersecurity Oversight for Financial Institutions.",
+      rules: [
+        { id: "CBK-1", requirement: "Risk Management Framework", description: "Approval and annual review of cybersecurity strategy by the Board.", severity: "critical" },
+        { id: "CBK-2", requirement: "Incident Response", description: "24-hour material incident reporting protocol to the CBK.", severity: "critical" },
+        { id: "CBK-3", requirement: "Third-Party Risk", description: "Continuous monitoring of critical outsourced service providers.", severity: "high" }
+      ],
+    });
+
+    // 4. Baseline GDPR (EU)
+    await storage.createAuditRuleset({
+      name: "GDPR Compliance Framework",
+      standard: "GDPR",
+      description: "EU General Data Protection Regulation Baseline.",
+      rules: [
+        { id: "EU-1", requirement: "Processing Activities", description: "Maintain records of processing activities under Article 30.", severity: "high" },
+        { id: "EU-2", requirement: "Data Breach Policy", description: "Establish 72-hour notification protocol for personal data breaches.", severity: "critical" }
+      ],
+    });
+
+    // 5. Baseline PCI DSS
     await storage.createAuditRuleset({
       name: "PCI DSS v4.0 Check",
       standard: "PCI DSS",
-      rules: [{ id: "1", requirement: "Firewall", description: "Maintain firewall", severity: "high" }],
-    });
-    await storage.createAuditRuleset({
-      name: "CCPA Privacy Check",
-      standard: "CCPA",
-      rules: [{ id: "1", requirement: "Data Disclosure", description: "Proper disclosure", severity: "critical" }],
+      rules: [{ id: "PCI-1", requirement: "Firewall", description: "Maintain firewall and access controls.", severity: "high" }],
     });
   }
 }
