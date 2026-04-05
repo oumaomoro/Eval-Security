@@ -5,6 +5,12 @@ async function throwIfResNotOk(res: Response) {
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
+
+  // Phase 24 Anti-Loop: If an API returns HTML, it means redirect/infrastructure failure
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("text/html")) {
+    throw new Error("Infrastructure Error: API returned HTML. Check Cloudflare Proxy or Vercel Auth.");
+  }
 }
 
 export async function apiRequest(

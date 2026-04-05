@@ -1,9 +1,10 @@
 import { Layout } from "@/components/Layout";
 import { useDashboardStats } from "@/hooks/use-dashboard";
+import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
 import { motion } from "framer-motion";
 import { AlertCircle, DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Lock, Award, Clock, Sparkles } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -11,12 +12,16 @@ import { useInfrastructureLogs, useHealInfrastructure } from "@/hooks/use-infras
 import { useBillingTelemetry } from "@/hooks/use-billing";
 import { useGovernancePosture } from "@/hooks/use-governance";
 import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
+import { AutonomicJurisdictionSync } from "@/components/Intelligence/AutonomicJurisdictionSync";
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: infraLogs } = useInfrastructureLogs();
   const { data: billing } = useBillingTelemetry();
   const { data: posture, isLoading: loadingPosture } = useGovernancePosture();
+  const { data: heatmapData, isLoading: loadingHeatmap } = useQuery<any[]>({
+    queryKey: ["/api/dashboard/risk-heatmap"],
+  });
   const heal = useHealInfrastructure();
 
   if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Activity className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
@@ -84,14 +89,15 @@ export default function Dashboard() {
             </div>
 
             <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
-              <h3 className="text-lg font-bold mb-6">Risk Profile</h3>
+              <h3 className="text-lg font-bold mb-6 italic uppercase tracking-tighter">Savings Breakdown</h3>
               <div className="h-full flex items-center justify-center -mt-8">
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'Critical', value: stats?.criticalRisks || 0 },
-                        { name: 'Safe', value: (stats?.totalContracts || 1) - (stats?.criticalRisks || 0) }
+                        { name: 'Direct Negotiation', value: (stats?.totalPotentialSavings || 0) * 0.4 },
+                        { name: 'Consolidation', value: (stats?.totalPotentialSavings || 0) * 0.3 },
+                        { name: 'Lifecycle Optimization', value: (stats?.totalPotentialSavings || 0) * 0.3 }
                       ]}
                       cx="50%"
                       cy="50%"
@@ -100,19 +106,22 @@ export default function Dashboard() {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      <Cell fill="#ef4444" />
+                      <Cell fill="#06b6d4" />
+                      <Cell fill="#3b82f6" />
                       <Cell fill="#10b981" />
                     </Pie>
                     <Tooltip
                       contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
                       itemStyle={{ color: "#f8fafc" }}
+                      formatter={(value: number) => `$${value.toLocaleString()}`}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center gap-4 text-sm mt-4">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500" /><span>Critical</span></div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500" /><span>Compliant</span></div>
+              <div className="flex justify-center flex-wrap gap-4 text-[9px] font-black uppercase mt-4">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-cyan-500" /><span>Negotiation</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500" /><span>Consolidation</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span>Lifecycle</span></div>
               </div>
             </div>
           </div>
@@ -195,36 +204,59 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Strategic Overview Widget */}
-            <div className="lg:col-span-4 bg-slate-950/50 backdrop-blur border border-slate-800/50 rounded-3xl p-8 shadow-2xl flex flex-col justify-center bg-gradient-to-br from-primary/5 to-cyan-500/10 relative overflow-hidden group">
-              <div className="absolute -right-12 -top-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-colors duration-700" />
-              <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-100 uppercase tracking-widest italic"><Sparkles className="w-5 h-5 text-primary" /> Autonomous Insights</h3>
-              <div className="space-y-4 relative z-10">
-                <div className="p-5 rounded-2xl bg-slate-950/80 border border-primary/20 hover:border-primary/40 transition-all">
-                  <p className="text-[10px] font-black text-primary uppercase tracking-tighter">Proactive Resilience</p>
-                  <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">Autonomic Health Engine has identified and self-healed 12 potential service anomalies this week.</p>
-                </div>
-                <div className="p-5 rounded-2xl bg-slate-950/80 border border-emerald-500/20 hover:border-emerald-500/40 transition-all">
-                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">Compliance Optimization</p>
-                  <p className="text-xs text-slate-400 mt-2 font-medium leading-relaxed">Governance drift in Regional FinTech Partner restricted via autonomic policy enforcement.</p>
-                </div>
-              </div>
+            {/* Executive Security Scorecard - Phase 3 WOW Factor */}
+            <div className="lg:col-span-4 flex flex-col gap-8">
+              <Card className="bg-slate-950 border-slate-800 shadow-3xl rounded-[2.5rem] overflow-hidden relative group h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-emerald-500/10 opacity-50" />
+                <CardHeader className="pb-2 relative z-10">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Security Scorecard</CardTitle>
+                    <Badge variant="outline" className="text-[8px] font-black border-primary/20 text-primary uppercase">MEA Audited</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-10 relative z-10">
+                  <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="relative"
+                  >
+                    <div className="text-9xl font-black italic tracking-tighter text-white drop-shadow-[0_20px_50px_rgba(6,182,212,0.3)]">
+                        { (posture?.resilienceIndex || 0) > 90 ? 'A' : (posture?.resilienceIndex || 0) > 80 ? 'B' : 'C' }
+                    </div>
+                    <div className="absolute top-0 -right-4">
+                        <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                    </div>
+                  </motion.div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-6 italic">Governance Grade: { (posture?.resilienceIndex || 0) > 90 ? 'Optimal' : (posture?.resilienceIndex || 0) > 80 ? 'Operational' : 'Review Required' }</p>
+                </CardContent>
+                <CardFooter className="bg-white/5 border-t border-white/5 p-6 flex flex-col gap-4 relative z-10">
+                  <div className="w-full flex items-center justify-between text-[10px] font-black uppercase text-slate-500">
+                    <span>Sovereignty Rating</span>
+                    <span className="text-white italic">High</span>
+                  </div>
+                  <div className="space-y-3 w-full">
+                    <div className="p-3 rounded-xl bg-slate-900/50 border border-white/5 group-hover:border-primary/30 transition-all">
+                        <p className="text-[8px] font-black text-primary uppercase">Autonomic Health</p>
+                        <p className="text-[10px] text-slate-400 font-medium leading-none mt-1">12 service anomalies self-healed this week.</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/50 border border-white/5 group-hover:border-emerald-500/30 transition-all">
+                        <p className="text-[8px] font-black text-emerald-500 uppercase">Drift Containment</p>
+                        <p className="text-[10px] text-slate-400 font-medium leading-none mt-1">Regional FinTech Partner policy enforced.</p>
+                    </div>
+                  </div>
+                </CardFooter>
+              </Card>
             </div>
           </div>
         </div>
 
-        {/* Strategic Risk Posture */}
+        {/* Global Risk Heatmap */}
         <div>
           <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-100 uppercase tracking-tighter"><ShieldCheck className="w-5 h-5 text-primary" /> Global Risk Heatmap</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <RiskHeatmap data={[
-              { name: "Global Cloud Services", compliance: 92, risk: 15, impact: 300 },
-              { name: "Identity & Access Provider", compliance: 88, risk: 22, impact: 200 },
-              { name: "Regional FinTech Partner", compliance: 65, risk: 45, impact: 150 },
-              { name: "Legacy Database Vendor", compliance: 42, risk: 78, impact: 100 },
-              { name: "AI Research Lab", compliance: 75, risk: 35, impact: 250 },
-            ]} />
-             <Card className="bg-slate-950 border-slate-800">
+            <RiskHeatmap data={heatmapData || []} />
+             <Card className="bg-slate-950 border-slate-800 relative overflow-hidden group">
+               <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                <CardHeader>
                  <CardTitle className="text-sm font-black uppercase text-slate-400">Governance Strategy</CardTitle>
                </CardHeader>

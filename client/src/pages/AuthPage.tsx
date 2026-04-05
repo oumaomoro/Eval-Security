@@ -88,16 +88,23 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-950 font-sans selection:bg-primary/30">
-      {/* Left Side: Branding & Marketing */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-slate-900 to-black relative overflow-hidden border-r border-slate-800">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent pointer-events-none" />
-        
+      {/* Left Side: Premium Costloci Branding */}
+      <div className="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden border-r border-[hsl(240,25%,18%)]" style={{background: 'linear-gradient(135deg, hsl(240,50%,7%) 0%, hsl(240,40%,4%) 100%)' }}>
+        {/* Decorative mesh */}
+        <div className="absolute inset-0 bg-grid-pattern opacity-100 pointer-events-none" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[80px] pointer-events-none" />
+
+        {/* Logo */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-2xl shadow-primary/20">
-              <Brain className="w-7 h-7 text-primary" />
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-2xl shadow-primary/30 animate-ring-pulse">
+              <ShieldCheck className="w-7 h-7 text-primary" />
             </div>
-            <span className="text-2xl font-black text-slate-100 uppercase tracking-tighter italic">CyberOptimize</span>
+            <div>
+              <span className="text-2xl font-black tracking-tighter gradient-text-emerald">Costloci</span>
+              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Enterprise Intelligence Platform</p>
+            </div>
           </div>
 
           <motion.div
@@ -105,30 +112,42 @@ export default function AuthPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <h1 className="text-5xl font-black text-white leading-none tracking-tighter mb-6 uppercase">
-              The Autonomic <br/><span className="text-primary italic">Resilience</span> Platform
+            <h1 className="text-5xl font-black text-white leading-none tracking-tighter mb-6">
+              Where Contracts<br/><span className="gradient-text-emerald italic">Generate ROI</span>
             </h1>
-            <p className="text-lg text-slate-400 max-w-md leading-relaxed font-medium">
-              Enterprise-grade contract intelligence, real-time compliance monitoring, and AI-driven predictive governance. Fully automated. Absolutely secure.
+            <p className="text-base text-slate-400 max-w-md leading-relaxed font-medium">
+              Enterprise contract intelligence, real-time jurisdictional compliance & AI-powered risk governance. Autonomic. Competitive. Profitable from Day One.
             </p>
           </motion.div>
-        </div>
 
-        <div className="relative z-10 grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                <ShieldCheck className="w-6 h-6 text-emerald-500 mb-2" />
-                <h4 className="text-xs font-black text-slate-200 uppercase tracking-tight">Financial Accuracy</h4>
-                <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">100% Billing Telemetry Integrity</p>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                <Globe className="w-6 h-6 text-cyan-500 mb-2" />
-                <h4 className="text-xs font-black text-slate-200 uppercase tracking-tight">Global Compliance</h4>
-                <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">GDPR • KDPA • PCI DSS Ready</p>
-            </div>
+          {/* Proof Points */}
+          <div className="mt-10 grid grid-cols-1 gap-3">
+            {[
+              { icon: ShieldCheck, color: "text-emerald-500", label: "AI Contract Analysis", metric: "~20x cheaper than GPT-4" },
+              { icon: Globe, color: "text-cyan-400", label: "Global Jurisdiction Sync", metric: "KDPA · POPIA · GDPR · CCPA" },
+              { icon: Brain, color: "text-primary", label: "Autonomic Risk Engine", metric: "Self-healing compliance drift" },
+            ].map((p, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + i * 0.1 }}
+                className="flex items-center gap-4 p-3 rounded-xl bg-white/3 border border-white/6 backdrop-blur-sm hover:border-primary/20 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-900/60 flex items-center justify-center shrink-0">
+                  <p.icon className={`w-4 h-4 ${p.color}`} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-200">{p.label}</p>
+                  <p className="text-[9px] text-slate-500 font-mono">{p.metric}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
 
         <div className="relative z-10 flex items-center gap-4 text-slate-600">
-           <span className="text-[10px] font-black uppercase tracking-widest">© 2026 CyberOptimize Enterprise v1.0</span>
+           <span className="text-[9px] font-black uppercase tracking-widest">© 2026 Costloci Technologies Ltd. All rights reserved.</span>
         </div>
       </div>
 
@@ -269,7 +288,7 @@ export default function AuthPage() {
                 </CardContent>
                 <CardFooter className="bg-slate-950/50 p-4 border-t border-slate-800 flex flex-col items-center gap-2">
                     <p className="text-[8px] text-slate-500 font-bold uppercase text-center leading-tight">
-                        By deploying your identity, you agree to the CyberOptimize Enterprise Service Level Agreement.
+                        By deploying your identity, you agree to the Costloci Enterprise Service Level Agreement.
                     </p>
                 </CardFooter>
               </Card>
@@ -314,7 +333,7 @@ export default function AuthPage() {
                 <Button 
                     variant="outline"
                     className="border-slate-800 bg-slate-950/50 hover:bg-slate-900 h-12 px-6 rounded-xl text-slate-400 font-bold text-xs uppercase flex items-center gap-2 group"
-                    onClick={() => { window.location.href = "/api/auth/sso/google" }}
+                    onClick={() => { window.location.href = "/api/auth/google" }}
                 >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

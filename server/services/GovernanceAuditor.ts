@@ -23,13 +23,13 @@ export class GovernanceAuditor {
         storage.getRisks()
       ]);
 
-      const systemPrompt = `You are the Chief Governance Officer (CGO) for an enterprise SaaS platform.
+      const systemPrompt = `You are the Chief Governance Officer (CGO) for an enterprise SaaS platform specializing in East African regulatory compliance.
         Analyze the provided system audit logs, compliance results, and risk register entries.
         Generate a high-fidelity "Governance Posture Report" in JSON format.
         Focus on:
         1. Operational Resilience (Autofix success rate)
-        2. Compliance Drift (Audit trends)
-        3. Critical Risk Exposure
+        2. Compliance Drift (Focus on IRA Kenya July 2025 mandates and KDPA DPO requirements)
+        3. Critical Risk Exposure (Especially third-party AI and data localization)
         4. Strategic Recommendations.`;
 
       const userPrompt = `
@@ -48,7 +48,7 @@ export class GovernanceAuditor {
         }`;
 
       const response = await cachedAuditAnalysis({
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }

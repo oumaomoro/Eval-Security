@@ -60,7 +60,7 @@ export default function Settings() {
       setDownloading(false);
       toast({
         title: "Strategic Pack Generated",
-        description: "CyberOptimize Executive Strategic Pack (v1.0) has been dispatched to your local storage.",
+        description: "Costloci Executive Strategic Pack (v1.0) has been dispatched to your local storage.",
       });
       // In a real scenario, this would trigger a window.open or a blob download
     }, 2000);

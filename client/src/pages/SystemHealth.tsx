@@ -87,7 +87,7 @@ export default function SystemHealth() {
                                     <RefreshCcw className="w-3 h-3 mr-2" /> Sync
                                 </Button>
                             </div>
-                            <CardDescription>Real-time monitoring and self-healing events across the CyberOptimize grid.</CardDescription>
+                            <CardDescription>Real-time monitoring and self-healing events across the Costloci grid.</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="space-y-4">

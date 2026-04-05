@@ -23,7 +23,8 @@ import {
   contractComparisons,
   infrastructureLogs,
   billingTelemetry,
-  auditLogs
+  auditLogs,
+  users
 } from './schema';
 
 // === SHARED ERROR SCHEMAS ===
@@ -147,6 +148,22 @@ export const api = {
           201: z.array(z.custom<typeof contractComparisons.$inferSelect>()),
           400: errorSchemas.validation,
         },
+      },
+    },
+    remediate: {
+      method: "POST" as const,
+      path: "/api/contracts/:id/remediate" as const,
+      input: z.object({
+        riskId: z.number(),
+        originalText: z.string(),
+      }),
+      responses: {
+        200: z.object({
+          suggestedText: z.string(),
+          explanation: z.string(),
+        }),
+        404: errorSchemas.notFound,
+        500: errorSchemas.internal,
       },
     },
   },
@@ -458,13 +475,12 @@ export const api = {
       method: 'POST' as const,
       path: '/api/comments' as const,
       input: z.object({
-        userId: z.string(),
         contractId: z.number().optional(),
         auditId: z.number().optional(),
         content: z.string(),
       }),
       responses: {
-        201: z.custom<typeof complianceAudits.$inferSelect>(),
+        201: z.custom<typeof comments.$inferSelect>(),
         400: errorSchemas.validation,
       },
     },
@@ -487,6 +503,42 @@ export const api = {
       responses: {
         201: z.custom<typeof workspaces.$inferSelect>(),
         400: errorSchemas.validation,
+      },
+    },
+    members: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/org/members' as const,
+        responses: {
+          200: z.array(z.custom<typeof users.$inferSelect>()),
+        },
+      },
+      invite: {
+        method: 'POST' as const,
+        path: '/api/org/invite' as const,
+        input: z.object({
+          email: z.string().email(),
+          role: z.string(),
+          firstName: z.string().optional(),
+          lastName: z.string().optional(),
+        }),
+        responses: {
+          201: z.custom<typeof users.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      updateRole: {
+        method: 'PUT' as const,
+        path: '/api/org/member' as const,
+        input: z.object({
+          userId: z.string(),
+          role: z.string(),
+        }),
+        responses: {
+          200: z.custom<typeof users.$inferSelect>(),
+          400: errorSchemas.validation,
+          404: errorSchemas.notFound,
+        },
       },
     },
   },

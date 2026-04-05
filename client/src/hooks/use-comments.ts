@@ -38,7 +38,7 @@ export function useCreateComment() {
     const { toast } = useToast();
 
     return useMutation({
-        mutationFn: async (data: { userId: string; contractId?: number; auditId?: number; content: string }) => {
+        mutationFn: async (data: { contractId?: number; auditId?: number; content: string }) => {
             const res = await fetch(api.comments.create.path, {
                 method: api.comments.create.method,
                 headers: { "Content-Type": "application/json" },

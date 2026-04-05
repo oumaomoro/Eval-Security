@@ -16,6 +16,7 @@ import SystemHealth from "@/pages/SystemHealth";
 import AuditLog from "@/pages/AuditLog";
 import Billing from "@/pages/Billing";
 import Settings from "@/pages/Settings";
+import WorkspaceSettings from "@/pages/WorkspaceSettings";
 import Marketplace from "@/pages/Marketplace";
 
 import React, { Suspense } from "react";
@@ -43,6 +44,7 @@ function PrivateRouter() {
         <Route path="/audit" component={AuditLog} />
         <Route path="/reports" component={Reports} />
         <Route path="/billing" component={Billing} />
+        <Route path="/workspace" component={WorkspaceSettings} />
         <Route path="/settings" component={Settings} />
         <Route path="/marketplace" component={Marketplace} />
         <Route component={NotFound} />

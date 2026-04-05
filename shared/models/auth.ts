@@ -14,8 +14,8 @@ export const sessions = pgTable(
 );
 
 // User storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-export const users = pgTable("users", {
+// Targets the "profiles" table in the public schema.
+export const users = pgTable("profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
@@ -26,6 +26,8 @@ export const users = pgTable("users", {
   webauthnId: varchar("webauthn_id"),
   webauthnCredential: text("webauthn_credential"),
   mfaEnabled: boolean("mfa_enabled").default(false),
+  subscriptionTier: varchar("subscription_tier").default("starter"), // starter, pro, enterprise
+  contractsCount: integer("contracts_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

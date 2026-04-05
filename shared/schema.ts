@@ -231,9 +231,10 @@ export const billingTelemetry = pgTable("billing_telemetry", {
 
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id), // Link to organization for data isolation
   userId: text("user_id").notNull(),
-  action: text("action").notNull(), // CONTRACT_UPLOAD, AUDIT_RUN, RULESET_UPDATE, INFRA_HEAL
-  resourceType: text("resource_type"), // contract, audit, ruleset, system
+  action: text("action").notNull(), 
+  resourceType: text("resource_type"), 
   resourceId: text("resource_id"),
   details: text("details"),
   timestamp: timestamp("timestamp").defaultNow(),

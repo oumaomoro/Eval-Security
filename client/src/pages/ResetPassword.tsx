@@ -90,7 +90,7 @@ export default function ResetPassword() {
             </CardContent>
             <CardFooter className="bg-slate-950/50 p-6 border-t border-slate-800">
                 <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest text-center mx-auto leading-relaxed">
-                    Identity verification is managed via the CyberOptimize Autonomic Gateway.
+                    Identity verification is managed via the Costloci Autonomic Gateway.
                 </p>
             </CardFooter>
         </Card>

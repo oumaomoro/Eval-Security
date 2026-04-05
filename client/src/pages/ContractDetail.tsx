@@ -2,9 +2,10 @@ import { useRoute, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useContract, useAnalyzeContract } from "@/hooks/use-contracts";
 import { useRisks } from "@/hooks/use-risks";
-import { useComments, useCreateComment } from "@/hooks/use-comments";
 import { useAuth } from "@/hooks/use-auth";
 import { ComparisonView } from "@/components/Intelligence/ComparisonView";
+import { MarketBenchmark } from "@/components/Intelligence/MarketBenchmark";
+import CommentSidebar from "@/components/Intelligence/CommentSidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -24,17 +25,22 @@ export default function ContractDetail() {
   const { user } = useAuth();
   const { data: contract, isLoading } = useContract(id);
   const { data: risks } = useRisks({ contractId: String(id) });
-  const { data: comments, isLoading: isLoadingComments } = useComments({ contractId: id });
-  const { mutate: postComment, isPending: isPosting } = useCreateComment();
   const { mutate: analyze, isPending: isAnalyzing } = useAnalyzeContract();
-  const [commentText, setCommentText] = useState("");
   const { toast } = useToast();
 
   // SignNow State
   const [isSignNowModalOpen, setIsSignNowModalOpen] = useState(false);
   const [signNowUrl, setSignNowUrl] = useState<string | null>(null);
   const [isInitiatingSignNow, setIsInitiatingSignNow] = useState(false);
-  const [activeRedline, setActiveRedline] = useState<{ original: string, suggested: string } | null>(null);
+  const [activeRedline, setActiveRedline] = useState<{ 
+    riskId: number, 
+    original: string, 
+    suggested: string, 
+    explanation: string,
+    confidenceScore?: number,
+    riskDelta?: number,
+    jurisdictionCitation?: string
+  } | null>(null);
 
   const handleRemediate = async (risk: any) => {
     try {
@@ -42,31 +48,26 @@ export default function ContractDetail() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          clauseId: risk.id, 
-          originalText: risk.riskDescription, 
-          riskDescription: risk.riskTitle 
+          riskId: risk.id, 
+          originalText: risk.riskDescription
         })
       });
       const data = await res.json();
       setActiveRedline({
+        riskId: risk.id,
         original: risk.riskDescription,
-        suggested: data.suggestedText
+        suggested: data.suggestedText,
+        explanation: data.explanation || "No explanation provided.",
+        confidenceScore: data.confidenceScore,
+        riskDelta: data.riskDelta,
+        jurisdictionCitation: data.jurisdictionCitation
       });
     } catch (e) {
       toast({ title: "Remediation Failed", variant: "destructive" });
     }
   };
 
-  const handlePostComment = () => {
-    if (!commentText.trim() || !user) return;
-    postComment({
-      userId: user.id,
-      contractId: id,
-      content: commentText
-    }, {
-      onSuccess: () => setCommentText("")
-    });
-  };
+
 
   const handleRequestSignature = async () => {
     try {
@@ -108,9 +109,17 @@ export default function ContractDetail() {
           <div className="p-8">
             <RedlineView 
               contractId={Number(id)}
+              riskId={activeRedline?.riskId || 0}
               originalText={activeRedline?.original || ""}
               suggestedText={activeRedline?.suggested || ""}
-              onComplete={() => setActiveRedline(null)}
+              explanation={activeRedline?.explanation || ""}
+              confidenceScore={activeRedline?.confidenceScore}
+              riskDelta={activeRedline?.riskDelta}
+              jurisdictionCitation={activeRedline?.jurisdictionCitation}
+              onComplete={() => {
+                  setActiveRedline(null);
+                  window.location.reload(); // Refresh to show mitigated status
+              }}
             />
           </div>
         </DialogContent>
@@ -172,9 +181,6 @@ export default function ContractDetail() {
           <TabsTrigger value="comments" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
             <MessageSquare className="w-4 h-4" />
             Collaboration
-            {comments && comments.length > 0 && (
-              <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{comments.length}</span>
-            )}
           </TabsTrigger>
         </TabsList>
 
@@ -279,7 +285,8 @@ export default function ContractDetail() {
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="intelligence" className="animate-in fade-in slide-in-from-bottom-2">
+        <TabsContent value="intelligence" className="animate-in fade-in slide-in-from-bottom-2 space-y-8">
+          <MarketBenchmark contractId={id} />
           <ComparisonView contractId={id} />
         </TabsContent>
         <TabsContent value="redline" className="animate-in fade-in slide-in-from-bottom-2">
@@ -303,55 +310,8 @@ export default function ContractDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="comments" className="animate-in fade-in slide-in-from-bottom-2">
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-lg h-[500px] flex flex-col">
-            <h3 className="font-bold mb-6 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-primary" /> Project Discussions</h3>
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
-              {isLoadingComments ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading discussion...</div>
-              ) : comments?.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
-                  <MessageSquare className="w-12 h-12 mb-4" />
-                  <p>No comments yet. Start the conversation!</p>
-                </div>
-              ) : (
-                comments?.map((comment) => (
-                  <div key={comment.id} className={`flex gap-4 ${comment.userId === user?.id ? "flex-row-reverse" : ""}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${comment.userId === user?.id ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {(comment.user?.firstName?.[0] || comment.user?.email?.[0] || 'U').toUpperCase()}
-                    </div>
-                    <div className={`p-3 rounded-xl border text-sm max-w-[80%] ${comment.userId === user?.id
-                      ? "bg-primary/10 border-primary/20 text-right rounded-tr-none"
-                      : "bg-muted/30 border-border rounded-tl-none"
-                      }`}>
-                      <span className="font-bold text-xs text-muted-foreground block mb-1">
-                        {comment.user?.firstName || comment.user?.email || "Unknown User"} • {new Date(comment.createdAt).toLocaleTimeString()}
-                      </span>
-                      {comment.content}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="mt-auto flex gap-2">
-              <input
-                type="text"
-                placeholder="Add a comment to the team..."
-                className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
-              />
-              <Button
-                size="icon"
-                className="shrink-0 rounded-xl"
-                onClick={handlePostComment}
-                disabled={isPosting || !commentText.trim()}
-              >
-                {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
-            </div>
-          </div>
+        <TabsContent value="comments" className="animate-in fade-in slide-in-from-bottom-2 max-w-2xl mx-auto">
+          <CommentSidebar contractId={id} />
         </TabsContent>
       </Tabs>
 

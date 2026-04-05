@@ -1,46 +1,46 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Dark mode default for Cyber/Security vibe */
-  --background: 222 47% 11%;     /* slate-950 */
-  --foreground: 210 40% 98%;     /* slate-50 */
+  /* Costloci Design System — Royal Indigo, Obsidian & Precision Emerald */
+  --background: 240 50% 5%;
+  --foreground: 210 40% 98%;
 
-  --card: 217 33% 17%;           /* slate-900 */
+  --card: 240 30% 9%;
   --card-foreground: 210 40% 98%;
 
-  --popover: 222 47% 11%;
+  --popover: 240 30% 9%;
   --popover-foreground: 210 40% 98%;
 
-  --primary: 189 94% 43%;        /* cyan-500 */
-  --primary-foreground: 222 47% 11%;
+  --primary: 156 72% 50%;       /* Precision Emerald */
+  --primary-foreground: 240 50% 5%;
 
-  --secondary: 217 33% 17%;      /* slate-900 lighter */
+  --secondary: 240 25% 15%;
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%; /* slate-400 */
+  --muted: 240 25% 15%;
+  --muted-foreground: 215 20% 65%;
 
-  --accent: 189 94% 43%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 156 72% 50%;
+  --accent-foreground: 240 50% 5%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 217 33% 20%;         /* slate-800 */
-  --input: 217 33% 20%;
-  --ring: 189 94% 43%;
+  --border: 240 25% 18%;
+  --input: 240 25% 18%;
+  --ring: 156 72% 50%;
 
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  /* Risk Colors */
+  /* Risk Tokens */
   --risk-critical: 0 84% 60%;
   --risk-high: 25 95% 53%;
   --risk-medium: 45 93% 47%;
-  --risk-low: 142 71% 45%;
+  --risk-low: 156 72% 50%;
 }
 
 @layer base {
@@ -49,36 +49,100 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Outfit', 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1, h2, h3 {
+    font-family: 'Outfit', sans-serif;
     @apply font-bold tracking-tight;
   }
-  /* Tech/Code font for IDs, specific data points */
+  h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
 }
 
-/* Custom Scrollbar for dark theme */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+/* --- Costloci Scrollbar --- */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { scrollbar-width: none; }
+
+/* --- Premium Grid Pattern --- */
+.bg-grid-pattern {
+  background-size: 48px 48px;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
 }
 
-/* Cyberpunk-ish grid background utility */
-.bg-grid-pattern {
-  background-size: 40px 40px;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+/* --- Glassmorphism Card --- */
+.glass-card {
+  background: rgba(15, 11, 50, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
+
+/* --- Costloci Button Base --- */
+.btn-costloci {
+  @apply font-black uppercase tracking-widest text-xs px-6 py-2.5 rounded-xl transition-all duration-200;
+  letter-spacing: 0.12em;
+}
+
+/* --- Premium Stat Card Hover glow --- */
+.stat-card-glow:hover {
+  box-shadow: 0 0 40px -10px hsl(var(--primary) / 0.25);
+}
+
+/* --- Floating animations --- */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float { animation: float 4s ease-in-out infinite; }
+
+/* --- Pulsing ring --- */
+@keyframes ring-pulse {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5); }
+  70% { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+.animate-ring-pulse { animation: ring-pulse 2s infinite; }
+
+/* --- Gradient text utility --- */
+.gradient-text-emerald {
+  background: linear-gradient(135deg, hsl(156,72%,60%) 0%, hsl(180,72%,50%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.gradient-text-indigo {
+  background: linear-gradient(135deg, hsl(240,60%,70%) 0%, hsl(210,70%,85%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* -- Shimmer loading -- */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--border)) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* --- Smooth page transitions --- */
+.animate-in { animation-duration: 300ms; animation-fill-mode: both; }
+.fade-in { animation-name: fadeIn; }
+.slide-in-from-bottom-2 { animation-name: slideInFromBottom; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInFromBottom { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
