@@ -71,7 +71,7 @@ export interface IStorage {
   createVendorScorecard(scorecard: InsertVendorScorecard): Promise<VendorScorecard>;
 
   // Dashboard & Intelligence
-  getDashboardStats(clientId?: number): Promise<any>;
+  getDashboardStats(clientId?: number, userId?: string): Promise<any>;
   getRiskHeatmap(clientId?: number): Promise<any[]>;
   getMarketIntelligence(contractId: number): Promise<any>;
 
@@ -650,7 +650,7 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   // --- DASHBOARD & ANALYTICS ---
-  async getDashboardStats(clientId?: number): Promise<any> {
+  async getDashboardStats(clientId?: number, userId?: string): Promise<any> {
     const [contracts, risks, savings, users, logs, infraLogs] = await Promise.all([
       this.getContracts({ clientId }),
       this.getRisks(),
@@ -692,7 +692,13 @@ export class SupabaseRESTStorage implements IStorage {
     // ── Phase 16: Executive ROI Component ──
     const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, 'enterprise');
 
+    const currentUser = userId ? users.find(u => u.id === userId) : (users[0] || {});
+    const subscriptionTier = currentUser?.subscription_tier || 'starter';
+    const contractsCount = currentUser?.contracts_count || contracts.length;
+
     return {
+      subscriptionTier,
+      contractsCount,
       totalContracts,
       totalAnnualCost,
       totalPotentialSavings,
@@ -1008,70 +1014,6 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
-  // --- COLLABORATION ---
-  async getComments(contractId?: number, auditId?: number): Promise<any[]> {
-    let query = supabase
-      .from("comments")
-      .select("*, user:profiles(first_name, last_name, profile_image_url)")
-      .order("created_at", { ascending: false });
-
-    if (contractId) query = query.eq("contract_id", contractId);
-    if (auditId) query = query.eq("audit_id", auditId);
-
-    const data = await this.handleResponse<any[]>(query);
-    return (data || []).map(d => ({
-      ...d,
-      user: {
-        firstName: d.user?.first_name,
-        lastName: d.user?.last_name,
-        profileImageUrl: d.user?.profile_image_url
-      }
-    }));
-  }
-
-  async createComment(comment: InsertComment & { userId: string }): Promise<Comment> {
-    const data = await this.handleResponse<any>(
-      supabase.from("comments")
-        .insert({
-          user_id: comment.userId,
-          contract_id: comment.contractId,
-          audit_id: comment.auditId,
-          content: comment.content
-        })
-        .select("*")
-        .single()
-    );
-    return {
-      id: data.id,
-      userId: data.user_id,
-      contractId: data.contract_id,
-      auditId: data.audit_id,
-      content: data.content,
-      resolved: data.resolved,
-      createdAt: data.created_at ? new Date(data.created_at) : null
-    };
-  }
-
-  // --- AUDIT LOGS ---
-  async getAuditLogs(clientId?: number, userId?: string): Promise<AuditLog[]> {
-    let query = supabase.from("audit_logs").select("*").order("timestamp", { ascending: false });
-    if (clientId) query = query.eq("client_id", clientId);
-    if (userId) query = query.eq("user_id", userId);
-
-    const data = await this.handleResponse<any[]>(query);
-    return (data || []).map(d => ({
-      id: d.id,
-      clientId: d.client_id,
-      userId: d.user_id,
-      action: d.action,
-      entityType: d.entity_type,
-      entityId: d.entity_id,
-      severity: d.severity,
-      ipAddress: d.ip_address,
-      metadata: d.metadata,
-      timestamp: d.timestamp ? new Date(d.timestamp) : null
-    }));
-  }
 
   // --- REGULATORY ---
   async getRegulatoryAlerts(status?: string): Promise<RegulatoryAlert[]> {

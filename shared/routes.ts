@@ -426,6 +426,8 @@ export const api = {
       path: '/api/dashboard/stats' as const,
       responses: {
         200: z.object({
+          subscriptionTier: z.string().optional(),
+          contractsCount: z.number().optional(),
           totalContracts: z.number(),
           totalAnnualCost: z.number(),
           totalPotentialSavings: z.number(),

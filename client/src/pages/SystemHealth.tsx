@@ -64,6 +64,10 @@ export default function SystemHealth() {
     }
 
     const technical = stats?.technicalMetrics || { apiResponseTimeAvgMs: 0, aiAccuracyRate: 0, systemUptime: 0 };
+    const tier = stats?.subscriptionTier || "starter";
+    const limit = tier === 'enterprise' ? 'Unlimited' : tier === 'pro' ? '250' : '20';
+    const usage = stats?.contractsCount || 0;
+    const usagePercent = limit === 'Unlimited' ? 0 : Math.min((usage / parseInt(limit)) * 100, 100);
 
     return (
         <Layout header={<h1 className="text-2xl font-bold flex items-center gap-2"><Server className="w-6 h-6 text-primary" /> Global Infrastructure Console</h1>}>
@@ -132,13 +136,13 @@ export default function SystemHealth() {
                     <div className="space-y-6">
                         <Card className="bg-slate-950 border-slate-800">
                             <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Resource Saturation</CardTitle>
+                                <CardTitle className="text-lg flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Resource & Plan Saturation</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
+                                <ResourceMetric label={`Contract Capacity (${tier})`} value={Math.round(usagePercent)} />
                                 <ResourceMetric label="CPU Usage (Vector Engine)" value={45} />
                                 <ResourceMetric label="Memory Consumption" value={62} />
                                 <ResourceMetric label="Database Connection Pool" value={28} />
-                                <ResourceMetric label="AI Token Throughput" value={74} />
                             </CardContent>
                         </Card>
 

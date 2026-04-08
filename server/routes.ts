@@ -883,7 +883,7 @@ Analyze the contract text and return JSON with exactly these fields:
 
   app.get(api.dashboard.stats.path, isAuthenticated, async (req: any, res) => {
     try {
-      const stats = await storage.getDashboardStats(req.user?.clientId);
+      const stats = await storage.getDashboardStats(req.user?.clientId, req.user?.id);
       res.json(stats);
     } catch { res.status(500).json({ message: "Dashboard stats failed" }); }
   });

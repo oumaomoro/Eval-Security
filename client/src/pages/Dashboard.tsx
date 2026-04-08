@@ -67,11 +67,18 @@ export default function Dashboard() {
 
   if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Activity className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
 
+  const currentTier = stats?.subscriptionTier || "starter";
+
   return (
     <Layout header={
       <div className="flex w-full items-center justify-between">
          <div className="flex flex-col gap-1">
-           <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Executive Dashboard</h1>
+           <div className="flex items-center gap-3">
+             <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Executive Dashboard</h1>
+             <Badge className={`uppercase tracking-widest text-[9px] font-black border badge-tier-${currentTier}`}>
+               {currentTier} PLAN
+             </Badge>
+           </div>
            {clusterHealth && (
              <Badge variant={clusterHealth.postgresLatency < 500 ? "default" : "destructive"} className="w-fit text-[10px] items-center flex gap-1 h-5 uppercase tracking-widest font-mono">
                <span className={`w-1.5 h-1.5 rounded-full ${clusterHealth.postgresLatency < 500 ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
@@ -108,7 +115,7 @@ export default function Dashboard() {
           <div>
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> User Success Metrics</h2>
             <div className="grid grid-cols-2 gap-4">
-              <MetricCard label="Contracts Analyzed / Mo" value={stats?.userMetrics?.contractsAnalyzedPerMonth} icon={FileCheck} color="text-blue-500" />
+              <MetricCard label={`Contracts: ${stats?.contractsCount || 0} / ${currentTier === 'enterprise' ? 'Unlimited' : currentTier === 'pro' ? '250' : '20'}`} value={stats?.userMetrics?.contractsAnalyzedPerMonth} icon={FileCheck} color="text-blue-500" />
               <MetricCard label="Savings Identified" value={stats?.userMetrics?.savingsOpportunitiesIdentified} icon={DollarSign} color="text-green-500" />
               <MetricCard label="Risks Mitigated" value={stats?.userMetrics?.risksMitigated} icon={ShieldCheck} color="text-indigo-500" />
               <MetricCard label="Time Saved (Hrs)" value={stats?.userMetrics?.timeSavedHours} icon={Clock} color="text-amber-500" />

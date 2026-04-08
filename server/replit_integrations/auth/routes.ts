@@ -83,11 +83,10 @@ export function registerAuthRoutes(app: Express): void {
       }
       
       // Store session in express-session
-      if (!req.session) {
-        req.session = {};
+      if (req.session) {
+        req.session.supabase_token = data.session.access_token;
+        req.session.expires_at = data.session.expires_at;
       }
-      req.session.supabase_token = data.session.access_token;
-      req.session.expires_at = data.session.expires_at;
 
       // 84. Sync with local DB (Harmonized Onboarding)
       let localUser = await authStorage.getUser(data.user.id).catch(() => null);
