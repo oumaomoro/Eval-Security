@@ -10,7 +10,7 @@ const openai = new OpenAI({
 export class Redliner {
   static async generateRedline(contractId: number, originalText: string, riskDescription: string): Promise<string> {
     // 1. Retrieve organization's standard clause library
-    const clauses = await storage.getClauses();
+    const clauses = await storage.getClauseLibrary();
     
     // 2. Identify relevant standards based on the risk category if possible
     // For now, we provide the full context to AI to find the best match

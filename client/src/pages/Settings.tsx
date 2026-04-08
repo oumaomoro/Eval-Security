@@ -11,6 +11,7 @@ import { startRegistration } from '@simplewebauthn/browser';
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -51,6 +52,26 @@ export default function Settings() {
     fetch('/api/health/latency')
       .then(res => res.json())
       .then(data => setLatencyData(data));
+      
+    // Handle PayPal Redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+        toast({
+            title: "Subscription Activated",
+            description: "Your Costloci Enterprise tier has been upgraded successfully. Telemetry unlocked.",
+            duration: 8000,
+        });
+        // Remove query param to prevent loop
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (urlParams.get('canceled') === 'true') {
+        toast({
+            title: "Checkout Canceled",
+            description: "The payment process was interrupted. No charges were made.",
+            variant: "destructive"
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const handleDownloadPack = () => {

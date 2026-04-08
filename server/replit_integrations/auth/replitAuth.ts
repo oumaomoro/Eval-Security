@@ -1,69 +1,84 @@
-import { type Express, type RequestHandler } from "express";
-import session from "express-session";
-import connectPg from "connect-pg-simple";
+import { type Express, type Request, type Response, type NextFunction } from "express";
+import { adminClient as supabase } from "../../services/supabase";
 import { authStorage } from "./storage";
-import { supabase } from "../../services/supabase";
 
-export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
-  return session({
-    secret: process.env.SESSION_SECRET || "Costloci-dev-secret",
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: sessionTtl,
-    },
-  });
-}
-
+/**
+ * UNIFIED AUTHENTICATION MIDDLEWARE V2
+ * Supports both Session (Browser) and Bearer (Mobile/App/Tests) authentication.
+ * Populates req.user with the unified profile and clientId context.
+ */
 export async function setupAuth(app: Express) {
-  app.set("trust proxy", 1);
-  app.use(getSession());
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    // 1. Resolve Identity (Session or Header)
+    let token: string | undefined;
 
-  // Middleware to attach Supabase user to request
-  app.use(async (req: any, _res: any, next: any) => {
-    const supabaseToken = req.session?.supabase_token;
-    if (supabaseToken) {
-      const { data: { user }, error } = await supabase.auth.getUser(supabaseToken);
-      if (!error && user) {
-        const localUser = await authStorage.getUser(user.id);
-        req.user = {
-          id: user.id,
-          email: user.email,
-          firstName: localUser?.firstName || user.user_metadata?.first_name,
-          lastName: localUser?.lastName || user.user_metadata?.last_name,
-          clientId: localUser?.clientId,
-          role: localUser?.role,
-          profileImageUrl: user.user_metadata?.avatar_url,
-          expires_at: req.session.expires_at
-        };
-      }
+    // Check for Authorization Header
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
     }
-    next();
+
+    // Check for Session Token (Replit/Standard)
+    if (!token && (req as any).session?.supabase_token) {
+      token = (req as any).session.supabase_token;
+    }
+
+    if (!token) return next();
+
+    try {
+      // 2. Refresh/Verify with Supabase
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data.user) return next();
+
+      const user = data.user;
+
+      // 3. Resolve Local Profile
+      const localUser = await authStorage.getUser(user.id).catch((err) => {
+        console.error(`[AUTH] Profile retrieval failed for ${user.id}:`, err.message);
+        return null;
+      });
+
+      // 4. Attach Identity Context
+      // Always provide a base user object even if profile is missing, 
+      // but if profile exists, it will have the clientId.
+      (req as any).user = {
+        id: user.id,
+        email: user.email,
+        firstName: localUser?.firstName ?? user.user_metadata?.first_name ?? "",
+        lastName: localUser?.lastName ?? user.user_metadata?.last_name ?? "",
+        clientId: localUser?.clientId ?? null,
+        role: localUser?.role ?? "viewer",
+        subscriptionTier: localUser?.subscriptionTier ?? "starter",
+        profileImageUrl: localUser?.profileImageUrl ?? null,
+        expires_at: user.last_sign_in_at,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown"
+      };
+
+      // Add Harmonization Header for Debugging (Phase 25)
+      res.setHeader("X-P25-Status", "Harmonized-V2");
+
+      return next();
+    } catch (err: any) {
+      console.error("[AUTH] Identification failed:", err.message);
+      return next();
+    }
   });
 }
 
-export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
-  if (!req.session?.supabase_token) {
-    return res.status(401).json({ message: "Unauthorized" });
+/**
+ * Session Accessor
+ */
+export function getSession(req: Request) {
+  return (req as any).user || null;
+}
+
+/**
+ * Simplified Authentication Guard
+ */
+export function isAuthenticated(req: any, res: Response, next: NextFunction) {
+  if (req.user) {
+    return next();
   }
-
-  const { data: { user }, error } = await supabase.auth.getUser(req.session.supabase_token);
-  if (error || !user) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  next();
-};
-
+  res.status(401).json({ message: "Unauthorized" });
+}

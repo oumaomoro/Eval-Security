@@ -368,6 +368,14 @@ export const api = {
         500: errorSchemas.internal,
       },
     },
+    evidencePack: {
+      method: 'POST' as const,
+      path: '/api/reports/evidence-pack' as const,
+      responses: {
+        201: z.custom<typeof reports.$inferSelect>(),
+        500: errorSchemas.internal,
+      },
+    },
     export: {
       method: 'GET' as const,
       path: '/api/reports/:id/export' as const,
@@ -440,6 +448,10 @@ export const api = {
             ltv: z.number(),
             churnRate: z.number(),
             nps: z.number(),
+            totalEconomicImpact: z.number().optional(),
+            roiRatio: z.number().optional(),
+            efficiencySavings: z.number().optional(),
+            riskMitigationValue: z.number().optional(),
           }).optional(),
           userMetrics: z.object({
             contractsAnalyzedPerMonth: z.number(),
@@ -506,6 +518,33 @@ export const api = {
       },
     },
     members: {
+      listByWorkspace: {
+        method: 'GET' as const,
+        path: '/api/workspaces/:workspaceId/members' as const,
+        responses: {
+          200: z.array(z.custom<typeof users.$inferSelect & { workspaceRole: string }>()),
+        },
+      },
+      addToWorkspace: {
+        method: 'POST' as const,
+        path: '/api/workspaces/:workspaceId/members' as const,
+        input: z.object({
+          userId: z.string(),
+          role: z.string(),
+        }),
+        responses: {
+          201: z.any(),
+          400: errorSchemas.validation,
+        },
+      },
+      removeFromWorkspace: {
+        method: 'DELETE' as const,
+        path: '/api/workspaces/:workspaceId/members/:userId' as const,
+        responses: {
+          200: z.any(),
+          404: errorSchemas.notFound,
+        },
+      },
       list: {
         method: 'GET' as const,
         path: '/api/org/members' as const,

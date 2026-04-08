@@ -26,8 +26,8 @@ export default function Contracts() {
     <Layout 
       header={
         <div className="flex items-center justify-between w-full">
-          <SEO title="Contract Management" description="Manage and audit your enterprise cybersecurity contracts in one place." />
-          <h1 className="text-2xl font-bold">Contract Management</h1>
+          <SEO title="Enterprise Contract Inventory" description="Analyze and audit your master service agreements and vendor contracts with Costloci Intelligence." />
+          <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Contract Inventory</h1>
           <div className="flex gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

@@ -13,6 +13,7 @@ import { useBillingTelemetry } from "@/hooks/use-billing";
 import { useGovernancePosture } from "@/hooks/use-governance";
 import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
 import { AutonomicJurisdictionSync } from "@/components/Intelligence/AutonomicJurisdictionSync";
+import { CustomerJourney } from "@/components/Intelligence/CustomerJourney";
 import { SEO } from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,6 +25,10 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { data: heatmapData, isLoading: loadingHeatmap } = useQuery<any[]>({
     queryKey: ["/api/dashboard/risk-heatmap"],
+  });
+  const { data: clusterHealth } = useQuery<any>({
+    queryKey: ["/api/health"],
+    refetchInterval: 60000 // Poll every 60s matching the heartbeat
   });
   const heal = useHealInfrastructure();
 
@@ -65,7 +70,15 @@ export default function Dashboard() {
   return (
     <Layout header={
       <div className="flex w-full items-center justify-between">
-         <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Executive Dashboard</h1>
+         <div className="flex flex-col gap-1">
+           <h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Executive Dashboard</h1>
+           {clusterHealth && (
+             <Badge variant={clusterHealth.postgresLatency < 500 ? "default" : "destructive"} className="w-fit text-[10px] items-center flex gap-1 h-5 uppercase tracking-widest font-mono">
+               <span className={`w-1.5 h-1.5 rounded-full ${clusterHealth.postgresLatency < 500 ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
+               Cluster: {clusterHealth.dbStatus} ({clusterHealth.postgresLatency}ms)
+             </Badge>
+           )}
+         </div>
          <Button onClick={() => generateReport.mutate()} disabled={generateReport.isPending} className="bg-primary/20 text-primary hover:bg-primary/30 border border-primary/50 shadow-[0_0_15px_rgba(6,182,212,0.15)] flex gap-2">
             {generateReport.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Generate Intelligence Report
@@ -75,6 +88,9 @@ export default function Dashboard() {
       <SEO title="Enterprise Dashboard" description="Monitor your cybersecurity posture and contract ROI in real-time." />
 
       <div className="space-y-8 pb-12">
+        
+        {/* Phase 3: Sovereign Customer Journey */}
+        <CustomerJourney />
 
         {/* Top Level KPIs */}
         <div>

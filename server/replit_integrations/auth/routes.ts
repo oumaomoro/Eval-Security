@@ -8,6 +8,7 @@ export function registerAuthRoutes(app: Express): void {
   // Get current authenticated user
   app.get("/api/auth/user", async (req: any, res) => {
     try {
+      res.setHeader("X-P25-Status", "Harmonized-V1");
       if (!req.user) return res.status(401).json({ message: "Unauthorized" });
       const user = await authStorage.getUser(req.user.id);
       res.json(user);
@@ -73,23 +74,52 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/login", async (req: any, res) => {
     try {
       const { email, password } = req.body;
+      console.log(`[AUTH-DIAG] Login Handler entry: email=${email}`);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[AUTH-DIAG] Supabase signIn error:`, error.message);
+        throw error;
+      }
       
       // Store session in express-session
+      if (!req.session) {
+        req.session = {};
+      }
       req.session.supabase_token = data.session.access_token;
       req.session.expires_at = data.session.expires_at;
 
-      // Sync with local DB
-      await authStorage.upsertUser({
-        id: data.user.id,
-        email: data.user.email!,
-        firstName: data.user.user_metadata?.first_name,
-        lastName: data.user.user_metadata?.last_name
-      });
+      // 84. Sync with local DB (Harmonized Onboarding)
+      let localUser = await authStorage.getUser(data.user.id).catch(() => null);
 
-      res.json({ message: "Login successful" });
+      if (!localUser || !localUser.clientId) {
+        console.log(`[AUTH-DIAG] Provisioning required for user ${data.user.id}`);
+        // First login or missing org — Provision Client -> Workspace -> User
+        const client = await storage.createClient({
+          companyName: `${data.user.user_metadata?.first_name || "New"}'s Enterprise Hub`,
+          industry: "Professional Services",
+          contactName: `${data.user.user_metadata?.first_name || "Enterprise"} ${data.user.user_metadata?.last_name || "User"}`,
+          contactEmail: data.user.email!,
+          status: "active"
+        });
+
+        await storage.createWorkspace({
+          name: "Main Workspace",
+          ownerId: data.user.id,
+          plan: "enterprise"
+        });
+
+        localUser = await authStorage.upsertUser({
+          id: data.user.id,
+          email: data.user.email!,
+          firstName: data.user.user_metadata?.first_name,
+          lastName: data.user.user_metadata?.last_name,
+          clientId: client.id,
+          role: "admin"
+        });
+      }
+
+      res.json(localUser);
     } catch (err: any) {
       res.status(401).json({ message: err.message });
     }

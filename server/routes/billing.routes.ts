@@ -88,8 +88,30 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
   try {
     const { event_type, resource } = req.body;
     
-    // In production, we MUST verify the webhook signature here using PayPal SDK
-    // skipping for brevity, but crucial for live environments
+    // Live Revenue Protection: Strict Webhook Signature Verification
+    const accessToken = await getPayPalAccessToken();
+    const verifyResponse = await fetch(`${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        auth_algo: req.headers['paypal-auth-algo'],
+        cert_url: req.headers['paypal-cert-url'],
+        transmission_id: req.headers['paypal-transmission-id'],
+        transmission_sig: req.headers['paypal-transmission-sig'],
+        transmission_time: req.headers['paypal-transmission-time'],
+        webhook_id: process.env.PAYPAL_WEBHOOK_ID || "LIVE_WEBHOOK_ID",
+        webhook_event: req.body
+      })
+    });
+    
+    const verifyData = await verifyResponse.json();
+    if (verifyData.verification_status !== "SUCCESS") {
+      console.warn("[Costloci Billing] SECURITY ALERT: Invalid Webhook Signature Rejected!");
+      return res.status(403).json({ message: "Invalid Signature" });
+    }
     
     if (event_type === "BILLING.SUBSCRIPTION.ACTIVATED" || event_type === "PAYMENT.SALE.COMPLETED") {
       const customId = resource.custom_id;

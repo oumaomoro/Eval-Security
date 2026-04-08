@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision, varchar, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -7,18 +7,28 @@ export * from "./models/auth";
 export * from "./models/chat";
 
 import { users } from "./models/auth";
+export const workspaceRoleEnum = pgEnum('workspace_role', ['owner', 'admin', 'editor', 'viewer']);
 
 // === TABLE DEFINITIONS ===
 
 export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  ownerId: text("owner_id").references(() => users.id),
   plan: text("plan").notNull().default("enterprise"),
   webhookUrl: text("webhook_url"),
   webhookEnabled: boolean("webhook_enabled").default(false),
   apiUsageCount: integer("api_usage_count").default(0),
   apiUsageResetDate: timestamp("api_usage_reset_date"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const workspaceMembers = pgTable('workspace_members', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: integer('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  role: workspaceRoleEnum('role').notNull().default('viewer'),
+  createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const clients = pgTable("clients", {
@@ -30,6 +40,8 @@ export const clients = pgTable("clients", {
   contactPhone: text("contact_phone"),
   annualBudget: doublePrecision("annual_budget"),
   status: text("status").notNull().default("active"), // active, inactive, onboarding
+  riskThreshold: integer("risk_threshold").default(70),
+  complianceFocus: text("compliance_focus").default("KDPA"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -61,6 +73,10 @@ export const contracts = pgTable("contracts", {
     riskFlags?: string[];
     riskScore?: number;
     summary?: string;
+    remediationStatus?: 'pending' | 'in_progress' | 'completed' | 'none';
+    remediationAddendum?: string;
+    legalAlignmentScore?: number;
+    remediatedAt?: string;
   }>(),
 
   createdAt: timestamp("created_at").defaultNow(),
@@ -163,8 +179,7 @@ export const reports = pgTable("reports", {
   id: serial("id").primaryKey(),
   userId: text("user_id"),
   organizationId: text("organization_id"),
-  reportName: text("report_name"),
-  title: text("title"), // Keep for compatibility
+  title: text("title").notNull(),
   type: text("type").notNull(),
   regulatoryBody: text("regulatory_body"),
   status: text("status").notNull().default("pending"),
@@ -204,6 +219,8 @@ export const auditLogs = pgTable("audit_logs", {
   resourceType: text("resource_type"),
   resourceId: text("resource_id"),
   details: text("details"),
+  ipAddress: text("ip_address"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
@@ -280,12 +297,36 @@ export const billingTelemetry = pgTable("billing_telemetry", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+export const clauses = pgTable("clauses", {
+  id: serial("id").primaryKey(),
+  contractId: integer("contract_id").references(() => contracts.id).notNull(),
+  category: text("category").notNull(),
+  content: text("content").notNull(),
+  riskLevel: text("risk_level").notNull().default("low"),
+  complianceStatus: text("compliance_status").notNull().default("compliant"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === DATABASE RELATIONS ===
 
 export const clientsRelations = relations(clients, ({ many }) => ({
   contracts: many(contracts),
   audits: many(auditLogs),
   billing: many(billingTelemetry),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  workspaceMemberships: many(workspaceMembers),
+}));
+
+export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
+  owner: one(users, { fields: [workspaces.ownerId], references: [users.id] }),
+  members: many(workspaceMembers),
+}));
+
+export const workspaceMembersRelations = relations(workspaceMembers, ({ one }) => ({
+  user: one(users, { fields: [workspaceMembers.userId], references: [users.id] }),
+  workspace: one(workspaces, { fields: [workspaceMembers.workspaceId], references: [workspaces.id] }),
 }));
 
 export const contractsRelations = relations(contracts, ({ one, many }) => ({
@@ -296,6 +337,7 @@ export const contractsRelations = relations(contracts, ({ one, many }) => ({
   scorecards: many(vendorScorecards),
   comments: many(comments),
   comparisons: many(contractComparisons),
+  clauses: many(clauses),
 }));
 
 export const auditRulesetsRelations = relations(auditRulesets, ({ many }) => ({
@@ -393,3 +435,12 @@ export type InsertUserPlaybook = z.infer<typeof insertUserPlaybookSchema>;
 export const insertRegulatoryAlertSchema = createInsertSchema(regulatoryAlerts).omit({ id: true, publishedDate: true });
 export type RegulatoryAlert = typeof regulatoryAlerts.$inferSelect;
 export type InsertRegulatoryAlert = z.infer<typeof insertRegulatoryAlertSchema>;
+
+export const insertContractClauseSchema = createInsertSchema(clauses).omit({ id: true, createdAt: true });
+export type ContractClause = typeof clauses.$inferSelect;
+export type InsertContractClause = z.infer<typeof insertContractClauseSchema>;
+
+export const insertWorkspaceMemberSchema = createInsertSchema(workspaceMembers).omit({ id: true, createdAt: true });
+export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
+export type InsertWorkspaceMember = z.infer<typeof insertWorkspaceMemberSchema>;
+export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';

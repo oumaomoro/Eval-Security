@@ -10,8 +10,8 @@ export default function Risks() {
   const { data: risks, isLoading } = useRisks();
 
   return (
-    <Layout header={<h1 className="text-2xl font-bold">Risk Register</h1>}>
-      <SEO title="Risk Register" description="Monitor and mitigate enterprise compliance and cybersecurity risks." />
+    <Layout header={<h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm">Risk Register</h1>}>
+      <SEO title="Enterprise Risk Registry" description="Monitor and mitigate enterprise compliance and cybersecurity risks with Costloci Intelligence." />
       {isLoading ? <div>Loading...</div> : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Matrix */}

@@ -22,15 +22,15 @@ export default function Compliance() {
 
   return (
     <Layout>
-      <SEO title="Compliance Hub" description="Monitor global jurisdictional regulatory updates and enterprise posture." />
+      <SEO title="Enterprise Governance Hub" description="Monitor global jurisdictional regulatory updates and enterprise compliance posture with Costloci Intelligence." />
       <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
         <div className="flex justify-between items-end">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
-              <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Compliance Hub</h1>
-              <Badge className="bg-primary/10 text-primary border-primary/20 px-4 py-1 text-xs font-black italic">AUTONOMIC MONITORING ACTIVE</Badge>
+              <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic drop-shadow-2xl">Compliance Hub</h1>
+              <Badge className="bg-primary/20 text-primary border-primary/50 px-4 py-1 text-xs font-black italic shadow-[0_0_15px_rgba(6,182,212,0.2)]">AUTONOMIC MONITORING ACTIVE</Badge>
             </div>
-            <p className="text-slate-500 font-bold uppercase tracking-tight text-sm">Regulatory Posture & Global Jurisdictional Intelligence</p>
+            <p className="text-slate-500 font-black uppercase tracking-widest text-[10px] italic">Jurisdictional Intelligence & Sovereign Posture Analysis</p>
           </div>
           <Button 
             onClick={handleRunAudit} 

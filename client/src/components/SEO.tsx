@@ -7,7 +7,7 @@ interface SEOProps {
 
 export function SEO({ title, description }: SEOProps) {
   useEffect(() => {
-    const baseTitle = "Costloci | Costloci";
+    const baseTitle = "Costloci | Enterprise Intelligence";
     const fullTitle = title ? `${title} | ${baseTitle}` : baseTitle;
     document.title = fullTitle;
 

@@ -35,7 +35,21 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const newUser = await storage.createUser({
+    const { adminClient } = await import('../services/supabase');
+    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password: "InvitedUser123!",
+      email_confirm: true,
+      user_metadata: { first_name: firstName, last_name: lastName }
+    });
+
+    if (authError || !authData.user) {
+      throw new Error(`Auth Provisioning Error: ${authError?.message || "Unknown error"}`);
+    }
+
+    const { authStorage } = await import('../replit_integrations/auth/storage');
+    const newUser = await authStorage.upsertUser({
+      id: authData.user.id,
       email,
       role,
       firstName,
@@ -48,7 +62,10 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: error.errors[0].message });
     }
-    res.status(500).json({ message: "Failed to send invite" });
+    if (error instanceof Error) {
+      return res.status(500).json({ message: `Failed to send invite: ${error.message}` });
+    }
+    return res.status(500).json({ message: `Failed to send invite: ${(error as Error)?.message || String(error)}` });
   }
 });
 

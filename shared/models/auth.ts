@@ -32,5 +32,5 @@ export const users = pgTable("profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
+export type UpsertUser = typeof users.$inferInsert & { email?: string };
+export type User = typeof users.$inferSelect & { email?: string };

@@ -3,7 +3,15 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, FileText, ShieldCheck, AlertTriangle, BookOpen, Users, BarChart, LogOut, Server, Fingerprint, ShoppingBag, Settings, Globe, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { Badge } from "@/components/ui/badge";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { motion } from "framer-motion";
 
 const navItems = [
@@ -32,6 +40,7 @@ const groups = [
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { workspaces, activeWorkspaceId, switchWorkspace, isLoading: wsLoading } = useWorkspace();
 
   return (
     <div className="h-screen w-64 flex flex-col fixed left-0 top-0 z-50 bg-[hsl(240,50%,5%)] border-r border-[hsl(240,25%,18%)]">
@@ -49,15 +58,44 @@ export function Sidebar() {
                 Costloci
                 </h1>
                 <Badge variant="outline" className="text-[7px] font-black uppercase tracking-tighter bg-primary/10 border-primary/20 text-primary py-0 px-1.5 h-3.5 leading-none italic shadow-lg shadow-primary/10">
-                    {user?.subscriptionTier || 'starter'}
+                    {user?.subscriptionTier || 'ENTERPRISE'}
                 </Badge>
             </div>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5">
-                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                ROI Engine Active
+            <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5 italic">
+                <div className="w-1 h-1 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                Sovereign Intelligence
             </p>
           </div>
         </div>
+      </div>
+      {/* Workspace Switcher */}
+      <div className="px-5 py-4 border-b border-[hsl(240,25%,18%)]">
+        <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 block px-1">
+          Active Workspace
+        </label>
+        <Select
+          value={activeWorkspaceId?.toString()}
+          onValueChange={(val) => switchWorkspace(parseInt(val))}
+          disabled={wsLoading}
+        >
+          <SelectTrigger className="w-full bg-slate-900/40 border-slate-800/60 hover:border-primary/40 transition-colors h-10 rounded-xl text-slate-200">
+            <SelectValue placeholder="Select Workspace" />
+          </SelectTrigger>
+          <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 rounded-xl overflow-hidden shadow-2xl">
+            {workspaces.map((ws) => (
+              <SelectItem 
+                key={ws.id} 
+                value={ws.id.toString()}
+                className="focus:bg-primary/10 transition-colors cursor-pointer"
+              >
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold">{ws.name}</span>
+                  <span className="text-[9px] text-slate-500 uppercase font-black">{ws.plan} Tier</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Navigation */}
