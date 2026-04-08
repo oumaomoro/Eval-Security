@@ -1008,20 +1008,31 @@ Analyze the contract text and return JSON with exactly these fields:
   app.post("/api/integrations/word/analyze", isAddinAuthenticated, async (req: any, res) => {
     try {
       const { textBlock } = req.body;
-      const text = (textBlock || "").substring(0, 15000);
-      const response = await cachedCompletion({
-        model: "gpt-3.5-turbo",
+      const text = (textBlock || "").substring(0, 12000); // 12k chars for context safety
+
+      console.log(`[ADDIN] Triggering high-fidelity scan for Word document snippet...`);
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
         messages: [
-          { role: "system", content: "Analyze this clause for enterprise compliance gaps (KDPA focus). Return JSON: { riskScore, flaggedTerms, redlineSuggestion }" },
+          { 
+            role: "system", 
+            content: "You are a Silicon Valley General Counsel. Analyze the provided contract text for enterprise risk and compliance gaps (KDPA/GDPR/SOC-2 focus). Maintain an executive, high-tech tone. Return JSON: { riskScore, complianceStatus, summary, findings: [{ requirement, description, severity, status }], leveragePoints: string[] }" 
+          },
           { role: "user", content: text },
         ],
         response_format: { type: "json_object" },
       });
-      res.json(JSON.parse(response.choices[0].message.content || "{}"));
-    } catch { res.status(500).json({ message: "Word analysis failed" }); }
+
+      const analysis = JSON.parse(response.choices[0].message.content || "{}");
+      res.json(analysis);
+    } catch (err: any) { 
+      console.error("[ADDIN API ERROR]", err.message);
+      res.status(500).json({ message: "Word analysis engine failed to initialize" }); 
+    }
   });
 
-  app.post("/api/integrations/word/publish", isAuthenticated, async (req, res) => {
+  app.post("/api/integrations/word/publish", isAddinAuthenticated, async (req, res) => {
     try {
       const clause = await storage.createClauseLibraryItem({
         clauseName: req.body.clauseName,

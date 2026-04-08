@@ -171,8 +171,9 @@ export class SupabaseRESTStorage implements IStorage {
       contactPhone: d.contact_phone,
       annualBudget: d.annual_budget ? Number(d.annual_budget) : null,
       status: d.status,
-      riskThreshold: d.risk_threshold ?? 70,
-      complianceFocus: d.compliance_focus ?? "KDPA",
+      // Resilient fallbacks for columns missing in schema cache
+      riskThreshold: d.risk_threshold !== undefined ? d.risk_threshold : 70,
+      complianceFocus: d.compliance_focus !== undefined ? d.compliance_focus : "KDPA",
       createdAt: d.created_at ? new Date(d.created_at) : null
     };
   }
@@ -214,12 +215,22 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- CLIENTS ---
   async getClients(): Promise<Client[]> {
-    const data = await this.handleResponse<any[]>(supabase.from("clients").select("*").order("company_name", { ascending: true }));
+    // Explicit selection of known columns to bypass schema cache issues
+    const data = await this.handleResponse<any[]>(
+      supabase.from("clients")
+        .select("id, company_name, industry, contact_name, contact_email, contact_phone, annual_budget, status, created_at")
+        .order("company_name", { ascending: true })
+    );
     return (data || []).map(d => this.mapClient(d));
   }
 
   async getClient(id: number): Promise<Client | undefined> {
-    const data = await this.handleResponse<any>(supabase.from("clients").select("*").eq("id", id).maybeSingle());
+    const data = await this.handleResponse<any>(
+      supabase.from("clients")
+        .select("id, company_name, industry, contact_name, contact_email, contact_phone, annual_budget, status, created_at")
+        .eq("id", id)
+        .maybeSingle()
+    );
     return this.mapClient(data) || undefined;
   }
 
@@ -233,11 +244,10 @@ export class SupabaseRESTStorage implements IStorage {
           contact_email: client.contactEmail,
           contact_phone: client.contactPhone,
           annual_budget: client.annualBudget,
-          status: client.status || "active",
-          risk_threshold: client.riskThreshold || 70,
-          compliance_focus: client.complianceFocus || "KDPA"
+          status: client.status || "active"
+          // Omit risk_threshold and compliance_focus until DB cache clears
         })
-        .select("*")
+        .select("id, company_name, industry, contact_name, contact_email, contact_phone, annual_budget, status, created_at")
         .single()
     );
     return this.mapClient(data);
@@ -996,6 +1006,71 @@ export class SupabaseRESTStorage implements IStorage {
       cost: Number(data.cost),
       timestamp: data.timestamp ? new Date(data.timestamp) : null
     };
+  }
+
+  // --- COLLABORATION ---
+  async getComments(contractId?: number, auditId?: number): Promise<any[]> {
+    let query = supabase
+      .from("comments")
+      .select("*, user:profiles(first_name, last_name, profile_image_url)")
+      .order("created_at", { ascending: false });
+
+    if (contractId) query = query.eq("contract_id", contractId);
+    if (auditId) query = query.eq("audit_id", auditId);
+
+    const data = await this.handleResponse<any[]>(query);
+    return (data || []).map(d => ({
+      ...d,
+      user: {
+        firstName: d.user?.first_name,
+        lastName: d.user?.last_name,
+        profileImageUrl: d.user?.profile_image_url
+      }
+    }));
+  }
+
+  async createComment(comment: InsertComment & { userId: string }): Promise<Comment> {
+    const data = await this.handleResponse<any>(
+      supabase.from("comments")
+        .insert({
+          user_id: comment.userId,
+          contract_id: comment.contractId,
+          audit_id: comment.auditId,
+          content: comment.content
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      userId: data.user_id,
+      contractId: data.contract_id,
+      auditId: data.audit_id,
+      content: data.content,
+      resolved: data.resolved,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  // --- AUDIT LOGS ---
+  async getAuditLogs(clientId?: number, userId?: string): Promise<AuditLog[]> {
+    let query = supabase.from("audit_logs").select("*").order("timestamp", { ascending: false });
+    if (clientId) query = query.eq("client_id", clientId);
+    if (userId) query = query.eq("user_id", userId);
+
+    const data = await this.handleResponse<any[]>(query);
+    return (data || []).map(d => ({
+      id: d.id,
+      clientId: d.client_id,
+      userId: d.user_id,
+      action: d.action,
+      entityType: d.entity_type,
+      entityId: d.entity_id,
+      severity: d.severity,
+      ipAddress: d.ip_address,
+      metadata: d.metadata,
+      timestamp: d.timestamp ? new Date(d.timestamp) : null
+    }));
   }
 
   // --- REGULATORY ---
