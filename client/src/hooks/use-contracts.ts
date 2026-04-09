@@ -44,7 +44,10 @@ export function useCreateContract() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create contract");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create contract");
+      }
       return api.contracts.create.responses[201].parse(await res.json());
     },
     onSuccess: () => {
@@ -86,7 +89,10 @@ export function useUploadContractFile() {
         body: formData, // FormData automatically sets correct Content-Type boundary
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Upload failed");
+      }
       return api.contracts.upload.responses[200].parse(await res.json());
     },
   });

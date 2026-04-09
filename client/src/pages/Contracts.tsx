@@ -127,10 +127,26 @@ function CreateContractDialog() {
         annualCost: Number(data.annualCost),
         contractTermMonths: Number(data.contractTermMonths),
       }, {
-        onSuccess: () => setIsOpen(false)
+        onSuccess: () => setIsOpen(false),
+        onError: (err: any) => {
+          if (err.message?.includes("Payment Required") || err.message?.includes("Limit Reached")) {
+            toast({ 
+              title: "Upgrade Required", 
+              description: err.message, 
+              variant: "destructive",
+              action: (
+                <Button variant="outline" size="sm" onClick={() => window.location.href = "/billing"}>
+                  Upgrade
+                </Button>
+              )
+            });
+          } else {
+            toast({ title: "Error", description: err.message || "Failed to process contract", variant: "destructive" });
+          }
+        }
       });
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to process contract", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Process Error", description: e.message, variant: "destructive" });
     }
   };
 

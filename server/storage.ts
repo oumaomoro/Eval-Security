@@ -31,8 +31,8 @@ export interface IStorage {
 
   // Contracts
   getContracts(filters?: { clientId?: number, status?: string }): Promise<(Contract & { client?: Client })[]>;
-  getContract(id: number): Promise<Contract | undefined>;
-  createContract(contract: InsertContract): Promise<Contract>;
+  getContract(id: number): Promise<(Contract & { client?: Client }) | undefined>;
+  createContract(contract: InsertContract, userId?: string): Promise<Contract>;
   updateContract(id: number, updates: Partial<InsertContract> & { aiAnalysis?: any }): Promise<Contract>;
 
   // Compliance
@@ -477,7 +477,7 @@ export class SupabaseRESTStorage implements IStorage {
     return { ...contract, client };
   }
 
-  async createContract(contract: InsertContract): Promise<Contract> {
+  async createContract(contract: InsertContract, userId?: string): Promise<Contract> {
     const data = await this.handleResponse<any>(
       supabase.from("contracts")
         .insert({
@@ -500,7 +500,26 @@ export class SupabaseRESTStorage implements IStorage {
         .select("*")
         .single()
     );
+
+    if (userId) {
+      await this.incrementUserContractCount(userId).catch(err => 
+        console.error(`[STORAGE] Failed to increment contract count for ${userId}:`, err.message)
+      );
+    }
+
     return this.mapContract(data);
+  }
+
+  private async incrementUserContractCount(userId: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (!user) return;
+
+    const currentCount = user.contractsCount || 0;
+    await this.handleResponse(
+      supabase.from("profiles")
+        .update({ contracts_count: currentCount + 1 })
+        .eq("id", userId)
+    );
   }
 
   async updateContract(id: number, updates: Partial<InsertContract> & { aiAnalysis?: any }): Promise<Contract> {

@@ -49,5 +49,9 @@ console.log('\n--- 4. Deploying Frontend to Cloudflare ---');
 const PROD_API_URL = 'https://api.costloci.com';
 run('npm run build', __dirname, { VITE_API_URL: PROD_API_URL });
 run('npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main', __dirname);
+// Automated Subdomain Alignment: Ensure www. resolving correctly
+console.log('\n--- 5. Registering Custom Subdomains (Automated DNS) ---');
+run('npx wrangler pages domain add costloci-frontend www.costloci.com', __dirname);
+run('npx wrangler pages domain add costloci-frontend costloci.com', __dirname);
 
 console.log('\n✅ MISSION COMPLETE: Platform is live, hardened, and verified.');

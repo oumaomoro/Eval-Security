@@ -126,19 +126,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const clientId = req.user?.clientId || 1;
       
-      // Paywall Enforcement Check
+      // Phase 26: Paywall Enforcement Check (Hardened)
       const tier = req.user?.subscriptionTier || "starter";
-      const limit = tier === "enterprise" ? Infinity : tier === "pro" ? 100 : 10;
-      const existingContracts = await storage.getContracts({ clientId });
-      if (existingContracts.length >= limit) {
-        return res.status(402).json({ message: `Payment Required: You have reached the ${limit} contract limit for the ${tier} tier. Please upgrade.` });
+      const limit = tier === "enterprise" ? Infinity : tier === "pro" ? 250 : 20;
+      const currentCount = req.user?.contractsCount || 0;
+      
+      if (currentCount >= limit) {
+        return res.status(402).json({ 
+          message: `Payment Required: You have reached the capacity limit (${limit} contracts) for your ${tier.toUpperCase()} plan. Please upgrade for unlimited analysis.`,
+          limit,
+          tier
+        });
       }
 
       const input = api.contracts.create.input.parse(req.body);
       const contract = await storage.createContract({
         ...input,
         clientId: input.clientId || req.user?.clientId || 1,
-      });
+      }, req.user?.id);
       await storage.createAuditLog({
         action: "CONTRACT_CREATED",
         userId: req.user?.id || "SYSTEM",
@@ -168,12 +173,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const clientId = req.user?.clientId || 1;
       
-      // Paywall Enforcement Check
+      // Phase 26: Paywall Enforcement Check (Hardened)
       const tier = req.user?.subscriptionTier || "starter";
-      const limit = tier === "enterprise" ? Infinity : tier === "pro" ? 100 : 10;
-      const existingContracts = await storage.getContracts({ clientId });
-      if (existingContracts.length >= limit) {
-        return res.status(402).json({ message: `Payment Required: You have reached the ${limit} contract limit for the ${tier} tier. Please upgrade via the Billing Hub.` });
+      const limit = tier === "enterprise" ? Infinity : tier === "pro" ? 250 : 20;
+      const currentCount = req.user?.contractsCount || 0;
+      
+      if (currentCount >= limit) {
+        return res.status(402).json({ 
+          message: `Tier Limit Reached: Your current ${tier.toUpperCase()} plan allows up to ${limit} contract analyses. Please upgrade in the Billing Hub to continue.`,
+          limit,
+          tier
+        });
       }
 
       const pdfData = await pdf(req.file.buffer);
@@ -209,7 +219,7 @@ Analyze the contract text and return JSON with exactly these fields:
           riskFlags: analysis.riskFlags || [],
           summary: `Compliance Grade: ${analysis.complianceGrade}`,
         },
-      });
+      }, req.user?.id);
 
       // Auto-persist extracted risks into risk register
       if (analysis.riskFlags?.length) {

@@ -74,6 +74,7 @@ export async function setupAuth(app: Express) {
         clientId: localUser?.clientId ?? null,
         role: localUser?.role ?? "viewer",
         subscriptionTier: localUser?.subscriptionTier ?? "starter",
+        contractsCount: localUser?.contractsCount ?? 0,
         profileImageUrl: localUser?.profileImageUrl ?? null,
         expires_at: user.last_sign_in_at,
         ip: req.ip,
