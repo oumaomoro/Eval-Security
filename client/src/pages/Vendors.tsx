@@ -1,7 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
 import { Layout } from "@/components/Layout";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { useVendorScorecards, useVendorBenchmarks } from "@/hooks/use-vendors";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,23 +13,9 @@ import { motion } from "framer-motion";
 import { SEO } from "@/components/SEO";
 
 export default function Vendors() {
-    const { data: benchmarks, isLoading: loadingBenchmarks } = useQuery({
-        queryKey: [api.vendors.benchmarks.path],
-        queryFn: async () => {
-            const res = await fetch(api.vendors.benchmarks.path);
-            if (!res.ok) throw new Error("Failed to fetch benchmarks");
-            return res.json();
-        }
-    });
+    const { data: benchmarks, isLoading: loadingBenchmarks } = useVendorBenchmarks();
+    const { data: scorecards, isLoading: loadingScorecards } = useVendorScorecards();
 
-    const { data: scorecards, isLoading: loadingScorecards } = useQuery({
-        queryKey: [api.vendors.scorecards.list.path],
-        queryFn: async () => {
-            const res = await fetch(api.vendors.scorecards.list.path);
-            if (!res.ok) throw new Error("Failed to fetch scorecards");
-            return res.json();
-        }
-    });
 
     if (loadingBenchmarks || loadingScorecards) {
         return <Layout><div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;

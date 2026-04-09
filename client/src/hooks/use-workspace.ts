@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { type Workspace } from "@shared/schema";
+import { api } from "@shared/routes";
+import { getApiUrl } from "@/lib/api-config";
 
 export function useWorkspace() {
   const queryClient = useQueryClient();
@@ -11,6 +13,15 @@ export function useWorkspace() {
 
   const { data: workspaces, isLoading } = useQuery<Workspace[]>({
     queryKey: ["/api/workspaces"],
+    queryFn: async () => {
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl(api.workspaces.list.path), { 
+        credentials: "include",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error("Failed to fetch workspaces");
+      return api.workspaces.list.responses[200].parse(await res.json());
+    },
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
 

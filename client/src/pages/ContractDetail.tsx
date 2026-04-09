@@ -18,6 +18,7 @@ import { SignNowModal } from "@/components/SignNowModal";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/api-config";
 
 export default function ContractDetail() {
   const [match, params] = useRoute("/contracts/:id");
@@ -44,9 +45,13 @@ export default function ContractDetail() {
 
   const handleRemediate = async (risk: any) => {
     try {
-      const res = await fetch(`/api/contracts/${id}/remediate`, {
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl(`/api/contracts/${id}/remediate`), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ 
           riskId: risk.id, 
           originalText: risk.riskDescription
@@ -72,9 +77,13 @@ export default function ContractDetail() {
   const handleRequestSignature = async () => {
     try {
       setIsInitiatingSignNow(true);
-      const res = await fetch("/api/signnow/embedded", {
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl("/api/signnow/embedded"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ contractId: id, signerEmail: user?.email })
       });
       

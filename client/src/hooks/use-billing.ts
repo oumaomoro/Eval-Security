@@ -1,23 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
+import { api } from "@shared/routes";
+import { getApiUrl } from "@/lib/api-config";
 
-export interface BillingTelemetry {
-    id: number;
-    clientId: number;
-    metricType: string;
-    value: number;
-    cost?: number;
-    timestamp: string;
-}
-
-export function useBillingTelemetry(clientId?: number) {
-    return useQuery<BillingTelemetry[]>({
-        queryKey: [api.billing.telemetry.path, clientId],
-        queryFn: async () => {
-            const url = buildUrl(api.billing.telemetry.path, clientId ? { clientId } : undefined);
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Failed to fetch billing telemetry");
-            return res.json();
-        },
-    });
+export function useBillingTelemetry(filters?: { clientId?: string }) {
+  return useQuery({
+    queryKey: [api.billing.telemetry.path, filters],
+    queryFn: async () => {
+      const token = localStorage.getItem("costloci_token");
+      const url = filters?.clientId 
+        ? `${api.billing.telemetry.path}?clientId=${filters.clientId}`
+        : api.billing.telemetry.path;
+        
+      const res = await fetch(getApiUrl(url), { 
+        credentials: "include",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error("Failed to fetch billing telemetry");
+      const result = await res.json();
+      return result.data || [];
+    },
+  });
 }

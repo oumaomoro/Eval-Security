@@ -1,6 +1,6 @@
 import { DiamondIcon } from "./DiamondIcon";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, FileText, ShieldCheck, AlertTriangle, BookOpen, Users, BarChart, LogOut, Server, Fingerprint, ShoppingBag, Settings, Globe, Zap } from "lucide-react";
+import { LayoutDashboard, FileText, ShieldCheck, AlertTriangle, BookOpen, Users, BarChart, LogOut, Server, Fingerprint, ShoppingBag, Settings, Globe, Zap, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -22,6 +22,7 @@ const navItems = [
   { label: "Clause Library", icon: BookOpen, href: "/clauses", group: "intelligence" },
   { label: "Vendor Governance", icon: Users, href: "/vendors", group: "intelligence" },
   { label: "Compliance Policies", icon: ShieldCheck, href: "/policies", group: "intelligence" },
+  { label: "Executive ROI", icon: DollarSign, href: "/roi", group: "intelligence" },
   { label: "Regulatory Reports", icon: BarChart, href: "/reports", group: "intelligence" },
   { label: "Billing & Usage", icon: Zap, href: "/billing", group: "platform" },
   { label: "System Health", icon: Server, href: "/system", group: "platform" },

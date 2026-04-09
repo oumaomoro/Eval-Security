@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Edit2, Trash2, ListChecks, Shield, Globe, GripVertical, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { getApiUrl } from "@/lib/api-config";
+import { useRulesets, useCreateRuleset } from "@/hooks/use-rulesets";
 
 interface Ruleset {
     id: number;
@@ -34,37 +36,19 @@ export default function Rulesets() {
     const [standard, setStandard] = useState("");
     const [rules, setRules] = useState<any[]>([]);
 
-    const { data: rulesets, isLoading } = useQuery({
-        queryKey: [api.auditRulesets.list.path],
-        queryFn: async () => {
-            const res = await fetch(api.auditRulesets.list.path);
-            if (!res.ok) throw new Error("Failed to fetch rulesets");
-            return res.json();
-        }
-    });
+    const { data: rulesets, isLoading } = useRulesets();
+    const createRuleset = useCreateRuleset();
 
-    const createRuleset = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await fetch(api.auditRulesets.create.path, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-            if (!res.ok) throw new Error("Failed to create ruleset");
-            return res.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [api.auditRulesets.list.path] });
-            toast({ title: "Ruleset created successfully" });
-            resetForm();
-        }
-    });
 
     const updateRuleset = useMutation({
         mutationFn: async ({ id, data }: { id: number, data: any }) => {
-            const res = await fetch(`/api/audit-rulesets/${id}`, {
+            const token = localStorage.getItem("costloci_token");
+            const res = await fetch(getApiUrl(`/api/audit-rulesets/${id}`), {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify(data),
             });
             if (!res.ok) throw new Error("Failed to update ruleset");
@@ -79,7 +63,11 @@ export default function Rulesets() {
 
     const deleteRuleset = useMutation({
         mutationFn: async (id: number) => {
-            const res = await fetch(`/api/audit-rulesets/${id}`, { method: "DELETE" });
+            const token = localStorage.getItem("costloci_token");
+            const res = await fetch(getApiUrl(`/api/audit-rulesets/${id}`), { 
+                method: "DELETE",
+                headers: token ? { "Authorization": `Bearer ${token}` } : {}
+            });
             if (!res.ok) throw new Error("Failed to delete ruleset");
         },
         onSuccess: () => {
@@ -90,9 +78,13 @@ export default function Rulesets() {
 
     const generateEvidencePack = useMutation({
         mutationFn: async () => {
-            const res = await fetch("/api/reports/evidence-pack", {
+            const token = localStorage.getItem("costloci_token");
+            const res = await fetch(getApiUrl("/api/reports/evidence-pack"), {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ standard: "SOC 2 / ISO 27001", type: "Enterprise Verification" })
             });
             if (!res.ok) throw new Error("Failed to generate pack");
@@ -117,9 +109,13 @@ export default function Rulesets() {
 
     const triggerRescan = useMutation({
         mutationFn: async () => {
-            const res = await fetch("/api/regulatory-alerts/trigger-rescan", {
+            const token = localStorage.getItem("costloci_token");
+            const res = await fetch(getApiUrl("/api/regulatory-alerts/trigger-rescan"), {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ standard: "Global", alertTitle: "Autonomic Compliance Rescan" })
             });
             if (!res.ok) throw new Error("Failed to trigger rescan");

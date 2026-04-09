@@ -12,52 +12,17 @@ import {
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboardStats } from "@/hooks/use-dashboard";
+import { useInfrastructureLogs, useHealInfrastructure } from "@/hooks/use-infrastructure";
+import { useBillingTelemetry } from "@/hooks/use-billing";
 
 export default function SystemHealth() {
     const { toast } = useToast();
     
-    const { data: stats, isLoading: loadingStats } = useQuery({
-        queryKey: [api.dashboard.stats.path],
-        queryFn: async () => {
-            const res = await fetch(api.dashboard.stats.path);
-            if (!res.ok) throw new Error("Failed to fetch system stats");
-            return res.json();
-        }
-    });
-
-    const { data: infraLogs, isLoading: loadingLogs } = useQuery({
-        queryKey: [api.infrastructure.logs.path],
-        queryFn: async () => {
-            const res = await fetch(api.infrastructure.logs.path);
-            if (!res.ok) throw new Error("Failed to fetch infra logs");
-            return res.json();
-        }
-    });
-
-    const { data: billing, isLoading: loadingBilling } = useQuery({
-        queryKey: [api.billing.telemetry.path],
-        queryFn: async () => {
-            const res = await fetch(api.billing.telemetry.path);
-            if (!res.ok) throw new Error("Failed to fetch billing telemetry");
-            return res.json();
-        }
-    });
-
-    const heal = useMutation({
-        mutationFn: async (logId: number) => {
-            const res = await fetch(api.infrastructure.heal.path, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ logId }),
-            });
-            if (!res.ok) throw new Error("Healing failed");
-            return res.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [api.infrastructure.logs.path] });
-            toast({ title: "Remediation Successful", description: "The system component has been restored to optimal state." });
-        }
-    });
+    const { data: stats, isLoading: loadingStats } = useDashboardStats();
+    const { data: infraLogs, isLoading: loadingLogs } = useInfrastructureLogs();
+    const { data: billing, isLoading: loadingBilling } = useBillingTelemetry();
+    const heal = useHealInfrastructure();
 
     if (loadingStats || loadingLogs || loadingBilling) {
         return <Layout><div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;

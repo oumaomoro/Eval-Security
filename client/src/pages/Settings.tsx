@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { getApiUrl } from "@/lib/api-config";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -23,15 +24,22 @@ export default function Settings() {
   const handleRegisterPasskey = async () => {
     setIsRegistering(true);
     try {
-      const res = await fetch('/api/auth/webauthn/generate-registration', { method: 'POST' });
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl('/api/auth/webauthn/generate-registration'), { 
+        method: 'POST',
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error("Failed to generate registration options");
       const options = await res.json();
 
       const attResp = await startRegistration(options);
 
-      const verifyRes = await fetch('/api/auth/webauthn/verify-registration', {
+      const verifyRes = await fetch(getApiUrl('/api/auth/webauthn/verify-registration'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(attResp),
       });
 
@@ -49,7 +57,10 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    fetch('/api/health/latency')
+    const token = localStorage.getItem("costloci_token");
+    fetch(getApiUrl('/api/health/latency'), {
+      headers: token ? { "Authorization": `Bearer ${token}` } : {}
+    })
       .then(res => res.json())
       .then(data => setLatencyData(data));
       

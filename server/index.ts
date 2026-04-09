@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { createServer } from "http";
 import { log } from "./vite.js";
 import { registerRoutes, seedDatabase } from "./routes.js";
@@ -9,6 +10,20 @@ import { serveStatic } from "./static.js";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// ── PHASE 27 HOTFIX: CROSS-DOMAIN PRODUCTION CONNECTIVITY ─────────
+// Allows costloci.com (Frontend) to communicate with api.costloci.com (Backend)
+app.use(cors({
+  origin: [
+    "https://costloci.com",
+    "https://www.costloci.com",
+    "http://localhost:5173",
+    "http://localhost:5000"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
 
 // Logging Hook
 app.use((req, res, next) => {

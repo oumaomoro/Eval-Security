@@ -2,20 +2,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertRisk } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/api-config";
 
 export function useRisks(filters?: { contractId?: string }) {
   return useQuery({
     queryKey: [api.risks.list.path, filters],
     queryFn: async () => {
-      const cleanFilters = Object.fromEntries(
-        Object.entries(filters || {}).filter(([_, v]) => v != null)
-      );
-      
-      const url = Object.keys(cleanFilters).length 
-        ? `${api.risks.list.path}?${new URLSearchParams(cleanFilters as Record<string, string>).toString()}`
+      const token = localStorage.getItem("costloci_token");
+      const url = filters?.contractId 
+        ? `${api.risks.list.path}?contractId=${filters.contractId}`
         : api.risks.list.path;
       
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(getApiUrl(url), { 
+        credentials: "include",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error("Failed to fetch risks");
       return api.risks.list.responses[200].parse(await res.json());
     },
@@ -50,14 +51,18 @@ export function useMitigateRisk() {
 
   return useMutation({
     mutationFn: async ({ id, status, strategy }: { id: number; status: string; strategy?: string }) => {
+      const token = localStorage.getItem("costloci_token");
       const url = buildUrl(api.risks.mitigate.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(getApiUrl(url), {
         method: api.risks.mitigate.method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ status, strategy }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update risk mitigation");
+      if (!res.ok) throw new Error("Failed to mitigate risk");
       return api.risks.mitigate.responses[200].parse(await res.json());
     },
     onSuccess: () => {

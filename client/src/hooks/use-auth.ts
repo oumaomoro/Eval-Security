@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
+import { getApiUrl } from "@/lib/api-config";
 
 async function fetchUser(): Promise<User | null> {
   const token = localStorage.getItem("costloci_token");
   if (!token) return null;
 
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || "";
-    const response = await fetch(`${apiUrl}/api/auth/user`, {
+    const response = await fetch(getApiUrl("/api/auth/user"), {
       headers: {
         "Authorization": `Bearer ${token}`
       }

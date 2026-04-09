@@ -1,12 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/api-config";
 
 export function useComplianceAudits() {
   return useQuery({
     queryKey: [api.compliance.list.path],
     queryFn: async () => {
-      const res = await fetch(api.compliance.list.path, { credentials: "include" });
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl(api.compliance.list.path), { 
+        credentials: "include",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error("Failed to fetch audits");
       return api.compliance.list.responses[200].parse(await res.json());
     },
@@ -19,9 +24,13 @@ export function useRunAudit() {
 
   return useMutation({
     mutationFn: async (data: { scope: { contractIds: number[]; standards: string[] } }) => {
-      const res = await fetch(api.compliance.run.path, {
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl(api.compliance.run.path), {
         method: api.compliance.run.method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(data),
         credentials: "include",
       });

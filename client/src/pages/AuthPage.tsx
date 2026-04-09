@@ -10,6 +10,7 @@ import { Loader2, ShieldCheck, Lock, Mail, User, ArrowRight, Brain, Globe } from
 import { motion } from "framer-motion";
 import { DiamondIcon } from "@/components/DiamondIcon";
 import { SEO } from "@/components/SEO";
+import { getApiUrl } from "@/lib/api-config";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
@@ -26,8 +27,7 @@ export default function AuthPage() {
 
   const loginMutation = useMutation({
     mutationFn: async () => {
-      const apiUrl = import.meta.env.VITE_API_URL || "";
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
+      const res = await fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -52,8 +52,7 @@ export default function AuthPage() {
 
   const registerMutation = useMutation({
     mutationFn: async () => {
-      const apiUrl = import.meta.env.VITE_API_URL || "";
-      const res = await fetch(`${apiUrl}/api/auth/register`, {
+      const res = await fetch(getApiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, firstName, lastName })
@@ -79,8 +78,7 @@ export default function AuthPage() {
 
   const forgotMutation = useMutation({
     mutationFn: async () => {
-      const apiUrl = import.meta.env.VITE_API_URL || "";
-      const res = await fetch(`${apiUrl}/api/auth/forgot-password`, {
+      const res = await fetch(getApiUrl("/api/auth/forgot-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })

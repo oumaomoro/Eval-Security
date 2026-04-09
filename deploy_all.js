@@ -46,12 +46,12 @@ run('vercel --prod --yes', path.join(__dirname, 'cyberoptimize-prod', 'backend')
 // 4. Build & Deploy Frontend (JWT-Hardened)
 console.log('\n--- 4. Deploying Frontend to Cloudflare ---');
 // VITE_API_URL is injected here to ensure the frontend talks to the correct production backend
-const PROD_API_URL = 'https://api.costloci.com';
+const PROD_API_URL = 'https://api.costloci.com/api';
 run('npm run build', __dirname, { VITE_API_URL: PROD_API_URL });
 run('npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main', __dirname);
 // Automated Subdomain Alignment: Ensure www. resolving correctly
 console.log('\n--- 5. Registering Custom Subdomains (Automated DNS) ---');
-run('npx wrangler pages domain add costloci-frontend www.costloci.com', __dirname);
-run('npx wrangler pages domain add costloci-frontend costloci.com', __dirname);
+run('npx wrangler pages project domain add --project-name costloci-frontend --domain www.costloci.com', __dirname);
+run('npx wrangler pages project domain add --project-name costloci-frontend --domain costloci.com', __dirname);
 
 console.log('\n✅ MISSION COMPLETE: Platform is live, hardened, and verified.');

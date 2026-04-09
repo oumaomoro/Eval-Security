@@ -40,4 +40,33 @@ CREATE TABLE IF NOT EXISTS clauses (
 ALTER TABLE workspace_members
 ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '{}';
 
+-- 6. Hardening Infrastructure Logs (Resolving PGRST204 Cache Desync)
+CREATE TABLE IF NOT EXISTS infrastructure_logs (
+    id SERIAL PRIMARY KEY,
+    component TEXT NOT NULL,
+    event TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'detected',
+    action_taken TEXT,
+    "actionTaken" TEXT, -- Diagnostic Alias for PostgREST Cache support
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 7. Hardening Billing & Telemetry Layer
+CREATE TABLE IF NOT EXISTS billing_telemetry (
+    id SERIAL PRIMARY KEY,
+    client_id INTEGER REFERENCES clients(id),
+    metric_type TEXT NOT NULL,
+    value DOUBLE PRECISION NOT NULL,
+    cost DOUBLE PRECISION DEFAULT 0,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 8. Hardening Identity Gateways (Resolving Constraint Desync)
+ALTER TABLE profiles 
+DROP CONSTRAINT IF EXISTS profiles_role_check;
+
+ALTER TABLE profiles
+ADD CONSTRAINT profiles_role_check 
+CHECK (role IN ('admin', 'analyst', 'executive', 'owner', 'user', 'msa_officer', 'msp_admin'));
+
 COMMIT;
