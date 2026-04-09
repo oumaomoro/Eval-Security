@@ -11,10 +11,67 @@ export default function Marketplace() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [isSelling, setIsSelling] = useState(false);
+  const [sellerProfile, setSellerProfile] = useState(null);
+  const [salesHistory, setSalesHistory] = useState([]);
+  const [registering, setRegistering] = useState(false);
 
   useEffect(() => {
     fetchItems();
+    fetchSellerProfile();
   }, [category]);
+
+  const fetchSellerProfile = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const [profileRes, statsRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/marketplace/register-seller`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        }).catch(() => ({ json: () => ({}) })),
+        fetch(`${import.meta.env.VITE_API_URL}/marketplace/seller-stats`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        }).then(r => r.json())
+      ]);
+
+      // Note: register-seller GET might not exist, but we use it to check profile
+      // For now, let's just use the direct profiles fetch if the endpoint is purely POST
+      const { data: profile } = await supabase.from('profiles').select('is_seller, paypal_email').eq('id', session.user.id).single();
+      setSellerProfile(profile);
+
+      if (statsRes.success) {
+        setSalesHistory(statsRes.stats.history || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch seller data:', err);
+    }
+  };
+
+  const handleRegisterSeller = async (email) => {
+    setRegistering(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/marketplace/register-seller`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ paypal_email: email })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('PayPal account linked! You can now sell clause templates.');
+        await fetchSellerProfile();
+      } else {
+        alert(data.error || 'Failed to link PayPal account');
+      }
+    } catch (err) {
+      console.error('Seller registration error:', err);
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   const fetchItems = async () => {
     setLoading(true);
@@ -29,9 +86,35 @@ export default function Marketplace() {
     setLoading(false);
   };
 
-  const handlePurchase = async (itemId) => {
-     // TODO: Implement Stripe Checkout session here
-     alert('Redirecting to secure manual payout checkout...');
+  const handlePurchase = async (item) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return alert('Please log in to purchase.');
+
+      // Step 1: Create a real PayPal Order on the backend
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/marketplace/create-order`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ itemId: item.id })
+      });
+
+      const data = await response.json();
+
+      if (!data.success || !data.approval_url) {
+        alert(data.error || 'Could not initiate PayPal checkout.');
+        return;
+      }
+
+      // Step 2: Redirect buyer to PayPal to authorize the payment
+      // On return, PayPal will redirect to the configured return_url with token & PayerID
+      window.location.href = data.approval_url;
+    } catch (err) {
+      console.error('Purchase error:', err);
+      alert('A critical error occurred during checkout. Please try again.');
+    }
   };
 
   return (
@@ -41,6 +124,40 @@ export default function Marketplace() {
         <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-[100px] -mr-40 -mt-40 animate-pulse"></div>
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
         
+        {/* ── SELLER DASHBOARD (Innovative High-Tech View) ── */}
+        {sellerProfile?.is_seller && (
+          <div className="max-w-7xl mx-auto px-10 mb-12">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-cyan-500/30 rounded-3xl p-8 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign size={100} /></div>
+              <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
+                <div>
+                  <h2 className="text-2xl font-black text-white italic uppercase mb-2">Seller Command Center</h2>
+                  <p className="text-slate-400 text-sm font-inter">Monitor your legal intelligence revenue and marketplace performance.</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="bg-black/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 text-center min-w-[140px]">
+                    <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest block mb-1">PayPal Earnings</span>
+                    <p className="text-2xl font-black text-white">${salesHistory.reduce((sum, s) => sum + (s.net_to_seller || 0), 0).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-black/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 text-center min-w-[140px]">
+                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block mb-1">Sales Count</span>
+                    <p className="text-2xl font-black text-white">{salesHistory.length}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => window.open('https://paypal.com/myaccount/transactions', '_blank')}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 transition-all"
+                >
+                  View PayPal Activity
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-xs text-slate-500 px-4">
+               <CheckCircle size={14} className="text-emerald-500" /> Linked PayPal Account: <span className="text-slate-300 font-bold">{sellerProfile?.paypal_email}</span>
+            </div>
+          </div>
+        )}
+
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
           <div className="max-w-2xl text-center md:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-widest mb-6">
@@ -56,9 +173,18 @@ export default function Marketplace() {
               <button className="px-8 py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-bold flex items-center gap-2 shadow-xl shadow-cyan-500/20 transition-all font-inter">
                  Browse Premium Library <ArrowRight size={18} />
               </button>
-              <button onClick={() => setIsSelling(true)} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold border border-white/5 transition-all font-inter">
-                 Become a Seller (30% Commission)
-              </button>
+              {!sellerProfile?.is_seller && (
+                <button 
+                  onClick={() => {
+                    const email = prompt("Enter your PayPal Email for payouts:");
+                    if (email) handleRegisterSeller(email);
+                  }} 
+                  disabled={registering}
+                  className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold border border-white/5 transition-all font-inter disabled:opacity-50"
+                >
+                  {registering ? 'Linking...' : 'Connect PayPal for Sales (30% Fee)'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -138,7 +264,7 @@ export default function Marketplace() {
                     <span className="text-xs font-bold text-slate-500">{item.sales_count} Sales</span>
                   </div>
                   <button 
-                    onClick={() => handlePurchase(item.id)}
+                    onClick={() => handlePurchase(item)}
                     className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-cyan-400 hover:text-white transition-colors"
                   >
                     View & Purchase <ArrowRight size={14} />
@@ -177,8 +303,15 @@ export default function Marketplace() {
                   <p className="text-xs text-slate-500 uppercase font-black tracking-widest">Global Exposure</p>
                </div>
             </div>
-            <button className="px-10 py-4 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-cyan-400 transition-colors flex items-center gap-2 mx-auto">
-              <PlusCircle size={18} /> Apply to be a Seller
+            <button 
+              onClick={() => {
+                const email = prompt("Enter your PayPal Email for payouts:");
+                if (email) handleRegisterSeller(email);
+              }} 
+              disabled={registering || sellerProfile?.is_seller}
+              className="px-10 py-4 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-cyan-400 transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+            >
+              <PlusCircle size={18} /> {sellerProfile?.is_seller ? 'PayPal Linked' : (registering ? 'Finalizing...' : 'Apply to be a Seller')}
             </button>
          </div>
       </div>

@@ -119,9 +119,9 @@ export const PASSWORD_RESET_TEMPLATE = (resetLink) => `
   </div>
 </body>
 </html>
-\`;
+`;
 
-export const DPO_ALERTS_TEMPLATE = (dpoName, contractVendor, riskLevel, actionRequired) => \`
+export const DPO_ALERTS_TEMPLATE = (dpoName, contractVendor, riskLevel, actionRequired) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -138,12 +138,12 @@ export const DPO_ALERTS_TEMPLATE = (dpoName, contractVendor, riskLevel, actionRe
     <div class="header">
       <h2 style="margin:0; color: #1e293b;">Compliance Alert: DPO Review Required</h2>
     </div>
-    <p>Hi \${dpoName || 'DPO Officer'},</p>
+    <p>Hi ${dpoName || 'DPO Officer'},</p>
     <p>A new high-risk priority has been flagged that requires your regulatory oversight.</p>
     <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-      <p><strong>Vendor:</strong> \${contractVendor}</p>
-      <p><strong>Risk Level:</strong> <span class="risk-high">\${riskLevel}</span></p>
-      <p><strong>Action Required:</strong> \${actionRequired}</p>
+      <p><strong>Vendor:</strong> ${contractVendor}</p>
+      <p><strong>Risk Level:</strong> <span class="risk-high">${riskLevel}</span></p>
+      <p><strong>Action Required:</strong> ${actionRequired}</p>
     </div>
     <p>Please log in to the Costloci Compliance Center to review the full clause mapping and initiate remediation.</p>
     <a href="https://costloci.com/compliance" class="button">Access Compliance Center</a>

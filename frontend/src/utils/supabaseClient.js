@@ -7,4 +7,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Supabase credentials missing in Frontend environment variables.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    cookieOptions: {
+      domain: window.location.hostname.includes('costloci.com') ? '.costloci.com' : window.location.hostname,
+      path: '/',
+      sameSite: 'lax',
+      secure: window.location.protocol === 'https:',
+    }
+  }
+});

@@ -1,0 +1,7 @@
+# List Network Requests
+
+| reqid | method | url | status |
+|---|---|---|---|
+| 28 | GET | https://5d9356b8.costloci-frontend.pages.dev/ | failed - 304 |
+| 29 | GET | https://5d9356b8.costloci-frontend.pages.dev/assets/index-f49f2171.js | pending |
+| 30 | GET | https://5d9356b8.costloci-frontend.pages.dev/assets/index-2a9d7860.css | failed - 304 |

@@ -1,9 +1,10 @@
 import { supabase } from './supabase.service.js';
-import { isSupabaseConfigured } from './db.utils.js';
 
 /**
- * Phase 11.3: Immutable Audit Logging for SOC 2 Readiness
- * Records critical user actions representing a Chain of Custody for data privacy compliance.
+ * Phase 17: Hardened Audit Service — Always writes to Supabase.
+ * Supabase is a required dependency in all environments.
+ * The mock console.log fallback is removed; if Supabase fails, the error is logged
+ * but the main flow is not interrupted.
  */
 export async function logAuditAction(userId, contractId, actionType, description, req) {
   try {
@@ -12,16 +13,16 @@ export async function logAuditAction(userId, contractId, actionType, description
       contract_id: contractId,
       action_type: actionType,
       description: description,
-      ip_address: req?.ip || req?.headers?.['x-forwarded-for'] || '127.0.0.1'
+      ip_address: req?.ip || req?.headers?.['x-forwarded-for'] || 'unknown',
+      organization_id: req?.user?.organization_id || null,
+      created_at: new Date().toISOString()
     };
 
-    if (isSupabaseConfigured()) {
-      await supabase.from('audit_logs').insert([logEntry]);
-    } else {
-      console.log(`[AUDIT MOCK] [${actionType}] Contract: ${contractId} | User: ${userId} | ${description}`);
-    }
+    const { error } = await supabase.from('audit_logs').insert([logEntry]);
+    if (error) throw error;
   } catch (err) {
-    console.error('[Audit Logger Error]', err.message);
-    // Deliberately not throwing so the main flow isn't blocked by telemetry failures
+    // Don't throw — audit failures must never break the main request lifecycle.
+    // However, we DO log them clearly for observability.
+    console.error(`[AuditService] Failed to persist audit log [${actionType}]:`, err.message);
   }
 }

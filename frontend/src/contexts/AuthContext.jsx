@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { identifyUser, resetAnalyticsUser } from '../utils/analytics.js'
 
 export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_URL || 'https://ulercnwyckrcjnrenzz.supabase.co',
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
@@ -20,6 +20,12 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Phase 7: Unified Anchor Reconstruction
+  // Frontend Anchor: www.costloci.com
+  // Backend Anchor: api.costloci.com
+  const BASE_API_URL = window.location.hostname.includes('costloci.com') 
+    ? 'https://api.costloci.com/api' 
+    : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
 
   useEffect(() => {
     const init = async () => {
@@ -43,7 +49,7 @@ export const AuthProvider = ({ children }) => {
             await supabase.from('profiles').insert({
               id: session.user.id,
               email: session.user.email,
-              role: 'user',
+              role: 'analyst',
               tier: 'free'
             })
           }
@@ -85,7 +91,7 @@ export const AuthProvider = ({ children }) => {
         setUser(prev => prev || sessionUser)
       }
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/billing/status`, {
+      const res = await fetch(`${BASE_API_URL}/billing/status`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
@@ -98,10 +104,11 @@ export const AuthProvider = ({ children }) => {
             id: data.user?.id || data.id || sessionUser?.id,
             tier: data.tier,
             plan: data.plan,
+            organization_id: data.user?.organization_id || data.organization_id || prev?.organization_id,
             email: data.email || sessionUser?.email || prev?.email
           }))
           identifyUser(
-            { id: data?.user?.id || data?.id || sessionUser?.id || 'unknown', email: data.email || sessionUser?.email },
+            { id: data?.user?.id || data?.id || sessionUser?.id || 'unknown', email: data.email || sessionUser?.email, organization_id: data.organization_id },
             data
           )
         }
@@ -118,8 +125,8 @@ export const AuthProvider = ({ children }) => {
 
   const signUp = async (email, password) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://api.costloci.com/api';
-      const res = await fetch(`${apiUrl}/auth/register`, {
+      // Enforce Absolute Production API Gateway (Unified Prefix)
+      const res = await fetch(`${BASE_API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -130,6 +137,9 @@ export const AuthProvider = ({ children }) => {
       if (data.token) {
         localStorage.setItem('costloci_token', data.token)
         setUser(data.user)
+      } else {
+        // Standard Supabase flow where user is created but unconfirmed
+        return { success: true, message: 'VERIFICATION_REQUIRED' };
       }
       return data
     } catch (err) {
@@ -146,8 +156,8 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     try {
-      // Favor local API for E2E testing/login flow
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+      // Favor absolute production gateway for identity
+      const res = await fetch(`${BASE_API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -163,7 +173,10 @@ export const AuthProvider = ({ children }) => {
 
       // Store token for subsequent API calls
       localStorage.setItem('costloci_token', data.token)
-      setUser(data.user)
+      setUser({
+        ...data.user,
+        organization_id: data.user?.organization_id || data.organization_id
+      })
 
       // Initialize unified analytics profile
       identifyUser(data.user, data.user)
@@ -189,7 +202,9 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: window.location.hostname.includes('costloci.com') 
+            ? 'https://www.costloci.com/dashboard' 
+            : `${window.location.origin}/dashboard`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

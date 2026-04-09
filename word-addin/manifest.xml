@@ -6,23 +6,22 @@
           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
           xsi:type="TaskPaneApp">
   <Id>6b513812-7065-4f2b-871d-55734898305c</Id>
-  <Version>1.0.0.0</Version>
-  <ProviderName>Costloci</ProviderName>
+  <Version>1.0.0.1</Version>
+  <ProviderName>Costloci Enterprise</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Costloci AI Analysis" />
-  <Description DefaultValue="Real-time AI contract analysis directly in Microsoft Word." />
-  <IconUrl DefaultValue="https://costloci.com/logo.png" />
-  <HighResolutionIconUrl DefaultValue="https://costloci.com/logo.png" />
-  <SupportUrl DefaultValue="https://costloci.com/support" />
+  <DisplayName DefaultValue="Costloci AI" />
+  <Description DefaultValue="Professional AI-driven contract intelligence and compliance auditing directly in Microsoft Word." />
+  <IconUrl DefaultValue="https://Costloci.com/addin/logo.png" />
+  <HighResolutionIconUrl DefaultValue="https://Costloci.com/addin/logo.png" />
+  <SupportUrl DefaultValue="https://Costloci.com/support" />
   <AppDomains>
-    <AppDomain>https://costloci.com</AppDomain>
-    <AppDomain>https://costloci.com</AppDomain>
+    <AppDomain>https://Costloci.com</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Document" />
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://costloci.com/taskpane.html" />
+    <SourceLocation DefaultValue="https://Costloci.com/addin/taskpane.html" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -31,13 +30,13 @@
         <DesktopFormFactor>
           <GetStarted>
             <Title DefaultValue="Costloci Analysis" />
-            <Description DefaultValue="Analyze your vendor agreements for risk and ROI." />
-            <LearnMoreUrl DefaultValue="https://costloci.com/how-it-works" />
+            <Description DefaultValue="Identify risks and compliance gaps in real-time." />
+            <LearnMoreUrl DefaultValue="https://Costloci.com/docs" />
           </GetStarted>
           <FunctionFile resid="Taskpane.Url" />
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <CustomTab id="CostlociTab">
-              <Group id="AnalysisGroup">
+              <Group id="IntelligenceGroup">
                 <Label resid="GroupLabel" />
                 <Control xsi:type="Button" id="AnalyzeButton">
                   <Label resid="AnalyzeButtonLabel" />
@@ -51,7 +50,7 @@
                     <bt:Image size="80" resid="Icon80" />
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>MyTaskPane</TaskpaneId>
+                    <TaskpaneId>CostlociPane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Url" />
                   </Action>
                 </Control>
@@ -64,20 +63,20 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon16" DefaultValue="https://costloci.com/logo.png" />
-        <bt:Image id="Icon32" DefaultValue="https://costloci.com/logo.png" />
-        <bt:Image id="Icon80" DefaultValue="https://costloci.com/logo.png" />
+        <bt:Image id="Icon16" DefaultValue="https://Costloci.com/addin/logo-16.png" />
+        <bt:Image id="Icon32" DefaultValue="https://Costloci.com/addin/logo-32.png" />
+        <bt:Image id="Icon80" DefaultValue="https://Costloci.com/addin/logo-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://costloci.com/taskpane.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://Costloci.com/addin/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:ShortString id="GroupLabel" DefaultValue="Costloci" />
-        <bt:ShortString id="AnalyzeButtonLabel" DefaultValue="Run Analysis" />
-        <bt:ShortString id="TabLabel" DefaultValue="Costloci AI" />
+        <bt:ShortString id="AnalyzeButtonLabel" DefaultValue="AI Scan" />
+        <bt:ShortString id="TabLabel" DefaultValue="COSTLOCI" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:LongString id="AnalyzeButtonTooltip" DefaultValue="Click to analyze the document for high-risk clauses and savings." />
+        <bt:LongString id="AnalyzeButtonTooltip" DefaultValue="Perform a multi-jurisdictional AI scan for risks, savings, and compliance gaps." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

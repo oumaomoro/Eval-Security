@@ -8,6 +8,8 @@ const router = express.Router();
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { SignnowService } from '../services/signnow.service.js';
+import { AnalyzerService } from '../services/analyzer.service.js';
+import pdf from 'pdf-parse';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'costloci-secret-2026';
 const upload = multer({ storage: multer.memoryStorage() });
@@ -48,14 +50,14 @@ router.post('/signnow/upload', requireAuth, upload.single('file'), async (req, r
     }
 
     // Step 1: Upload the dynamically generated Word Doc
-    const uploadResult = await SignnowService.uploadDocument(token, req.file.buffer, req.file.originalname);
+    const uploadResult = await SignnowService.uploadDocument(token, req.file.buffer, req.file.originalname, req.user.clientId);
 
     // Optional Step 2: If an invite email was provided, immediately send it to the queue
     if (req.body.inviteEmail) {
       await SignnowService.sendInvite(token, uploadResult.id, req.body.inviteEmail);
     }
 
-    res.json({ success: true, document_id: uploadResult.id, message: 'Successfully routed to SignNow Queue' });
+    res.json({ success: true, document_id: uploadResult.id, message: 'Successfully routed to SignNow Queue with automated client mapping' });
   } catch (err) {
     console.error('[SignNow Route] Error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -155,13 +157,60 @@ router.post('/callback', requireAuth, async (req, res) => {
 
     let tokenData;
     const clientId = process.env[`${provider.toUpperCase()}_CLIENT_ID`];
+    const clientSecret = process.env[`${provider.toUpperCase()}_CLIENT_SECRET`];
+    const redirectUri = `${process.env.FRONTEND_URL || 'http://127.0.0.1:5180'}/settings`;
 
-    if (clientId) {
-      // TODO: Execute server-to-server POST to exchange 'code' for an access token
-      // E.g., await fetch('https://account-d.docusign.com/oauth/token', ...)
-      throw new Error(`Real token exchange pending config for ${provider}`);
+    if (clientId && clientSecret) {
+      console.log(`[integrations] Exchanging code for ${provider} access token...`);
+      
+      const endpoints = {
+        docusign: 'https://account-d.docusign.com/oauth/token',
+        slack: 'https://slack.com/api/oauth.v2.access',
+        jira: 'https://auth.atlassian.com/oauth/token'
+      };
+
+      const endpoint = endpoints[provider];
+      let body;
+      let headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+
+      if (provider === 'docusign') {
+        const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+        headers['Authorization'] = `Basic ${auth}`;
+        body = new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code
+        }).toString();
+      } else if (provider === 'slack') {
+        body = new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: code,
+          redirect_uri: redirectUri
+        }).toString();
+      } else if (provider === 'jira') {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({
+          grant_type: 'authorization_code',
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: code,
+          redirect_uri: redirectUri
+        });
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body
+      });
+
+      tokenData = await response.json();
+
+      if (!response.ok || tokenData.error) {
+        throw new Error(`${provider} exchange failed: ${tokenData.error_description || tokenData.error || response.statusText}`);
+      }
     } else {
-      throw new Error(`${provider} integration is not configured.`);
+      throw new Error(`${provider} integration is not fully configured (missing Client ID or Secret).`);
     }
 
     // Read current integrations
@@ -229,35 +278,54 @@ router.delete('/:provider', requireAuth, async (req, res) => {
   }
 });
 
-// 5. DocuSign Webhook: Automated Ingestion
-router.post('/docusign/webhook', async (req, res) => {
-  const { event, data } = req.body;
+// 6. SignNow Webhook: Automated Zero-Touch Ingestion
+router.post('/signnow/webhook', async (req, res) => {
+  const { event, document_id } = req.body;
 
   try {
-    console.log(`[DocuSign Webhook] Received event: ${event}`);
+    console.log(`[SignNow Webhook] Received event: ${event} for document ${document_id}`);
 
-    if (event === 'envelope-completed') {
-      const envelopeId = data?.envelopeId;
-      const userId = data?.customFields?.find(f => f.name === 'costloci_user_id')?.value;
+    if (event === 'document.complete') {
+      // 1. Resolve Client Mapping from hidden metadata
+      const metadata = await SignnowService.getDocumentMetadata(document_id);
+      const clientId = metadata?.clientId || 1; // Fallback to 1
 
-      if (!userId) {
-        console.warn(`[DocuSign Webhook] No costloci_user_id found in custom fields for envelope ${envelopeId}`);
-        return res.status(200).json({ success: true, message: 'Skipped - No user mapping' });
-      }
+      console.log(`[SignNow Webhook] Mapping document ${document_id} to Client ${clientId}`);
 
-      console.log(`[DocuSign Webhook] Processing completed envelope ${envelopeId} for user ${userId}`);
+      // 2. Download the signed document
+      const pdfBuffer = await SignnowService.downloadDocument(document_id);
 
-      // MOCK: In a real scenario, we would use the DocuSign SDK to download the PDF buffer here.
-      // const pdfBuffer = await DocusignService.downloadEnvelope(envelopeId);
+      // 3. Parse and Analyze
+      const pdfData = await pdf(pdfBuffer);
+      const extractedText = pdfData.text;
 
-      // For now, we simulate a successful ingestion trigger
-      // Note: We would typically call a service here to handle the background analysis
-      console.log(`[DocuSign Webhook] Triggering automated AI analysis for envelope ${envelopeId}...`);
+      console.log(`[SignNow Webhook] AI Analysis started for document ${document_id}...`);
+      const analysis = await AnalyzerService.analyze(extractedText, { clientId });
+
+      // 4. Persist to Costloci Inventory
+      const { data: contract, error: dbError } = await supabase
+        .from('contracts')
+        .insert({
+          client_id: clientId,
+          vendor_name: analysis.vendor_name || 'SignNow Automated Vendor',
+          product_service: analysis.product_service || 'Enterprise Service',
+          category: analysis.category || 'e-Signature Ingestion',
+          annual_cost: analysis.annual_cost || 0,
+          status: 'active',
+          ai_analysis: analysis.ai_analysis,
+          file_url: `signnow://${document_id}`
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      console.log(`[SignNow Webhook] Successfully ingested contract ${contract.id} for Client ${clientId}`);
     }
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('[DocuSign Webhook] Error:', err.message);
+    console.error('[SignNow Webhook] Error:', err.message);
     res.status(500).json({ success: false, error: 'Webhook processing failed' });
   }
 });

@@ -1,8 +1,8 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
-import { supabase, isSupabaseConfigured, orgScopedQuery } from '../services/supabase.service.js';
+import { supabase } from '../services/supabase.service.js';
+import { orgScopedQuery } from '../services/db.utils.js';
 import { ReporterService } from '../services/reporter.service.js';
-import { requireEnterprisePlan } from '../middleware/auth.middleware.js';
 import archiver from 'archiver';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
@@ -30,12 +30,55 @@ router.get('/', authenticateToken, async (req, res) => {
     const { data, error } = await supabase
       .from('reports')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('organization_id', req.user.organization_id)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return res.json({ success: true, data: data || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/reports/evidence-pack
+router.post('/evidence-pack', authenticateToken, async (req, res) => {
+  try {
+    const { standard, type } = req.body;
+    
+    // 1. Fetch SOC2/ISO Audit trail logs
+    const { data: auditLogs } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('organization_id', req.user.organization_id)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    // 2. Fetch Compliance Drifts
+    const { data: drifts } = await supabase
+      .from('compliance_drifts')
+      .select('*, contract_id(vendor_name), ruleset_id(name)')
+      .eq('organization_id', req.user.organization_id)
+      .order('created_at', { ascending: false });
+
+    // 3. Compile Evidence Data
+    const evidencePayload = {
+      standard: standard || 'SOC2 / ISO 27001',
+      reportType: type || 'Enterprise Verification',
+      timestamp: new Date().toISOString(),
+      organization_id: req.user.organization_id,
+      generated_by: req.user.email,
+      auditTrailCount: auditLogs?.length || 0,
+      driftsResolved: drifts?.filter(d => d.alert_generated)?.length || 0,
+      evidenceLogs: auditLogs || [],
+      driftRegister: drifts || []
+    };
+
+    console.log(`[Evidence Pack] Generated ${evidencePayload.auditTrailCount} evidence rows for ${standard}.`);
+    
+    // Return structured JSON for the frontend to export as CSV or Display
+    res.json({ success: true, evidence: evidencePayload });
+  } catch (error) {
+    console.error('Evidence Pack Error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -112,11 +155,15 @@ router.get('/export/audit-pack', authenticateToken, async (req, res) => {
 
     // 1. Fetch all documents and metadata
     const { data: contracts } = await orgScopedQuery('contracts', req.user);
-    const { data: auditLogs } = await supabase.from('audit_logs').select('*'); // Should ideally be orgScoped in production
+    const { data: auditLogs } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('organization_id', req.user.organization_id);
 
     // 2. Add summary metadata
     archive.append(JSON.stringify({
-      organization: req.user.id,
+      organization_id: req.user.organization_id,
+      exported_by: req.user.email,
       exported_at: new Date().toISOString(),
       contracts_count: contracts?.length || 0,
       portfolio: contracts?.map(c => ({
@@ -191,29 +238,80 @@ router.post('/:id/strategic-brief/enqueue', authenticateToken, async (req, res) 
 
     if (jobError) throw jobError;
 
-    // 3. Trigger "Background" Processing (Async)
-    // In a full production env, this would be picked up by a BullMQ worker or Vercel Cron
-    // Here we simulate the handoff to the processing engine
-    setTimeout(async () => {
-       try {
-          await supabase.from('background_jobs').update({ status: 'processing' }).eq('id', job.id);
-          
-          // Simulation of PDF Generation Logic (Same as the sync route)
-          // In real production, this would upload to Supabase Storage and return a signed URL
-          const mockFileUrl = `https://api.costloci.com/api/reports/jobs/${job.id}/download`;
-          
-          await supabase.from('background_jobs').update({ 
-             status: 'completed', 
-             result: { file_url: mockFileUrl },
-             updated_at: new Date().toISOString()
-          }).eq('id', job.id);
-       } catch (procError) {
-          await supabase.from('background_jobs').update({ 
-             status: 'failed', 
-             error: procError.message 
-          }).eq('id', job.id);
-       }
-    }, 2000);
+    // 3. Real Background Processing — Generate PDF & upload to Supabase Storage
+    setImmediate(async () => {
+      try {
+        await supabase.from('background_jobs').update({ status: 'processing' }).eq('id', job.id);
+
+        // Pull live data for the pack
+        const { data: contracts } = await orgScopedQuery('contracts', req.user);
+        const { data: risks } = await orgScopedQuery('risk_register', req.user);
+
+        // Generate the Strategic PDF
+        const pdfDoc = new PDFDocument({ margin: 50, size: 'A4' });
+        const fileName = `strategic-pack-${job.id}.pdf`;
+        const tmpPath = join(__dirname, '../uploads', fileName);
+        const writeStream = fs.createWriteStream(tmpPath);
+        pdfDoc.pipe(writeStream);
+
+        // ── PDF Content ───────────────────────────────────────────────────
+        pdfDoc.rect(0, 0, 600, 90).fill('#0f172a');
+        pdfDoc.fillColor('#ffffff').fontSize(22).text('COSTLOCI', 50, 28, { characterSpacing: 2 });
+        pdfDoc.fontSize(10).text('Enterprise Strategic Intelligence Pack', 50, 58);
+        pdfDoc.moveDown(4);
+        pdfDoc.fillColor('#1e293b').fontSize(16).text(`Strategic Pack: ${report.report_name}`, 50, 110);
+        pdfDoc.fontSize(10).fillColor('#64748b').text(`Generated: ${new Date().toLocaleDateString()} · Organization: ${req.user.organization_id || req.user.id}`, 50, 132);
+        pdfDoc.moveTo(50, 150).lineTo(550, 150).stroke('#e2e8f0');
+
+        pdfDoc.moveDown(2);
+        pdfDoc.fillColor('#0f172a').fontSize(13).text('Portfolio Summary', 50);
+        pdfDoc.fontSize(10).fillColor('#475569').text(`Total Contracts Analyzed: ${contracts?.length || 0}`, 50);
+        pdfDoc.text(`Total Identified Risks: ${risks?.length || 0}`, 50);
+
+        if (contracts && contracts.length > 0) {
+          pdfDoc.moveDown(1);
+          pdfDoc.fillColor('#0f172a').fontSize(12).text('Contract Portfolio');
+          contracts.slice(0, 20).forEach((c, i) => {
+            pdfDoc.fontSize(9).fillColor('#334155')
+              .text(`${i + 1}. ${c.vendor_name || 'Unknown'} — $${(c.annual_cost || 0).toLocaleString()}/yr — Compliance: ${c.ai_analysis?.compliance_readiness || 'N/A'}%`, 60);
+          });
+        }
+
+        pdfDoc.fontSize(8).fillColor('#94a3b8').text('Confidential. For internal use only. Generated by Costloci Enterprise.', 50, 760, { align: 'center' });
+        pdfDoc.end();
+        // ─────────────────────────────────────────────────────────────────
+
+        await new Promise((resolve, reject) => {
+          writeStream.on('finish', resolve);
+          writeStream.on('error', reject);
+        });
+
+        // Upload to Supabase Storage
+        const fileBuffer = fs.readFileSync(tmpPath);
+        const storagePath = `${req.user.organization_id || req.user.id}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('reports')
+          .upload(storagePath, fileBuffer, { contentType: 'application/pdf', upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(storagePath);
+        fs.unlinkSync(tmpPath);
+
+        await supabase.from('background_jobs').update({
+          status: 'completed',
+          result: { file_url: publicUrl },
+          updated_at: new Date().toISOString()
+        }).eq('id', job.id);
+
+      } catch (procError) {
+        console.error('[reports/enqueue] PDF generation failed:', procError.message);
+        await supabase.from('background_jobs').update({
+          status: 'failed',
+          error: procError.message
+        }).eq('id', job.id);
+      }
+    });
 
     res.json({ success: true, jobId: job.id, message: 'Strategic Pack generation enqueued.' });
   } catch (err) {

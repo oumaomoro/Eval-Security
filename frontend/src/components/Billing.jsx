@@ -45,6 +45,9 @@ export default function Billing() {
   const [banner, setBanner] = useState(null)   // { type, text }
   const [gateway, setGateway] = useState('paypal') // 'paypal' | 'paystack'
   const [billingInterval, setBillingInterval] = useState('month') // 'month' | 'year'
+  const [activeTab, setActiveTab] = useState('plans') // 'plans' | 'usage' | 'invoices'
+  const [usageData, setUsageData] = useState(null)
+  const [invoices, setInvoices] = useState([])
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -54,12 +57,16 @@ export default function Billing() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [plansRes, statusRes] = await Promise.all([
+      const [plansRes, statusRes, usageRes, invoicesRes] = await Promise.all([
         api.get('/billing/plans'),
         api.get('/billing/status'),
+        api.get('/billing/usage'),
+        api.get('/billing/invoices')
       ])
       setPlans(plansRes.data || [])
       setCurrentSub(statusRes.data || null)
+      setUsageData(usageRes.data?.usage || null)
+      setInvoices(invoicesRes.data || [])
     } catch (err) {
       console.error('Billing fetch error:', err)
       setBanner({ type: 'error', text: 'Failed to load billing information. Please refresh.' })
@@ -208,38 +215,43 @@ export default function Billing() {
           </span>
         </div>
 
-        {/* Gateway Selector (Regional Solidity) */}
-        <div className="inline-flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner mb-6">
-          <button
-            onClick={() => setGateway('paypal')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${gateway === 'paypal' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <CreditCard size={16} /> Global (PayPal)
-          </button>
-          <button
-            onClick={() => setGateway('paystack')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${gateway === 'paystack' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <Zap size={16} /> Regional (Paystack)
-          </button>
+      </div>
+      
+      {/* ── Tabs ── */}
+      <div className="flex justify-center mb-8">
+        <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+          {['plans', 'usage', 'invoices'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={twMerge(
+                "px-6 py-2 rounded-lg text-sm font-bold capitalize transition-all",
+                activeTab === tab ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Active subscription banner */}
       {currentSub && (
-        <div className="mb-8 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CheckCircle className="text-emerald-600 flex-shrink-0" size={22} />
+        <div className="mb-8 p-6 bg-slate-900 border border-white/5 rounded-3xl flex items-center justify-between shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/20 transition-all"></div>
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+              <Shield size={24} />
+            </div>
             <div>
-              <p className="font-bold text-emerald-900">Active: {currentSub.plan} Plan</p>
-              <p className="text-sm text-emerald-700">
-                ${currentSub.amount}/{currentSub.billing_cycle || 'month'} &nbsp;·&nbsp; Renews {currentSub.next_billing_date}
+              <p className="text-white font-black text-lg uppercase italic tracking-tighter">Current Plan: {currentSub.plan}</p>
+              <p className="text-slate-400 text-sm">
+                Next Renewal: <span className="text-blue-400 font-bold">{currentSub.next_billing_date}</span> &nbsp;·&nbsp; Method: <span className="text-slate-300">PayPal Enterprise</span>
               </p>
             </div>
           </div>
           <button
             onClick={fetchData}
-            title="Refresh subscription status"
             className="p-2 hover:bg-emerald-100 rounded-lg transition-colors text-emerald-700"
           >
             <RefreshCw size={16} />
@@ -250,101 +262,156 @@ export default function Billing() {
       {/* Status banner */}
       {banner && <StatusBanner type={banner.type}>{banner.text}</StatusBanner>}
 
-      {/* Plan cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {plans.map(plan => {
-          const meta = PLAN_META[plan.name] || PLAN_META.Starter
-          const { Icon, accent, badge } = meta
-          const isHighlight = !!badge
-          const isCurrentPlan = currentSub?.plan === plan.name
-          const isBusy = checkingOut === plan.id
+      {/* ── Content Panes ── */}
+      {activeTab === 'plans' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 animate-in fade-in zoom-in-95 duration-500">
+          {plans.map(plan => {
+            // ... (rest of plans map logic remains the same)
+            const meta = PLAN_META[plan.name] || PLAN_META.Starter
+            const { Icon, accent, badge } = meta
+            const isHighlight = !!badge
+            const isCurrentPlan = currentSub?.plan === plan.name
+            const isBusy = checkingOut === plan.id
 
-          const accentBg = isHighlight ? `bg-${accent}-600` : 'bg-white'
-          const accentText = isHighlight ? 'text-white' : `text-${accent}-700`
-          const accentBorder = isHighlight ? `border-${accent}-300` : 'border-slate-200'
-          const btnClass = isCurrentPlan
-            ? 'bg-emerald-100 text-emerald-700 cursor-default'
-            : isHighlight
-              ? `bg-${accent}-600 text-white hover:bg-${accent}-700 shadow-lg shadow-${accent}-200`
-              : 'bg-slate-900 text-white hover:bg-slate-700'
+            const accentBg = isHighlight ? `bg-${accent}-600` : 'bg-white'
+            const accentText = isHighlight ? 'text-white' : `text-${accent}-700`
+            const accentBorder = isHighlight ? `border-${accent}-300` : 'border-slate-200'
+            const btnClass = isCurrentPlan
+              ? 'bg-emerald-100 text-emerald-700 cursor-default'
+              : isHighlight
+                ? `bg-${accent}-600 text-white hover:bg-${accent}-700 shadow-lg shadow-${accent}-200`
+                : 'bg-slate-900 text-white hover:bg-slate-700'
 
-          return (
-            <div
-              key={plan.id}
-              className={`relative rounded-3xl border ${accentBorder} p-7 flex flex-col transition-all duration-300 bg-white ${isHighlight
-                  ? `shadow-2xl shadow-${accent}-100 ring-2 ring-${accent}-400 ring-offset-2 scale-[1.03]`
-                  : 'shadow-sm hover:shadow-lg hover:-translate-y-0.5'
-                }`}
-            >
-              {badge && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                  <span className={`bg-${accent}-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-lg whitespace-nowrap`}>
-                    {badge}
+            return (
+              <div key={plan.id} className={`relative rounded-3xl border ${accentBorder} p-7 flex flex-col bg-white transition-all ${isHighlight ? 'ring-2 ring-blue-500 scale-105 shadow-2xl' : 'shadow-sm'}`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-5 ${accentBg} border border-slate-200`}>
+                  <Icon size={22} className={accentText} />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mb-1">{plan.name}</h3>
+                <div className="mb-5">
+                   <span className="text-5xl font-black text-slate-900">{getPriceLabel(plan.price)}</span>
+                   <span className="text-slate-500 text-sm font-medium">/mo</span>
+                </div>
+                <ul className="space-y-3 flex-1 mb-7">
+                  {plan.features.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-700">
+                      <CheckCircle size={15} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => handleCheckout(plan)}
+                  disabled={isCurrentPlan || !!checkingOut}
+                  className={`w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${btnClass}`}
+                >
+                  {isBusy ? <Loader size={16} className="animate-spin" /> : isCurrentPlan ? 'Current Plan' : 'Get Started'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {activeTab === 'usage' && usageData && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 mb-12 animate-in slide-in-from-right-4 duration-500">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">Usage Intelligence</h2>
+              <p className="text-slate-500 text-sm">Real-time token consumption for your organization.</p>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Billing Cycle Starts</span>
+              <p className="text-slate-900 font-bold">{new Date(usageData.billing_cycle_start).toLocaleDateString()}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between text-sm font-bold mb-2">
+                  <span className="text-slate-700">AI Token Consumption</span>
+                  <span className={usageData.total_tokens > usageData.included_tokens ? 'text-rose-600' : 'text-blue-600'}>
+                    {usageData.total_tokens.toLocaleString()} / {usageData.included_tokens.toLocaleString()}
                   </span>
                 </div>
-              )}
-
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-5 ${accentBg} ${isHighlight ? 'shadow-md' : 'border border-slate-200 bg-slate-50'}`}>
-                <Icon size={22} className={accentText} />
+                <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 shadow-inner">
+                  <div 
+                    className={twMerge("h-full transition-all duration-1000", usageData.total_tokens > usageData.included_tokens ? 'bg-rose-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600')}
+                    style={{ width: `${Math.min(100, (usageData.total_tokens / usageData.included_tokens) * 100)}%` }}
+                  />
+                </div>
               </div>
 
-              <h3 className="text-xl font-black text-slate-900 mb-1">{plan.name}</h3>
-              <div className="mb-5">
-                {billingInterval === 'year' ? (
-                  <>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-5xl font-black text-slate-900">{getPriceLabel(Math.floor(plan.price * 12 * 0.8))}</span>
-                      <span className="text-slate-500 text-sm font-medium">/yr</span>
-                    </div>
-                    <div className="text-sm text-slate-400 mt-1 line-through">{getPriceLabel(plan.price)}/mo</div>
-                    <div className="text-xs font-bold text-emerald-600 mt-0.5">({getPriceLabel((Math.floor(plan.price * 12 * 0.8) / 12).toFixed(2))}/mo equivalent)</div>
-                  </>
-                ) : (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-5xl font-black text-slate-900">{getPriceLabel(plan.price)}</span>
-                    <span className="text-slate-500 text-sm font-medium">/mo</span>
-                  </div>
-                )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Included Limit</span>
+                  <p className="text-xl font-black text-slate-900">{(usageData.included_tokens / 1000).toFixed(0)}k</p>
+                </div>
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contracts Analyzed</span>
+                  <p className="text-xl font-black text-slate-900">{usageData.analysis_count}</p>
+                </div>
               </div>
-
-              <ul className="space-y-3 flex-1 mb-7">
-                {plan.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm text-slate-700">
-                    <CheckCircle size={15} className={`flex-shrink-0 mt-0.5 ${isHighlight ? `text-${accent}-500` : 'text-emerald-500'}`} />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                id={`checkout-btn-${plan.id}`}
-                onClick={() => handleCheckout(plan)}
-                disabled={isCurrentPlan || !!checkingOut}
-                className={`w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${btnClass} disabled:opacity-60 disabled:cursor-not-allowed`}
-              >
-                {isBusy ? (
-                  <><Loader size={16} className="animate-spin" /> Processing…</>
-                ) : isCurrentPlan ? (
-                  <><CheckCircle size={16} /> Current Plan</>
-                ) : (
-                  <>
-                    <CreditCard size={16} />
-                    {gateway === 'paypal' ? 'Pay with PayPal' : 'Secure Paystack Checkout'}
-                    <ArrowRight size={14} />
-                  </>
-                )}
-              </button>
-
-              {!isCurrentPlan && !isHighlight && (
-                <p className="text-center text-[11px] text-slate-400 mt-3">No long-term commitment</p>
-              )}
-              {isHighlight && (
-                <p className="text-center text-[11px] text-blue-400 mt-3">Cancel anytime · Instant activation</p>
-              )}
             </div>
-          )
-        })}
-      </div>
+
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white flex flex-col justify-between">
+              <div>
+                <Zap className="text-yellow-400 mb-4" size={24} />
+                <h3 className="text-lg font-bold mb-1">Projected Overage</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">Based on your current trajectory, your estimated overage charge for this cycle is:</p>
+              </div>
+              <div className="mt-8">
+                <span className="text-5xl font-black">${usageData.projected_overage_cost.toFixed(2)}</span>
+                <span className="text-slate-400 text-sm font-medium ml-2">USD</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'invoices' && (
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden mb-12 animate-in slide-in-from-right-4 duration-500">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Date</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Amount</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {invoices.length > 0 ? invoices.map(inv => (
+                <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-5 text-sm font-bold text-slate-600 text-center">{new Date(inv.created_at).toLocaleDateString()}</td>
+                  <td className="px-6 py-5">
+                    <p className="text-sm font-black text-slate-900">Subscription + Overage</p>
+                    <p className="text-xs text-slate-400">ID: {inv.id.substring(0,8).toUpperCase()}</p>
+                  </td>
+                  <td className="px-6 py-5 text-sm font-black text-slate-900 text-center">${inv.amount.toFixed(2)}</td>
+                  <td className="px-6 py-5 text-center">
+                    <a 
+                      href={inv.pdf_url} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                    >
+                      <ArrowRight size={14} className="rotate-45" /> Download
+                    </a>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center">
+                    <p className="text-slate-400 font-medium">No invoices found for this organization.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* FAQ row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 text-sm">

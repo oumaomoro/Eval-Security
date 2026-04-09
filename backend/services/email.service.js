@@ -1,7 +1,12 @@
 import { Resend } from 'resend';
 import { supabase } from './supabase.service.js';
 
-export const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
+const RESEND_KEY = process.env.RESEND_API_KEY;
+export const resend = RESEND_KEY ? new Resend(RESEND_KEY) : null;
+
+if (!resend) {
+  console.warn('⚠️  [EmailService] RESEND_API_KEY is missing. Emails will be queued but NOT dispatched.');
+}
 
 export const EmailService = {
   async sendRenewalAlert(email, contractDetails) {
@@ -62,6 +67,43 @@ export const EmailService = {
     return this.queueEmail(email, subject, DPO_ALERTS_TEMPLATE(dpoName, contractVendor, riskLevel, actionRequired));
   },
 
+  async sendInvoiceEmail(email, pdfUrl) {
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto">
+        <div style="background:#0f172a;padding:24px;border-radius:12px 12px 0 0">
+          <h1 style="color:#fff;font-size:20px;margin:0">COSTLOCI</h1>
+          <p style="color:#94a3b8;margin:4px 0 0">Enterprise Legal Intelligence</p>
+        </div>
+        <div style="padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:0 0 12px 12px">
+          <h2 style="color:#1e293b">Your Invoice is Ready</h2>
+          <p style="color:#475569">A professional invoice has been generated for your recent transaction.</p>
+          <a href="${pdfUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:12px">Download Invoice (PDF)</a>
+          <p style="color:#94a3b8;font-size:12px;margin-top:24px">If you have any questions, contact finance@Costloci.com</p>
+        </div>
+      </div>
+    `;
+    return this.queueEmail(email, 'Your Costloci Invoice', html);
+  },
+
+  async sendOverageBillingAlert(email, fullName, amountUSD, contractCount) {
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto">
+        <div style="background:#0f172a;padding:24px;border-radius:12px 12px 0 0">
+          <h1 style="color:#fff;font-size:20px;margin:0">COSTLOCI</h1>
+          <p style="color:#94a3b8;margin:4px 0 0">Billing Notice</p>
+        </div>
+        <div style="padding:24px;background:#fff9f0;border:1px solid #fed7aa;border-radius:0 0 12px 12px">
+          <h2 style="color:#9a3412">AI Usage Overage Invoice</h2>
+          <p>Hi ${fullName || 'there'},</p>
+          <p>Your organization has been charged <strong>$${amountUSD.toFixed(2)}</strong> for <strong>${contractCount}</strong> contract analysis overages in the previous billing cycle.</p>
+          <p>A PayPal invoice has been sent to this email. Please settle it at your earliest convenience to maintain uninterrupted access.</p>
+          <p style="color:#94a3b8;font-size:12px;margin-top:24px">Questions? Contact finance@Costloci.com</p>
+        </div>
+      </div>
+    `;
+    return this.queueEmail(email, `💳 Costloci Overage Invoice: $${amountUSD.toFixed(2)}`, html);
+  },
+
   async queueEmail(to, subject, html, autoProcess = true) {
     console.log(`[EmailService] Queueing email to ${to}: ${subject}`);
     const { data, error } = await supabase
@@ -105,20 +147,14 @@ export const EmailService = {
     let processedCount = 0;
     for (const email of pending) {
       try {
-        if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 're_mock_key') {
-          // Mock processing
-          console.log(`[EmailService] Mock dispatch for queued email ${email.id}`);
-          await supabase.from('email_queue').update({ status: 'sent' }).eq('id', email.id);
-        } else {
-          // Real dispatch
+        // Always dispatch via real Resend — no mock key bypass
           await resend.emails.send({
-            from: 'Costloci <alerts@costloci.com>',
+            from: 'Costloci <alerts@Costloci.com>',
             to: email.to,
             subject: email.subject,
             html: email.html
           });
           await supabase.from('email_queue').update({ status: 'sent' }).eq('id', email.id);
-        }
         processedCount++;
       } catch (dispatchErr) {
         console.error(`[EmailService] Dispatch failed for ${email.id}:`, dispatchErr.message);

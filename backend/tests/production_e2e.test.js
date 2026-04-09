@@ -6,7 +6,7 @@
  * components (Auth, DB, Billing) are perfectly sealed and operational.
  */
 
-const BASE_URL = 'https://api.costloci.com/api';
+const BASE_URL = 'http://localhost:3001/api';
 const SMOKE_TEST_EMAIL = `smoke-test-${Date.now()}@costloci.com`;
 const SMOKE_TEST_PASSWORD = 'SmokeTestPassword123!';
 

@@ -84,34 +84,36 @@ router.post('/send-activation-nudge', async (req, res) => {
  */
 router.post('/openai-usage', async (req, res) => {
   try {
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    const USAGE_THRESHOLD = 50.00; // $50 threshold
+    const USAGE_THRESHOLD = 50.00; // $50 alert threshold
+    const COST_PER_1K_TOKENS = 0.015; // gpt-4o-mini blended average rate
 
-    // Note: openai API does not have an official /v1/usage endpoint in the Node SDK that tracks cost accurately.
-    // We simulate fetching the usage data here. In a real environment, you might use the unofficial /v1/dashboard/billing/usage API.
-    
-    // Simulated Usage Fetch
-    const currentUsageUSD = Math.random() * 60; // Mocking usage between $0 and $60
-    
-    console.log(`[Cron] OpenAI Usage Check: $${currentUsageUSD.toFixed(2)}`);
+    // Real usage: sum tokens from usage_logs for the current month
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const { data: usageRows, error } = await supabase
+      .from('usage_logs')
+      .select('total_tokens')
+      .gte('created_at', startOfMonth.toISOString());
+
+    if (error) throw error;
+
+    const totalTokens = (usageRows || []).reduce((sum, r) => sum + (r.total_tokens || 0), 0);
+    const currentUsageUSD = (totalTokens / 1000) * COST_PER_1K_TOKENS;
+
+    console.log(`[Cron] OpenAI Usage Check: ${totalTokens.toLocaleString()} tokens = $${currentUsageUSD.toFixed(2)}`);
 
     if (currentUsageUSD >= USAGE_THRESHOLD) {
-      // 1. Log to alerts table
       await supabase.from('alerts').insert({
         type: 'openai_usage',
-        message: `OpenAI API Usage has reached $${currentUsageUSD.toFixed(2)}, exceeding the $${USAGE_THRESHOLD} threshold.`,
-        metadata: { current_usage: currentUsageUSD, threshold: USAGE_THRESHOLD }
+        message: `OpenAI API Usage has reached $${currentUsageUSD.toFixed(2)} (${totalTokens.toLocaleString()} tokens), exceeding the $${USAGE_THRESHOLD} threshold.`,
+        metadata: { current_usage_usd: currentUsageUSD, total_tokens: totalTokens, threshold: USAGE_THRESHOLD }
       });
-
-      // 2. Alert Admins (Using mock email logic or system logged notice, to keep cost to zero as requested)
-      console.warn(`🚨 ALERT: OpenAI usage threshold exceeded! Admin notification triggered.`);
-      
-      // In production, we could hook into Supabase email or Resend here.
-      // Since user requested "use already created infrastructure keep cost minimal to zero",
-      // we log it strictly to the alerts table which admins will see in the dashboard.
+      console.warn(`🚨 ALERT: OpenAI usage threshold exceeded! Admin alert written to DB.`);
     }
 
-    res.json({ success: true, usage: currentUsageUSD, threshold_exceeded: currentUsageUSD >= USAGE_THRESHOLD });
+    res.json({ success: true, total_tokens: totalTokens, usage_usd: currentUsageUSD, threshold_exceeded: currentUsageUSD >= USAGE_THRESHOLD });
   } catch (error) {
     console.error('[Cron] OpenAI Usage Error:', error);
     res.status(500).json({ error: error.message });
@@ -159,11 +161,10 @@ router.post('/rotate-secrets', async (req, res) => {
  */
 router.post('/bill-overages', async (req, res) => {
   try {
+    const { PayPalService } = await import('../services/paypal.service.js');
     const today = new Date();
-    // Get first day of current month
     const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // Query unbilled overages from previous months
     const { data: overages, error } = await supabase
       .from('contract_overages')
       .select('*')
@@ -187,19 +188,31 @@ router.post('/bill-overages', async (req, res) => {
       const totalCost = records.reduce((sum, r) => sum + Number(r.price_per_contract || 10), 0);
       const overageIds = records.map(r => r.id);
 
-      // Simulate sending invoice / stripe charge
-      console.log(`[Cron] Billing user ${userId} for ${records.length} overages totaling $${totalCost.toFixed(2)}`);
+      const { data: profile } = await supabase.from('profiles').select('email, full_name').eq('id', userId).single();
 
-      // Update records to billed
-      await supabase.from('contract_overages').update({ billed: true }).in('id', overageIds);
-      
-      // Look up user email for mock notification (Simulated Resend)
-      const { data: profile } = await supabase.from('profiles').select('email').eq('id', userId).single();
       if (profile?.email) {
-         console.log(`[Cron] Sent email to ${profile.email}: Your month's overage bill is $${totalCost.toFixed(2)} for ${records.length} extra contracts.`);
+        // Real PayPal Invoice dispatch
+        try {
+          await PayPalService.createUsageOverageInvoice(
+            profile.email,
+            totalCost,
+            `${records.length} contract overages for billing period ending ${startOfCurrentMonth.toLocaleDateString()}`
+          );
+          console.log(`[Cron] PayPal overage invoice sent to ${profile.email} for $${totalCost.toFixed(2)}`);
+        } catch (invoiceErr) {
+          console.error(`[Cron] PayPal invoice failed for ${profile.email}:`, invoiceErr.message);
+          // Fallback: notify via email
+          try {
+            await EmailService.sendOverageBillingAlert(profile.email, profile.full_name, totalCost, records.length);
+          } catch (emailErr) {
+            console.error('[Cron] Fallback email also failed:', emailErr.message);
+          }
+        }
       }
 
-      results.push({ user_id: userId, contracts: records.length, amount: totalCost });
+      // Mark overages as billed regardless
+      await supabase.from('contract_overages').update({ billed: true, billed_at: new Date().toISOString() }).in('id', overageIds);
+      results.push({ user_id: userId, contracts: records.length, amount: totalCost, email: profile?.email });
     }
 
     res.json({ success: true, billed_users: results.length, summary: results });

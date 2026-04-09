@@ -2,10 +2,11 @@ import express from 'express';
 import { supabase } from '../services/supabase.service.js';
 import { isSupabaseConfigured, orgScopedQuery } from '../services/db.utils.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
+import { ROIService } from '../services/roi.service.js';
 
 const router = express.Router();
 
-router.get('/metrics', authenticateToken, async (req, res) => {
+router.get('/stats', authenticateToken, async (req, res) => {
   try {
     // ── STAGE 1: LIGHTWEIGHT CONNECTIVITY TEST ─────────────────────
     // head-only count to verify access and data presence
@@ -35,17 +36,19 @@ router.get('/metrics', authenticateToken, async (req, res) => {
       });
     }
 
-    // ── STAGE 2: MEMORY-OPTIMIZED FIELD SELECTION ──────────────────
-    // Strip unnecessary overhead (e.g. metadata, heavy content)
-    const { data: contracts, error: dbError } = await orgScopedQuery('contracts', req.user, 'id, risk_score, annual_cost, renewal_date')
-      .order('created_at', { ascending: false })
-      .limit(200); 
-        
-    if (dbError) throw dbError;
+    // ── STAGE 2: REAL-TIME ROI AGGREGATION ──────────────────────────
+    const [{ data: contracts }, { data: allRisks }, { data: savings }] = await Promise.all([
+      orgScopedQuery('contracts', req.user, 'id, risk_score, annual_cost, renewal_date, ai_analysis, status'),
+      orgScopedQuery('risks', req.user, 'id, mitigation_status, financial_exposure_max'),
+      orgScopedQuery('savings_opportunities', req.user, 'id, status, estimated_savings')
+    ]);
 
     const data = contracts || [];
     const total_contracts = data.length;
+    const userTier = req.user.subscription_tier || req.user.tier || 'free';
     
+    const roiMetrics = ROIService.calculateEconomicImpact(data, allRisks || [], savings || [], userTier);
+
     // Defensive Aggregation
     const sum_risk = data.reduce((sum, c) => sum + (Number(c.risk_score) || 50), 0);
     const avg_risk = total_contracts > 0 ? sum_risk / total_contracts : 0;
@@ -64,7 +67,8 @@ router.get('/metrics', authenticateToken, async (req, res) => {
       high_risk_contracts: data.filter(c => 
         (c.risk_score && Number(c.risk_score) > 70)
       ).length,
-      roi_savings: total_contracts * 150 * 4,
+      roi_savings: roiMetrics.total_impact,
+      roi_details: roiMetrics,
       maturity_score: Math.round(100 - avg_risk),
       risk_trend: total_contracts > 0 
         ? [70, 68, 65, 60, 55, 50, Math.round(avg_risk)] 

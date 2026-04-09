@@ -18,6 +18,7 @@ export default function LanguageSwitcher() {
         className="text-sm bg-transparent border-none text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer uppercase font-medium"
       >
         <option value="en">EN</option>
+        <option value="sw">SW</option>
         <option value="fr">FR</option>
         <option value="ar">AR</option>
       </select>

@@ -130,4 +130,103 @@ export class PayPalService {
 
     return await response.json();
   }
+
+  /**
+   * ── PAYOUTS: MONETIZE SELLERS ──────────────────────────────────────────────
+   * Sends net earnings (70%) to a marketplace seller's PayPal account.
+   */
+  static async sendPayout(amount, sellerEmail, memo = 'Marketplace Earnings - Costloci') {
+    const accessToken = await this.generateAccessToken();
+    const url = `${this.getBaseUrl()}/v1/payments/payouts`;
+    
+    const payoutPayload = {
+      sender_batch_header: {
+        sender_batch_id: `PAYOUT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        email_subject: 'You have a new payment from legal experts at Costloci!',
+        email_message: memo
+      },
+      items: [
+        {
+          recipient_type: 'EMAIL',
+          amount: { value: amount.toFixed(2), currency: 'USD' },
+          receiver: sellerEmail,
+          note: memo,
+          sender_item_id: `ITEM-${Date.now()}`
+        }
+      ]
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payoutPayload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[PayPal Service] Payout Failure:', JSON.stringify(data));
+      throw new Error(`PayPal Payout failed: ${data.message || 'Unknown Error'}`);
+    }
+
+    return data;
+  }
+
+  /**
+   * ── USAGE: MONETIZE AT SCALE ───────────────────────────────────────────────
+   * Generates a PayPal invoice for monthly token consumption overages.
+   */
+  static async createUsageOverageInvoice(customerEmail, amount, tokenUsageDetail) {
+    const accessToken = await this.generateAccessToken();
+    
+    // 1. Create Draft Invoice
+    const invoicePayload = {
+      detail: {
+        invoice_number: `OVERAGE-${Date.now()}`,
+        invoice_date: new Date().toISOString().split('T')[0],
+        currency_code: 'USD',
+        note: `Projected AI token consumption overage: ${tokenUsageDetail}`,
+        term: 'Due on Receipt'
+      },
+      invoicer: {
+        name: { given_name: 'Costloci', surname: 'Enterprise' },
+        email_address: 'finance@Costloci.com'
+      },
+      primary_recipients: [{ billing_info: { email_address: customerEmail } }],
+      items: [
+        {
+          name: 'AI Analysis Overage',
+          description: `Token usage exceeding your current plan limit. Details: ${tokenUsageDetail}`,
+          quantity: '1',
+          unit_amount: { currency_code: 'USD', value: amount.toFixed(2) }
+        }
+      ],
+      configuration: { allow_tip: false, tax_inclusive: true }
+    };
+
+    const response = await fetch(`${this.getBaseUrl()}/v2/invoicing/invoices`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(invoicePayload)
+    });
+
+    const draft = await response.json();
+    if (!response.ok) throw new Error(`PayPal Invoice creation failed: ${draft.message}`);
+
+    // 2. Send the Invoice immediately (Triggers email to customer)
+    const sendResponse = await fetch(`${this.getBaseUrl()}/v2/invoicing/invoices/${draft.id}/send`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return await sendResponse.json();
+  }
 }

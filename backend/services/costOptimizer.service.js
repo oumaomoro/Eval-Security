@@ -22,7 +22,7 @@ export class CostOptimizerService {
       // 2. Fetch Benchmark for the category/sector
       // Sector mapping for better matching
       const category = this.mapSectorToBenchmark(contract.detected_sector);
-      
+
       const { data: benchmark, error: benchErr } = await supabase
         .from('market_benchmarks')
         .select('*')
@@ -36,10 +36,10 @@ export class CostOptimizerService {
       // If actual cost > benchmark, there is a saving opportunity
       const actual = Number(contract.annual_cost) || 0;
       const target = Number(benchmark.avg_annual_cost);
-      
+
       if (actual > target) {
         const potentialSavings = actual - target;
-        
+
         // 4. Store in savings_opportunities
         await supabase.from('savings_opportunities').upsert({
           user_id: userId,
@@ -49,9 +49,9 @@ export class CostOptimizerService {
           benchmark_cost: target,
           potential_savings: potentialSavings,
           status: 'identified',
-          recommendation: `Your ${contract.vendor_name} agreement is ${Math.round((actual/target - 1)*100)}% above industry average for "${category}". Consider renegotiation or vendor consolidation.`
+          recommendation: `Your ${contract.vendor_name} agreement is ${Math.round((actual / target - 1) * 100)}% above industry average for "${category}". Consider renegotiation or vendor consolidation.`
         }, { onConflict: 'contract_id' });
-        
+
         console.log(`[CostOptimizer] Identified $${potentialSavings} savings for contract ${contract.id}`);
       }
     } catch (err) {
@@ -60,13 +60,16 @@ export class CostOptimizerService {
   }
 
   static mapSectorToBenchmark(sector) {
-    if (!sector) return 'monitoring'; // Default
+    if (!sector) return 'monitoring';
     const s = sector.toLowerCase();
     if (s.includes('firewall') || s.includes('network')) return 'firewall';
     if (s.includes('edr') || s.includes('endpoint') || s.includes('antivirus')) return 'edr';
     if (s.includes('cloud') || s.includes('aws') || s.includes('azure')) return 'cloud_security';
     if (s.includes('siem') || s.includes('log') || s.includes('soc')) return 'siem';
     if (s.includes('vuln') || s.includes('scan')) return 'vulnerability_management';
+    if (s.includes('saas') || s.includes('software')) return 'saas_subscription';
+    if (s.includes('telecom') || s.includes('isp')) return 'telco_link';
+    if (s.includes('fintech') || s.includes('payment')) return 'payment_gateway';
     return 'monitoring';
   }
 
@@ -78,7 +81,7 @@ export class CostOptimizerService {
       .from('contracts')
       .select('id')
       .eq('user_id', userId);
-    
+
     if (contracts) {
       for (const contract of contracts) {
         await this.optimizeContract(contract.id, userId);

@@ -1,4 +1,5 @@
 import { openai } from '../config/openai.js';
+import { scrubPII } from './security.utils.js';
 import { findSimilarGoldStandard } from './vector.service.js';
 import { supabase } from './supabase.service.js';
 import crypto from 'crypto';
@@ -20,7 +21,7 @@ export class AnalyzerService {
       } catch (err) {
         const isRateLimit = err.status === 429 || err.message?.includes('rate_limit');
         if (i === retries - 1 || !(isRateLimit || err.status >= 500)) throw err;
-        console.warn(`[Retry ${i+1}/${retries}] Pausing for ${delay}ms after:`, err.message);
+        console.warn(`[Retry ${i + 1}/${retries}] Pausing for ${delay}ms after:`, err.message);
         await new Promise(r => setTimeout(r, delay));
         delay *= 2; // Exponential backoff
       }
@@ -33,84 +34,64 @@ export class AnalyzerService {
    */
   static async analyze(text, options = {}) {
     console.log('🚀 Starting Global Enterprise Analysis...');
-
+    const scrubbedText = scrubPII(text);
     const targetLang = options.targetLanguage || 'English';
-    
-    // 1. Pass 1: Global Context Discovery (Jurisdiction & Sector detection)
-    // Innovative Step: Using gpt-4o-mini (Cost-Efficient) for initial detection.
-    const contextPrompt = `Identify the industry sector (e.g., Healthcare, FinTech, SaaS, Insurance) and primary jurisdiction (specifically checking East Africa, Central Africa, and South Africa - e.g., Kenya, Uganda, Tanzania, Rwanda, DRC, South Africa SADC, COMESA) of this contract text.
-    Contract text: ${text.substring(0, 5000)}`;
 
-    const contextResult = await this.routeAIModel(contextPrompt, 'low');
+    // 1. Pass 1: Global Context Discovery
+    const contextPrompt = `Identify sector and primary jurisdiction of this contract.
+    Contract text: ${scrubbedText.substring(0, 5000)}`;
+
+    const contextResult = await this.routeAIModel(contextPrompt, 'low', false, options);
     const { sector, jurisdiction, agreement_type } = this.parseContext(contextResult);
 
-    // 2. Pass 2: Professional Metadata & Structural Extraction (Cost-Efficient)
+    // 2. Pass 2: Professional Metadata & Structural Extraction
     const extractionPrompt = `Analyze this ${agreement_type || 'contract'} and extract findings into structured JSON.
-    Sector: ${sector}, Jurisdiction: ${jurisdiction}, Type: ${agreement_type}
+    Sector: ${sector}, Jurisdiction: ${jurisdiction}
     
     SPECIAL INSTRUCTIONS:
-    - If DPA: Focus on GDPR Art. 28/KDPA/POPIA (South Africa) compliance, sub-processor liability, and breach notification.
-    - If SaaS MSA/FinTech/Insurance: Focus on liability caps, service level agreements (SLAs), and data localization requirements in Sub-Saharan Africa.
-    - REGIONAL COMPLIANCE (CRITICAL - EAST, CENTRAL, SOUTH AFRICA): Explicitly flag any missing clauses required by the Insurance Regulatory Authority of Kenya (IRA), Capital Markets Authority (CMA), Central Bank of Kenya (CBK), or regional equivalents in Uganda, Tanzania, Rwanda, and South Africa. Be highly accurate, professional, and innovative in identifying regulatory gaps.
-    - JURISDICTIONAL PINNING: Match analysis strictly against the GOLD STANDARD retrieved for the detected **${jurisdiction}** and **${sector}**.
-    - MULTI-LANGUAGE REQUIREMENT: All output string fields (like title, description, and verbatim_text) MUST BE fully translated natively into **${targetLang}**. The JSON keys must remain exact English.
+    - AI SAFETY: For each finding, provide a "confidence_score" between 0 and 1.
+    - REGIONAL COMPLIANCE: Match analysis strictly against the GOLD STANDARD for **${jurisdiction}**.
+    - MULTI-LANGUAGE REQUIREMENT: Output string fields MUST BE in **${targetLang}**.
     
     Structure:
     {
-      "metadata": {
-        "vendor_name": "string",
-        "product_service": "string",
-        "annual_cost": 0,
-        "renewal_date": "YYYY-MM-DD"
-      },
+      "metadata": { "vendor_name": "string", "product_service": "string", "annual_cost": 0, "renewal_date": "YYYY-MM-DD" },
       "categorized_findings": [
         {
           "category": "legal" | "security" | "compliance" | "financial",
-          "title": "Short title",
-          "description": "Clear explanation",
+          "title": "string",
+          "description": "string",
           "severity": "critical" | "high" | "medium" | "low",
-          "verbatim_text": "The literal text extracted from the document"
+          "verbatim_text": "string",
+          "confidence_score": 0.0-1.0
         }
       ],
       "compliance_readiness": 0-100
     }
 
-    Contract Text: ${text}`;
+    Contract Text: ${scrubbedText}`;
 
-    const extractionResult = await this.routeAIModel(extractionPrompt, 'low', true);
+    const extractionResult = await this.routeAIModel(extractionPrompt, 'low', true, options);
     const analysisResult = JSON.parse(extractionResult);
 
-    // 3. Pass 3: Innovative Vector Matching & High-Precision Delta Analysis (Global Accuracy)
+    // 3. Pass 3: Innovative Vector Matching & High-Precision Delta Analysis
     const enrichedFindings = [];
     for (const finding of analysisResult.categorized_findings) {
       if (finding.verbatim_text) {
-        // Find best match with Sector & Jurisdiction filtering (Phase 18 Hardening)
         const vectorMatch = await findSimilarGoldStandard(finding.verbatim_text, finding.category, sector, jurisdiction);
-        
+
         if (vectorMatch && vectorMatch.similarity > 0.6) {
-          // 1. ROI Optimization: Check Clause Cache to prevent redundant LLM tokens
           const clauseHash = crypto.createHash('sha256').update(finding.verbatim_text).digest('hex');
           const frameworkContext = `JURISDICTION_${jurisdiction}_SECTOR_${sector}`;
-          
-          const { data: cached } = await supabase
-            .from('clause_cache')
-            .select('*')
-            .eq('clause_hash', clauseHash)
-            .eq('framework_context', frameworkContext)
-            .single();
-          
+
+          const { data: cached } = await supabase.from('clause_cache').select('*').eq('clause_hash', clauseHash).eq('framework_context', frameworkContext).single();
+
           if (cached) {
-            console.log(`[Analyzer] 💸 ROI Hit: Served from cache (Saved ${cached.clause_hash.slice(0,8)})`);
-            await supabase.from('clause_cache').update({ 
-               times_served: (cached.times_served || 0) + 1,
-               last_hit: new Date().toISOString()
-            }).eq('id', cached.id);
-            
             finding.gold_standard_alignment = cached.analysis_json;
           } else {
             const gapAnalysis = await this.generateDeltaAnalysis(finding.verbatim_text, vectorMatch.clause_text, options);
             const suggestedRedline = await this.generateRedline(finding.verbatim_text, vectorMatch.clause_text, finding.category, options);
-            
+
             const alignment = {
               match: vectorMatch.clause_text,
               similarity: Math.round(vectorMatch.similarity * 100),
@@ -119,23 +100,16 @@ export class AnalyzerService {
               suggested_redline: suggestedRedline
             };
 
-            // Cache the result for future ROI optimization
-            await supabase.from('clause_cache').insert({
-              clause_hash: clauseHash,
-              framework_context: frameworkContext,
-              analysis_json: alignment
-            });
-
+            await supabase.from('clause_cache').insert({ clause_hash: clauseHash, framework_context: frameworkContext, analysis_json: alignment });
             finding.gold_standard_alignment = alignment;
           }
         } else {
-          // Option B Implementation: Strict Compliance - No Global Fallbacks
           finding.gold_standard_alignment = {
-              match: "No specific Gold Standard defined for this market.",
-              similarity: 0,
-              standard: "Review Required",
-              gap_analysis: `⚠️ **Regional Compliance Gap Detected.** No baseline standard exists in our database for the detected jurisdiction: **${jurisdiction}** (${sector}). We strictly recommend assigning a local legal counsel to establish a proprietary standard for this market.`,
-              suggested_redline: "Pending Legal Review. Do not execute without establishing a jurisdictional baseline."
+            match: "No specific Gold Standard defined.",
+            similarity: 0,
+            standard: "Review Required",
+            gap_analysis: `⚠️ **Regional Compliance Gap.** Establish a jurisdictional baseline for **${jurisdiction}**.`,
+            suggested_redline: "Pending Legal Review."
           };
         }
       }
@@ -164,12 +138,12 @@ export class AnalyzerService {
 
     const targetLang = options.targetLanguage || 'English';
     const complexity = 'high'; // Force high complexity (GPT-4) for all tasks
-    
+
     // 1. Pass 1: Global Context Discovery
     const contextPrompt = `Perform a comprehensive legal metadata analysis. Identify the industry sector (e.g., Healthcare, FinTech, SaaS, Insurance), primary jurisdiction, and the exact agreement type of this contract text.
     Contract text: ${text.substring(0, 5000)}`;
 
-    const contextResult = await this.routeAIModel(contextPrompt, complexity);
+    const contextResult = await this.routeAIModel(contextPrompt, complexity, false, options);
     const { sector, jurisdiction, agreement_type } = this.parseContext(contextResult);
 
     // 2. Pass 2: Deep Extraction & Risk Matrix
@@ -213,11 +187,11 @@ export class AnalyzerService {
     for (const finding of analysisResult.categorized_findings) {
       if (finding.verbatim_text) {
         const vectorMatch = await findSimilarGoldStandard(finding.verbatim_text, finding.category, sector, jurisdiction);
-        
+
         if (vectorMatch && vectorMatch.similarity > 0.5) { // Looser matching for broader alignment in deep scan
           const gapAnalysis = await this.generateDeltaAnalysis(finding.verbatim_text, vectorMatch.clause_text, options);
           const suggestedRedline = await this.generateRedline(finding.verbatim_text, vectorMatch.clause_text, finding.category, options);
-          
+
           finding.gold_standard_alignment = {
             match: vectorMatch.clause_text,
             similarity: Math.round(vectorMatch.similarity * 100),
@@ -228,11 +202,11 @@ export class AnalyzerService {
         } else {
           // Deep Scan Option B Implementation
           finding.gold_standard_alignment = {
-              match: "No specific Gold Standard defined for this market.",
-              similarity: 0,
-              standard: "Critical Review Required",
-              gap_analysis: `⚠️ **Critical Regional Gap.** Our deep scan found no proprietary baseline for **${jurisdiction}** (${sector}). This represents high latent risk. Establish localized SLAs and caps based on East/Central/South African precedents before signing.`,
-              suggested_redline: "Immediate Legal Escalation Recommended."
+            match: "No specific Gold Standard defined for this market.",
+            similarity: 0,
+            standard: "Critical Review Required",
+            gap_analysis: `⚠️ **Critical Regional Gap.** Our deep scan found no proprietary baseline for **${jurisdiction}** (${sector}). This represents high latent risk. Establish localized SLAs and caps based on East/Central/South African precedents before signing.`,
+            suggested_redline: "Immediate Legal Escalation Recommended."
           };
         }
       }
@@ -257,7 +231,7 @@ export class AnalyzerService {
    * THE INTELLIGENT MODEL ROUTER (Cost-Efficiency Integration)
    * High complexity tasks use gpt-4o, Low complexity tasks use gpt-4o-mini.
    */
-  static async routeAIModel(prompt, complexity = 'low', isJson = false) {
+  static async routeAIModel(prompt, complexity = 'low', isJson = false, options = {}) {
     const model = complexity === 'high' ? 'gpt-4o' : 'gpt-4o-mini';
     console.log(`📡 Routing task [${complexity}] to model: ${model}`);
 
@@ -270,8 +244,8 @@ export class AnalyzerService {
           return cached;
         }
       }
-    } catch (e) { 
-      console.warn('[KV Cache Warning] Failed to reach Redis:', e.message); 
+    } catch (e) {
+      console.warn('[KV Cache Warning] Failed to reach Redis:', e.message);
     }
 
     const completion = await this._withRetry(() => openai.chat.completions.create({
@@ -282,14 +256,38 @@ export class AnalyzerService {
     }));
 
     const result = completion.choices[0].message.content;
+    const usage = completion.usage;
+
+    // ── PHASE 14: ASYNC USAGE LOGGING ──────────────────────────────────
+    if (usage && options.userId) {
+      this.logUsage(options.userId, options.organizationId, model, usage, options.feature || 'contract_analysis')
+        .catch(err => console.error('[UsageLog] Failed to persist telemetry:', err.message));
+    }
+    // ───────────────────────────────────────────────────────────────────
 
     try {
       if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-         await kv.set(cacheKey, result, { ex: 604800 }); // Cache for 7 days
+        await kv.set(cacheKey, result, { ex: 604800 }); // Cache for 7 days
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return result;
+  }
+
+  /**
+   * Persists AI token consumption to the database for billing telemetry.
+   */
+  static async logUsage(userId, organizationId, model, usage, feature) {
+    const { error } = await supabase.from('usage_logs').insert({
+      user_id: userId,
+      organization_id: organizationId,
+      model: model,
+      prompt_tokens: usage.prompt_tokens,
+      completion_tokens: usage.completion_tokens,
+      total_tokens: usage.total_tokens,
+      feature: feature
+    });
+    if (error) throw error;
   }
 
   /**
@@ -343,12 +341,28 @@ export class AnalyzerService {
   }
 
   static parseContext(text) {
-    const isDPA = text.toLowerCase().includes('data processing') || text.toLowerCase().includes('dpa');
-    const isMSA = text.toLowerCase().includes('master service') || text.toLowerCase().includes('msa') || text.toLowerCase().includes('subscription');
-    
+    const t = text.toLowerCase();
+    const isDPA = t.includes('data processing') || t.includes('dpa') || t.includes('privacy');
+    const isMSA = t.includes('master service') || t.includes('msa') || t.includes('subscription') || t.includes('software as a service');
+
+    // Detect Region
+    let jurisdiction = 'Global';
+    if (t.includes('kenya') || t.includes('kdpa')) jurisdiction = 'Kenya (KDPA)';
+    else if (t.includes('south africa') || t.includes('popia')) jurisdiction = 'South Africa (POPIA)';
+    else if (t.includes('nigeria') || t.includes('ndpr')) jurisdiction = 'Nigeria (NDPR)';
+    else if (t.includes('uganda') || t.includes('tanzania') || t.includes('rwanda')) jurisdiction = 'East Africa (EAC)';
+    else if (t.includes('gdpr') || t.includes('european')) jurisdiction = 'EU (GDPR)';
+
+    // Detect Sector
+    let sector = 'General';
+    if (t.includes('healthcare') || t.includes('hipaa') || t.includes('medical')) sector = 'Healthcare';
+    else if (t.includes('fintech') || t.includes('banking') || t.includes('cbk') || t.includes('payment')) sector = 'FinTech';
+    else if (t.includes('insurance') || t.includes('ira')) sector = 'Insurance';
+    else if (t.includes('telecom') || t.includes('communication')) sector = 'Telecom';
+
     return {
-      sector: text.toLowerCase().includes('healthcare') ? 'healthcare' : text.toLowerCase().includes('fintech') ? 'fintech' : text.toLowerCase().includes('insurance') ? 'insurance' : 'general',
-      jurisdiction: text.toLowerCase().includes('kenya') || text.toLowerCase().includes('east africa') || text.toLowerCase().includes('mea') ? 'kenya/mea' : text.includes('GDPR') ? 'GDPR' : text.includes('CCPA') ? 'CCPA' : 'global',
+      sector,
+      jurisdiction,
       agreement_type: isDPA ? 'DPA' : isMSA ? 'SaaS MSA' : 'General Contract'
     };
   }
@@ -358,10 +372,10 @@ export class AnalyzerService {
     findings.forEach(f => {
       if (f.gold_standard_alignment) {
         map[f.title] = {
-           match: f.gold_standard_alignment.match,
-           similarity: f.gold_standard_alignment.similarity,
-           standard: f.gold_standard_alignment.standard,
-           gap_analysis: f.gold_standard_alignment.gap_analysis
+          match: f.gold_standard_alignment.match,
+          similarity: f.gold_standard_alignment.similarity,
+          standard: f.gold_standard_alignment.standard,
+          gap_analysis: f.gold_standard_alignment.gap_analysis
         };
       }
     });

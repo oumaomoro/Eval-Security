@@ -1,4 +1,4 @@
-# CyberOptimize Final Production Integrity Check
+# Costloci Final Production Integrity Check
 # Purpose: Deep End-to-End verification of live infrastructure.
 
 $API_URL = "https://api.costloci.com/api/health"

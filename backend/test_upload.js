@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjQzYTM4OWJlLTcyYzctNDYwNC05ZTFhLTEwMzNlZWFjMjVjYTU1IiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6ImFkbWluIiwidGllciI6ImVudGVycHJpc2UiLCJpYXQiOjE3NDM1Mzc3ODMsImV4cCI6MTc0NDE0MjU4M30.4Nnsv4VTJWd9UNfJa937Y4HAjOWeew75RPG5Zj8';
-const filePath = 'c:\\Users\\Jack.Ouma\\Downloads\\New folder\\Cyber-Optimize\\Cyber-Optimize\\cyberoptimize-prod\\test_agreement.pdf';
+const filePath = 'c:\\Users\\Jack.Ouma\\Downloads\\New folder\\Costloci\\Costloci\\Costloci-prod\\test_agreement.pdf';
 
 async function testUpload() {
     console.log('--- Starting System Stress Test (Contract Ingestion) ---');

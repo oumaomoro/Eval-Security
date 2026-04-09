@@ -4,7 +4,7 @@
  */
 
 const SIGNNOW_API_BASE = 'https://api.signnow.com';
-const SIGNNOW_TOKEN = process.env.SIGNNOW_API_KEY || '1ee4d1313f0940c9523a5add9f3ecd8a96b8cb6084cbb69048d1a80c2f6e3b9b';
+const SIGNNOW_TOKEN = process.env.SIGNNOW_API_KEY;
 
 export class SignnowService {
   /**
@@ -13,10 +13,10 @@ export class SignnowService {
    * 2. Creates a field (if needed, simplified for now)
    * 3. Generates embedded signing link
    */
-  static async createEmbeddedSession(fileBuffer, filename, signerEmail) {
+  static async createEmbeddedSession(fileBuffer, filename, signerEmail, clientId) {
     try {
       // 1. Upload Document
-      const doc = await this.uploadDocument(fileBuffer, filename);
+      const doc = await this.uploadDocument(fileBuffer, filename, clientId);
       const documentId = doc.id;
 
       // 2. Create Invite (Embedded)
@@ -72,7 +72,7 @@ export class SignnowService {
     }
   }
 
-  static async uploadDocument(fileBuffer, filename) {
+  static async uploadDocument(fileBuffer, filename, clientId) {
     const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
     const preBoundary = Buffer.from(
       `--${boundary}\r\n` +
@@ -96,6 +96,67 @@ export class SignnowService {
       throw new Error(`SignNow Upload Error: ${response.status} - ${errorText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    // Mapping: Attach Client ID to document as metadata for zero-touch ingestion
+    if (clientId) {
+      await this.setDocumentMetadata(data.id, { clientId }).catch(err => 
+        console.error(`[SignNow Mapping] Failed to set metadata for ${data.id}:`, err.message)
+      );
+    }
+
+    return data;
+  }
+
+  /**
+   * Attach metadata to a SignNow document for integration mapping
+   */
+  static async setDocumentMetadata(documentId, metadata) {
+    const response = await fetch(`${SIGNNOW_API_BASE}/document/${documentId}/integration/metadata`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${SIGNNOW_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ metadata })
+    });
+
+    if (!response.ok) {
+       const err = await response.text();
+       throw new Error(`SignNow Metadata Error: ${response.status} - ${err}`);
+    }
+    return true;
+  }
+  
+  /**
+   * Fetch Document Metadata (used in webhook)
+   */
+  static async getDocumentMetadata(documentId) {
+    const response = await fetch(`${SIGNNOW_API_BASE}/document/${documentId}/integration/metadata`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${SIGNNOW_TOKEN}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.metadata || null;
+  }
+
+  /**
+   * Download the signed document
+   */
+  static async downloadDocument(documentId) {
+    const response = await fetch(`${SIGNNOW_API_BASE}/document/${documentId}/download`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${SIGNNOW_TOKEN}`
+      }
+    });
+
+    if (!response.ok) throw new Error(`SignNow Download Error: ${response.status}`);
+    return Buffer.from(await response.arrayBuffer());
   }
 }

@@ -1,19 +1,15 @@
-import React, { useState, useEffect } from 'react'
-import { AlertCircle, FileText, CheckCircle, Shield, ArrowRight } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { AlertCircle, FileText, CheckCircle, Shield, ArrowRight, Settings } from 'lucide-react'
 
 const WordTaskpane = () => {
-  const { user, loading, login } = useAuth()
-  const [status, setStatus] = useState('initializing...')
+  const { user, loading, signIn } = useAuth()
+  const [status, setStatus] = useState('Ready.')
   const [findings, setFindings] = useState([])
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState(null)
- 
-  // Automatically start analysis if we already have selection on load and authed
-  useEffect(() => {
-    if (user) setStatus('Ready.')
-    else setStatus('Please sign in...')
-  }, [user])
- 
+  const [jurisdiction, setJurisdiction] = useState('global')
+  const [sector, setSector] = useState('general')
+
   const analyzeSelectedText = async () => {
     if (!user) {
       setError('You must be signed in to analyze clauses.')
@@ -21,34 +17,34 @@ const WordTaskpane = () => {
     }
     setAnalyzing(true)
     setError(null)
-    
+
     try {
       await window.Word.run(async (context) => {
         const selection = context.document.getSelection()
         selection.load('text')
         await context.sync()
-        
+
         const text = selection.text
         if (!text || text.trim().length < 20) {
-          throw new Error('Please select a larger block of text for analysis.')
+          throw new Error('Please select a larger block of text.')
         }
 
         setStatus('AI Analyzing...')
-        
-        // Call the production API endpoint for "Clause Analysis"
-        // Call the production API endpoint for "Clause Analysis" with the user's token
+
         const token = localStorage.getItem('costloci_token')
-        const response = await fetch('https://api.costloci.com/api/ai/analyze-clause', {
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://api.costloci.com/api'
+
+        const response = await fetch(`${apiUrl}/ai/analyze-clause`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ text })
+          body: JSON.stringify({ text, jurisdiction, sector })
         })
 
         if (!response.ok) throw new Error('AI analysis failed.')
-        
+
         const data = await response.json()
         setFindings(data.findings || [])
         setStatus('Analysis Complete.')
@@ -83,8 +79,8 @@ const WordTaskpane = () => {
         <p className="text-slate-400 text-sm mb-8 leading-relaxed font-inter">
           Sign in to your Costloci account to analyze vendor agreements directly in Microsoft Word.
         </p>
-        <a 
-          href="/login" 
+        <a
+          href="/login"
           target="_blank"
           className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 font-inter"
         >
@@ -113,20 +109,41 @@ const WordTaskpane = () => {
 
       <main className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
         <section className="bg-slate-800/50 backdrop-blur border border-white/5 p-4 rounded-2xl shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 font-inter">Live Guard</h3>
-             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-inter ${status.includes('Ready') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                {status}
-             </span>
+          <div className="space-y-3 mb-6">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Jurisdiction</label>
+              <select
+                value={jurisdiction}
+                onChange={(e) => setJurisdiction(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-xs rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 block w-full text-white"
+              >
+                <option value="global">Global Standard</option>
+                <option value="kenya">Kenya (KDPA)</option>
+                <option value="south_africa">South Africa (POPIA)</option>
+                <option value="nigeria">Nigeria (NDPR)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Sector Context</label>
+              <select
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-xs rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 block w-full text-white"
+              >
+                <option value="general">General Business</option>
+                <option value="fintech">FinTech / Banking</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="telecom">Telecommunications</option>
+              </select>
+            </div>
           </div>
           <button
             onClick={analyzeSelectedText}
             disabled={analyzing}
-            className={`w-full py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl group font-inter ${
-              analyzing 
-                ? 'bg-slate-800 cursor-not-allowed text-slate-600 border border-slate-700' 
-                : 'bg-white text-slate-900 hover:bg-slate-50 active:scale-95'
-            }`}
+            className={`w-full py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl group font-inter ${analyzing
+              ? 'bg-slate-800 cursor-not-allowed text-slate-600 border border-slate-700'
+              : 'bg-white text-slate-900 hover:bg-slate-50 active:scale-95'
+              }`}
           >
             {analyzing ? (
               <div className="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></div>
@@ -153,17 +170,16 @@ const WordTaskpane = () => {
             {findings.map((f, i) => (
               <div key={i} className="bg-slate-800/40 border border-white/5 p-4 rounded-2xl shadow-xl hover:border-blue-500/30 transition-all group">
                 <div className="flex justify-between items-start mb-3">
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-inter ${
-                    f.severity === 'critical' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-inter ${f.severity === 'critical' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
                     {f.severity}
                   </span>
                 </div>
                 <h4 className="font-bold text-sm text-white mb-2 leading-tight font-inter">{f.title}</h4>
                 <p className="text-xs text-slate-400 mb-4 font-medium leading-relaxed font-inter">{f.description}</p>
-                
+
                 {f.suggested_redline && (
-                  <button 
+                  <button
                     onClick={() => applyRedline(f.suggested_redline)}
                     className="w-full text-[10px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl flex items-center justify-between group transition-all shadow-lg font-inter"
                   >
@@ -175,10 +191,10 @@ const WordTaskpane = () => {
           </div>
         ) : !analyzing && (
           <div className="py-12 text-center text-slate-600 opacity-50">
-             <Shield size={32} className="mx-auto mb-3" />
-             <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed font-inter">
-               Select document text<br/>to begin security scan
-             </p>
+            <Shield size={32} className="mx-auto mb-3" />
+            <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed font-inter">
+              Select document text<br />to begin security scan
+            </p>
           </div>
         )}
       </main>

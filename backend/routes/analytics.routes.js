@@ -1,6 +1,8 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
-import { supabase, orgScopedQuery } from '../services/supabase.service.js';
+import { supabase } from '../services/supabase.service.js';
+import { orgScopedQuery } from '../services/db.utils.js';
+import { ROIService } from '../services/roi.service.js';
 
 const router = express.Router();
 
@@ -31,19 +33,8 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       risks = data || [];
     } catch (e) { console.warn('[analytics] risk_register fetch skipped due to error'); }
 
-    // Executive ROI Calculation (Higher Accuracy)
-    // 1. Efficiency: 2.5 hours saved per review at $350/hour internal legal rate
-    // 2. Risk Mitigation: $2,500 average avoided data breach penalty/legal cost per identified gap
-    const hoursSaved = totalContracts * 2.5;
-    const efficiencySavings = hoursSaved * 350;
-
-    let totalIdentifiedGaps = 0;
-    contracts.forEach(c => {
-      totalIdentifiedGaps += (c.ai_analysis?.categorized_findings?.length || 0);
-    });
-    const riskMitigationValue = totalIdentifiedGaps * 2500;
-
     // Heatmap Aggregation (count failed compliance areas)
+    const totalContracts = contracts.length;
     const riskHeatmap = {
       'Data Privacy (GDPR/KDPA)': 0,
       'Security (ISO27001)': 0,
@@ -55,6 +46,13 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     let totalFinancialExposure = 0;
     let avgComplianceScore = 0;
     let sectorBenchmark = 75; // Industry average baseline
+
+    // Executive ROI Calculation (Phase 16: Enterprise ROIService)
+    const { data: profile } = await supabase.from('profiles').select('tier').eq('id', req.user.id).single();
+    const tier = profile?.tier || 'free';
+
+    const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, tier);
+    const totalEconomicImpact = roiMetrics.total_impact;
 
     if (totalContracts > 0) {
       const totalScore = contracts.reduce((acc, c) => acc + (c.ai_analysis?.compliance_readiness || 0), 0);
@@ -79,10 +77,12 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       success: true,
       data: {
         executive_roi: {
-          total_economic_impact: efficiencySavings + riskMitigationValue,
-          efficiency_savings: efficiencySavings,
-          risk_mitigation_value: riskMitigationValue,
-          hours_liberated: hoursSaved
+          total_economic_impact: totalEconomicImpact,
+          efficiency_savings: roiMetrics.efficiency_savings,
+          risk_mitigation_value: roiMetrics.risk_mitigation_value,
+          hours_liberated: roiMetrics.hours_saved,
+          roi_ratio: roiMetrics.roi_ratio,
+          board_summary: `Your portfolio of ${totalContracts} contracts has a compliance health of ${avgComplianceScore}%. By automating analysis, you've realized $${totalEconomicImpact.toLocaleString()} in economic impact.`
         },
         compliance_health: {
           current_score: avgComplianceScore,
@@ -97,6 +97,31 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Analytics Fetch Error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /api/analytics/roi-deep-dive - Returns detailed benchmark delta
+router.get('/roi-deep-dive', authenticateToken, async (req, res) => {
+  try {
+    const { data: contracts } = await orgScopedQuery('contracts', req.user);
+    if (!contracts) return res.json({ success: true, deltas: [] });
+
+    const deltas = contracts.map(c => {
+      const benchmark = ROIService.getSectorBenchmarks(c.detected_sector, c.detected_jurisdiction);
+      return {
+        id: c.id,
+        vendor: c.vendor_name,
+        annual_cost: c.annual_cost,
+        market_average: benchmark.avg_annual_cost,
+        delta: c.annual_cost - benchmark.avg_annual_cost,
+        compliance_score: c.ai_analysis?.compliance_readiness || 0,
+        compliance_target: benchmark.compliance_target
+      };
+    });
+
+    res.json({ success: true, data: deltas });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
