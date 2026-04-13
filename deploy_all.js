@@ -37,7 +37,8 @@ run('node scripts/verify_services.js', __dirname);
 
 // 2. Sync Environment Variables for Backend
 console.log('\n--- 2. Syncing Cloud Secrets (Vercel) ---');
-run('node scripts/sync_vercel_env.js', path.join(__dirname, 'cyberoptimize-prod', 'backend'));
+const backendPath = path.join(__dirname, 'cyberoptimize-prod', 'backend');
+run('node scripts/sync_vercel_env.js', backendPath);
 
 // 3. Deploy Hardened Backend
 console.log('\n--- 3. Deploying Backend to Vercel ---');
@@ -52,8 +53,8 @@ run('npx wrangler pages deploy dist/public --project-name=costloci-frontend --br
 // Automated Subdomain Alignment: Ensure www. resolving correctly
 console.log('\n--- 5. Registering Custom Subdomains (Automated DNS) ---');
 try {
-    run('npx wrangler pages custom-domain add www.costloci.com --project-name costloci-frontend', __dirname);
-    run('npx wrangler pages custom-domain add costloci.com --project-name costloci-frontend', __dirname);
+    run('npx wrangler pages domains add costloci-frontend www.costloci.com', __dirname);
+    run('npx wrangler pages domains add costloci-frontend costloci.com', __dirname);
 } catch (e) {
     console.warn('\n⚠️ Custom domain registration passed/skipped. Cloudflare may already possess the domains.');
 }
