@@ -122,18 +122,23 @@ export default function Dashboard() {
 
 function MetricCard({ label, value, icon: Icon, color }: any) {
   return (
-    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl shadow-sm hover:border-slate-700 transition-colors">
-      <div className="flex justify-between items-start">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative bg-slate-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl shadow-xl hover:border-emerald-500/20 transition-all group overflow-hidden"
+    >
+      <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-colors" />
+      <div className="flex justify-between items-start relative z-10">
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</p>
-          <h3 className="text-3xl font-bold tracking-tight text-white">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">{label}</p>
+          <h3 className="text-3xl font-black tracking-tighter text-white italic">
             {value}
           </h3>
         </div>
-        <div className={`p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 ${color}`}>
+        <div className={`p-3 rounded-xl bg-slate-950 border border-white/10 shadow-inner group-hover:scale-110 transition-transform ${color}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

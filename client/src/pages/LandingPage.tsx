@@ -55,11 +55,11 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/auth">
-                <Button size="lg" className="h-16 px-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-2xl shadow-2xl shadow-emerald-500/20 group uppercase italic">
+                <Button size="lg" className="h-16 px-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-2xl shadow-[0_20px_50px_rgba(16,185,129,0.3)] group uppercase italic transition-all active:scale-95">
                   Start Free Audit <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="h-16 px-10 border-white/10 text-white font-bold text-lg rounded-2xl hover:bg-white/5 uppercase italic">
+              <Button size="lg" variant="outline" className="h-16 px-10 border-white/10 text-white font-bold text-lg rounded-2xl hover:bg-white/5 backdrop-blur-sm uppercase italic transition-all">
                 Schedule Demo
               </Button>
             </div>
