@@ -37,8 +37,7 @@ run('node scripts/verify_services.js', __dirname);
 
 // 2. Sync Environment Variables for Backend
 console.log('\n--- 2. Syncing Cloud Secrets (Vercel) ---');
-const backendPath = path.join(__dirname, 'cyberoptimize-prod', 'backend');
-run('node scripts/sync_vercel_env.js', backendPath);
+run('node scripts/sync_vercel_env.js', __dirname);
 
 // 3. Deploy Hardened Backend
 console.log('\n--- 3. Deploying Backend to Vercel ---');
