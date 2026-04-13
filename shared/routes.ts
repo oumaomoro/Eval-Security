@@ -469,6 +469,19 @@ export const api = {
             status: z.string(),
             timestamp: z.string()
           })).optional(),
+          roi_details: z.object({
+            total_savings: z.number(),
+            implementation_cost: z.number(),
+            net_benefit: z.number(),
+            payback_months: z.number(),
+            efficiency_gain: z.number(),
+            total_impact: z.number(),
+            efficiency_savings: z.number(),
+            direct_savings: z.number(),
+            hours_saved: z.number(),
+            mitigated_exposure: z.number(),
+            roi_ratio: z.number(),
+          }).optional(),
         }),
       },
     },
@@ -615,6 +628,37 @@ export const api = {
       },
     },
   },
+  system: {
+    health: {
+      method: "GET" as const,
+      path: "/api/health" as const,
+      responses: {
+        200: z.object({
+          status: z.string(),
+          dbStatus: z.string(),
+          postgresLatency: z.number(),
+          pulseAgeMs: z.number(),
+          version: z.string(),
+        }),
+      },
+    },
+  },
+  governance: {
+    posture: {
+      method: "GET" as const,
+      path: "/api/governance/posture" as const,
+      responses: {
+        200: z.object({
+          overallStatus: z.enum(["Optimal", "Caution", "Critical"]),
+          resilienceIndex: z.number(),
+          complianceHealth: z.number(),
+          executiveSummary: z.string(),
+          topRecommendations: z.array(z.string()),
+          predictiveAnalysis: z.string(),
+        }),
+      },
+    },
+  },
   auditLogs: {
     list: {
       method: "GET" as const,
@@ -624,7 +668,62 @@ export const api = {
       },
     },
   },
+  auth: {
+    apiKey: {
+      rotate: {
+        method: "POST" as const,
+        path: "/api/auth/api-key" as const,
+        responses: {
+          200: z.object({ apiKey: z.string() }),
+          401: errorSchemas.validation,
+        },
+      },
+    },
+  },
+  integrations: {
+    word: {
+      analyze: {
+        method: "POST" as const,
+        path: "/api/integrations/word/analyze" as const,
+        input: z.object({ textBlock: z.string() }),
+        responses: {
+          200: z.object({
+            riskScore: z.number(),
+            complianceStatus: z.string(),
+            leveragePoints: z.array(z.string()),
+            findings: z.array(z.object({
+              requirement: z.string(),
+              severity: z.string(),
+              description: z.string(),
+            })),
+          }),
+          401: errorSchemas.validation,
+          500: errorSchemas.internal,
+        },
+      },
+      publish: {
+        method: "POST" as const,
+        path: "/api/integrations/word/publish" as const,
+        input: z.object({
+          clauseName: z.string(),
+          clauseCategory: z.string(),
+          standardLanguage: z.string(),
+          riskLevelIfMissing: z.string().optional(),
+        }),
+        responses: {
+          201: z.object({
+            success: z.boolean(),
+            clause: z.custom<typeof clauseLibrary.$inferSelect>(),
+            message: z.string(),
+          }),
+          401: errorSchemas.validation,
+          500: errorSchemas.internal,
+        },
+      },
+    },
+  },
 };
+
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
   let url = path;

@@ -103,7 +103,9 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUsersByClientId(clientId: number): Promise<User[]>;
+  getUsersByOrganizationId(organizationId: string): Promise<User[]>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByApiKey(apiKey: string): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   createUser(user: Partial<User>): Promise<User>;
 
@@ -171,12 +173,12 @@ export class SupabaseRESTStorage implements IStorage {
       contactPhone: d.contact_phone,
       annualBudget: d.annual_budget ? Number(d.annual_budget) : null,
       status: d.status,
-      // Resilient fallbacks for columns missing in schema cache
-      riskThreshold: d.risk_threshold !== undefined ? d.risk_threshold : 70,
-      complianceFocus: d.compliance_focus !== undefined ? d.compliance_focus : "KDPA",
+      riskThreshold: d.risk_threshold,
+      complianceFocus: d.compliance_focus,
       createdAt: d.created_at ? new Date(d.created_at) : null
     };
   }
+
  
   private mapWorkspace(d: any): Workspace {
     if (!d) return d;
@@ -202,12 +204,14 @@ export class SupabaseRESTStorage implements IStorage {
       lastName: row.last_name,
       role: row.role,
       clientId: row.client_id,
+      organizationId: row.organization_id,
       profileImageUrl: row.profile_image_url,
       subscriptionTier: row.subscription_tier,
       contractsCount: row.contracts_count,
       webauthnId: row.webauthn_id,
       webauthnCredential: row.webauthn_credential,
       mfaEnabled: row.mfa_enabled,
+      apiKey: row.api_key,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
     } as any;
@@ -244,112 +248,18 @@ export class SupabaseRESTStorage implements IStorage {
           contact_email: client.contactEmail,
           contact_phone: client.contactPhone,
           annual_budget: client.annualBudget,
-          status: client.status || "active"
-          // Omit risk_threshold and compliance_focus until DB cache clears
+          status: client.status || "active",
+          risk_threshold: client.riskThreshold || 70,
+          compliance_focus: client.complianceFocus || "KDPA"
         })
-        .select("id, company_name, industry, contact_name, contact_email, contact_phone, annual_budget, status, created_at")
+        .select("*")
         .single()
     );
     return this.mapClient(data);
   }
 
-  // --- WORKSPACES ---
-  async getWorkspaces(): Promise<Workspace[]> {
-    const data = await this.handleResponse<any[]>(supabase.from("workspaces").select("*").order("created_at", { ascending: false }));
-    return (data || []).map(d => this.mapWorkspace(d));
-  }
 
-  async createWorkspace(workspace: InsertWorkspace): Promise<Workspace> {
-    const data = await this.handleResponse<any>(
-      supabase.from("workspaces")
-        .insert({
-          name: workspace.name,
-          owner_id: workspace.ownerId,
-          plan: workspace.plan || 'enterprise',
-          webhook_url: workspace.webhookUrl,
-          webhook_enabled: workspace.webhookEnabled
-        })
-        .select("*")
-        .single()
-    );
-    return this.mapWorkspace(data);
-  }
 
-  async getWorkspaceMembers(workspaceId: number): Promise<(User & { workspaceRole: WorkspaceRole })[]> {
-    const { data, error } = await supabase
-      .from('workspace_members')
-      .select('*, profiles(*)')
-      .eq('workspace_id', workspaceId);
-    
-    if (error) throw error;
-    return (data || []).map((m: any) => ({
-      ...this.mapProfileToUser(m.profiles),
-      workspaceRole: m.role
-    }));
-  }
-
-  async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
-    const data = await this.handleResponse<any>(
-      supabase.from('workspace_members')
-        .insert({
-          user_id: member.userId,
-          workspace_id: member.workspaceId,
-          role: member.role
-        })
-        .select("*")
-        .single()
-    );
-    return {
-      id: data.id,
-      userId: data.user_id,
-      workspaceId: data.workspace_id,
-      role: data.role,
-      createdAt: new Date(data.created_at)
-    };
-  }
-
-  async updateWorkspaceMemberRole(userId: string, workspaceId: number, role: WorkspaceRole): Promise<void> {
-    await this.handleResponse(
-      supabase.from('workspace_members')
-        .update({ role })
-        .eq('user_id', userId)
-        .eq('workspace_id', workspaceId)
-    );
-  }
-
-  async removeWorkspaceMember(userId: string, workspaceId: number): Promise<void> {
-    await this.handleResponse(
-      supabase.from('workspace_members')
-        .delete()
-        .eq('user_id', userId)
-        .eq('workspace_id', workspaceId)
-    );
-  }
-
-  async getUserWorkspaces(userId: string): Promise<Workspace[]> {
-    const { data: memberRows, error: memberError } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId);
-    
-    if (memberError) throw memberError;
-    if (!memberRows || memberRows.length === 0) return [];
-
-    const workspaceIds = memberRows.map(r => r.workspace_id);
-    const data = await this.handleResponse<any[]>(
-      supabase.from('workspaces')
-        .select('*')
-        .in('id', workspaceIds)
-    );
-
-    return (data || []).map(d => this.mapWorkspace(d));
-  }
-
-  async getDefaultWorkspace(userId: string): Promise<Workspace> {
-    const workspaces = await this.getUserWorkspaces(userId);
-    if (workspaces.length === 0) throw new Error('No workspace found');
-    return workspaces[0];
-  }
 
   // --- AUDIT LOGS ---
   async getAuditLogs(clientId?: number, userId?: string): Promise<AuditLog[]> {
@@ -378,76 +288,7 @@ export class SupabaseRESTStorage implements IStorage {
     await AuditService.logAuditAction(log);
   }
 
-  // --- USERS ---
-  async getUser(id: string): Promise<User | undefined> {
-    const data = await this.handleResponse<any | null>(
-      supabase.from("profiles")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle()
-    );
-    return this.mapProfileToUser(data) || undefined;
-  }
 
-  async getUsersByClientId(clientId: number): Promise<User[]> {
-    const data = await this.handleResponse<any[]>(
-      supabase.from("profiles")
-        .select("*")
-        .eq("client_id", clientId)
-    );
-    return (data || []).map(row => this.mapProfileToUser(row));
-  }
-
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const data = await this.handleResponse<any | null>(
-      supabase.from("profiles")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle()
-    );
-    return this.mapProfileToUser(data) || undefined;
-  }
-
-  async updateUser(id: string, updates: Partial<User>): Promise<User> {
-    const profilePayload: any = {};
-    if (updates.firstName !== undefined) profilePayload.first_name = updates.firstName;
-    if (updates.lastName !== undefined) profilePayload.last_name = updates.lastName;
-    if (updates.role !== undefined) profilePayload.role = updates.role;
-    if (updates.clientId !== undefined) profilePayload.client_id = updates.clientId;
-    if (updates.subscriptionTier !== undefined) profilePayload.subscription_tier = updates.subscriptionTier;
-    if (updates.profileImageUrl !== undefined) profilePayload.profile_image_url = updates.profileImageUrl;
-    if (updates.contractsCount !== undefined) profilePayload.contracts_count = updates.contractsCount;
-    profilePayload.updated_at = new Date().toISOString();
-
-    const data = await this.handleResponse<any>(
-      supabase.from("profiles")
-        .update(profilePayload)
-        .eq("id", id)
-        .select("*")
-        .single()
-    );
-    return this.mapProfileToUser(data);
-  }
-
-  async createUser(user: Partial<User>): Promise<User> {
-    const data = await this.handleResponse<any>(
-      supabase.from("profiles")
-        .insert({
-          id: user.id || randomUUID(),
-          email: user.email,
-          first_name: user.firstName,
-          last_name: user.lastName,
-          role: user.role || 'user',
-          client_id: user.clientId,
-          subscription_tier: user.subscriptionTier || 'starter',
-          profile_image_url: user.profileImageUrl,
-          updated_at: new Date().toISOString()
-        })
-        .select("*")
-        .single()
-    );
-    return this.mapProfileToUser(data);
-  }
 
   // --- CONTRACTS ---
   async getContracts(filters?: { clientId?: number, status?: string }): Promise<(Contract & { client?: Client })[]> {
@@ -746,6 +587,14 @@ export class SupabaseRESTStorage implements IStorage {
         efficiencySavings: roiMetrics.efficiencySavings,
         riskMitigationValue: roiMetrics.riskMitigationValue
       },
+      roi_details: {
+        total_impact: roiMetrics.totalImpact,
+        efficiency_savings: roiMetrics.efficiencySavings,
+        direct_savings: totalPotentialSavings,
+        hours_saved: roiMetrics.hoursSaved,
+        mitigated_exposure: roiMetrics.mitigatedExposure,
+        roi_ratio: roiMetrics.roiRatio
+      },
       userMetrics: { 
         contractsAnalyzedPerMonth: totalContracts, 
         complianceScoreImprovement: 15.2, 
@@ -755,6 +604,37 @@ export class SupabaseRESTStorage implements IStorage {
       },
       remediationLog: infraLogs.slice(0, 10)
     };
+  }
+
+  async getVendorBenchmarks(clientId?: number): Promise<any[]> {
+    const [contracts, risks] = await Promise.all([
+      this.getContracts({ clientId }),
+      this.getRisks()
+    ]);
+
+    const vendorMap = new Map<string, { totalCost: number, compliance: number[], riskScores: number[], count: number }>();
+
+    contracts.forEach(c => {
+      const existing = vendorMap.get(c.vendorName) || { totalCost: 0, compliance: [], riskScores: [], count: 0 };
+      existing.totalCost += (c.annualCost || 0);
+      
+      const contractRisks = risks.filter(r => r.contractId === c.id);
+      const avgRisk = contractRisks.length > 0 ? contractRisks.reduce((sum, r) => sum + (r.riskScore || 0), 0) / contractRisks.length : 20;
+      
+      existing.riskScores.push(avgRisk);
+      existing.compliance.push(Math.max(100 - avgRisk, 0));
+      existing.count += 1;
+      vendorMap.set(c.vendorName, existing);
+    });
+
+    return Array.from(vendorMap.entries()).map(([vendor, data]) => ({
+      vendor,
+      avgCompliance: Math.round(data.compliance.reduce((a, b) => a + b, 0) / data.count),
+      avgCost: Math.round(data.totalCost / data.count),
+      totalCost: data.totalCost,
+      riskScore: Math.round(data.riskScores.reduce((a, b) => a + b, 0) / data.count),
+      highestRisk: Math.max(...data.riskScores)
+    }));
   }
 
   async getRiskHeatmap(clientId?: number): Promise<any[]> {
@@ -925,12 +805,14 @@ export class SupabaseRESTStorage implements IStorage {
     return (data || []).map(d => ({
       id: d.id,
       contractId: d.contract_id,
-      category: d.category,
+      title: d.title,
       content: d.content,
       riskLevel: d.risk_level,
-      complianceStatus: d.compliance_status,
+      category: d.category,
+      isStandard: d.is_standard,
       createdAt: d.created_at ? new Date(d.created_at) : null
     }));
+
   }
 
   async createClause(clause: InsertContractClause): Promise<ContractClause> {
@@ -938,10 +820,11 @@ export class SupabaseRESTStorage implements IStorage {
       supabase.from("clauses")
         .insert({
           contract_id: clause.contractId,
+          title: clause.title,
           category: clause.category,
           content: clause.content,
           risk_level: clause.riskLevel || 'low',
-          compliance_status: clause.complianceStatus || 'compliant'
+          is_standard: clause.isStandard || false
         })
         .select("*")
         .single()
@@ -949,13 +832,15 @@ export class SupabaseRESTStorage implements IStorage {
     return {
       id: data.id,
       contractId: data.contract_id,
+      title: data.title,
       category: data.category,
       content: data.content,
       riskLevel: data.risk_level,
-      complianceStatus: data.compliance_status,
+      isStandard: data.is_standard,
       createdAt: data.created_at ? new Date(data.created_at) : null
     };
   }
+
 
   async updateContractAnalysis(id: number, analysis: any): Promise<Contract> {
     const data = await this.handleResponse(
@@ -1043,6 +928,178 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createRegulatoryAlert(alert: InsertRegulatoryAlert): Promise<RegulatoryAlert> {
     return this.handleResponse<RegulatoryAlert>(supabase.from("regulatory_alerts").insert(alert).select().single());
+  }
+
+  // --- USERS ---
+  async getUser(id: string): Promise<User | undefined> {
+    const data = await this.handleResponse<any | null>(supabase.from("profiles").select("*").eq("id", id).maybeSingle());
+    return this.mapProfileToUser(data);
+  }
+
+  async getUsersByClientId(clientId: number): Promise<User[]> {
+    const data = await this.handleResponse<any[]>(supabase.from("profiles").select("*").eq("client_id", clientId));
+    return (data || []).map(d => this.mapProfileToUser(d));
+  }
+
+  async getUsersByOrganizationId(organizationId: string): Promise<User[]> {
+    const data = await this.handleResponse<any[]>(supabase.from("profiles").select("*").eq("organization_id", organizationId));
+    return (data || []).map(d => this.mapProfileToUser(d));
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const data = await this.handleResponse<any | null>(supabase.from("profiles").select("*").eq("email", email).maybeSingle());
+    return this.mapProfileToUser(data);
+  }
+
+  async getUserByApiKey(apiKey: string): Promise<User | undefined> {
+    // Performs a direct match against the stored api_key column.
+    // For enhanced security, this column should be hashed in a future phase.
+    const data = await this.handleResponse<any | null>(
+      supabase.from("profiles").select("*").eq("api_key", apiKey).maybeSingle()
+    );
+    return data ? this.mapProfileToUser(data) : undefined;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    const payload: any = { updated_at: new Date().toISOString() };
+    if (updates.firstName !== undefined) payload.first_name = updates.firstName;
+    if (updates.lastName !== undefined) payload.last_name = updates.lastName;
+    if (updates.role !== undefined) payload.role = updates.role;
+    if (updates.clientId !== undefined) payload.client_id = updates.clientId;
+    if (updates.organizationId !== undefined) payload.organization_id = updates.organizationId;
+    if (updates.profileImageUrl !== undefined) payload.profile_image_url = updates.profileImageUrl;
+    if (updates.subscriptionTier !== undefined) payload.subscription_tier = updates.subscriptionTier;
+    if (updates.contractsCount !== undefined) payload.contracts_count = updates.contractsCount;
+    if (updates.apiKey !== undefined) payload.api_key = updates.apiKey;
+
+
+    const data = await this.handleResponse<any>(
+      supabase.from("profiles")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single()
+    );
+    return this.mapProfileToUser(data);
+  }
+
+  async createUser(user: Partial<User>): Promise<User> {
+    const data = await this.handleResponse<any>(
+      supabase.from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          first_name: user.firstName,
+          last_name: user.lastName,
+          role: user.role,
+          client_id: user.clientId,
+          organization_id: user.organizationId
+        })
+        .select("*")
+        .single()
+    );
+    return this.mapProfileToUser(data);
+  }
+
+  // --- WORKSPACES ---
+  async getWorkspaces(): Promise<Workspace[]> {
+    const data = await this.handleResponse<any[]>(supabase.from("workspaces").select("*"));
+    return (data || []).map(d => this.mapWorkspace(d));
+  }
+
+  async createWorkspace(workspace: InsertWorkspace): Promise<Workspace> {
+    const data = await this.handleResponse<any>(
+      supabase.from("workspaces")
+        .insert({
+          name: workspace.name,
+          owner_id: workspace.ownerId,
+          plan: workspace.plan,
+          webhook_url: workspace.webhookUrl,
+          webhook_enabled: workspace.webhookEnabled
+        })
+        .select("*")
+        .single()
+    );
+    return this.mapWorkspace(data);
+  }
+
+  async getWorkspaceMembers(workspaceId: number): Promise<(User & { workspaceRole: WorkspaceRole, permissions: any })[]> {
+    // Join profiles with workspace_members
+    const { data, error } = await supabase
+      .from("workspace_members")
+      .select("role, permissions, profile:profiles(*)")
+      .eq("workspace_id", workspaceId);
+    
+    if (error) throw new Error(error.message);
+    
+    return (data || []).map(d => ({
+      ...this.mapProfileToUser(d.profile),
+      workspaceRole: d.role as WorkspaceRole,
+      permissions: d.permissions
+    }));
+  }
+
+
+  async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
+    const data = await this.handleResponse<any>(
+      supabase.from("workspace_members")
+        .insert({
+          user_id: member.userId,
+          workspace_id: member.workspaceId,
+          role: member.role,
+          permissions: member.permissions || {}
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      userId: data.user_id,
+      workspaceId: data.workspace_id,
+      role: data.role as WorkspaceRole,
+      permissions: data.permissions,
+      createdAt: new Date(data.created_at)
+    };
+  }
+
+
+  async updateWorkspaceMemberRole(userId: string, workspaceId: number, role: WorkspaceRole): Promise<void> {
+    await this.handleResponse(
+      supabase.from("workspace_members")
+        .update({ role })
+        .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
+    );
+  }
+
+  async removeWorkspaceMember(userId: string, workspaceId: number): Promise<void> {
+    await this.handleResponse(
+      supabase.from("workspace_members")
+        .delete()
+        .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
+    );
+  }
+
+  async getUserWorkspaces(userId: string): Promise<Workspace[]> {
+    const { data, error } = await supabase
+      .from("workspace_members")
+      .select("workspace:workspaces(*)")
+      .eq("user_id", userId);
+    
+    if (error) throw new Error(error.message);
+    return (data || []).map(d => this.mapWorkspace(d.workspace));
+  }
+
+  async getDefaultWorkspace(userId: string): Promise<Workspace> {
+    // Favor workspace where user is owner, else first joined
+    const workspaces = await this.getUserWorkspaces(userId);
+    if (workspaces.length === 0) {
+      // Create a default personal workspace if none exists
+      return this.createWorkspace({ name: "Personal Workspace", ownerId: userId, plan: "starter" });
+    }
+    const owned = workspaces.find(w => w.ownerId === userId);
+    return owned || workspaces[0];
   }
 
   // --- SYSTEM HEALTH ---

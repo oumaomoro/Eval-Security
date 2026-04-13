@@ -28,8 +28,10 @@ export const workspaceMembers = pgTable('workspace_members', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   workspaceId: integer('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
   role: workspaceRoleEnum('role').notNull().default('viewer'),
+  permissions: jsonb('permissions').default({}),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -300,12 +302,14 @@ export const billingTelemetry = pgTable("billing_telemetry", {
 export const clauses = pgTable("clauses", {
   id: serial("id").primaryKey(),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
-  category: text("category").notNull(),
+  title: text("title"),
   content: text("content").notNull(),
   riskLevel: text("risk_level").notNull().default("low"),
-  complianceStatus: text("compliance_status").notNull().default("compliant"),
+  category: text("category").notNull(),
+  isStandard: boolean("is_standard").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
 
 // === DATABASE RELATIONS ===
 

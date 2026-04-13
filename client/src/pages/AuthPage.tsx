@@ -92,6 +92,27 @@ export default function AuthPage() {
     }
   });
 
+  const magicLinkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(getApiUrl("/api/auth/magic-link"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || err.error || "Failed to dispatch magic link");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Magic Link Sent", description: "Priority login link dispatched to your inbox." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Dispatch Error", description: err.message, variant: "destructive" });
+    }
+  });
+
   if (user) {
     window.location.href = "/";
     return null;
@@ -259,6 +280,16 @@ export default function AuthPage() {
                         <span className="relative z-10">Authenticate & Connect</span>
                         <ArrowRight className="w-4 h-4 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
                       </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => magicLinkMutation.mutate()}
+                    disabled={magicLinkMutation.isPending || !email}
+                    variant="outline"
+                    className="w-full bg-slate-950 border-slate-800 hover:bg-slate-900 text-slate-300 font-bold uppercase tracking-tight h-12 rounded-xl mt-2 flex items-center justify-center gap-2 transition-all hover:border-emerald-500/30"
+                  >
+                    {magicLinkMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <><Mail className="w-4 h-4 text-emerald-500" /> Send Magic Link</>
                     )}
                   </Button>
                 </CardContent>

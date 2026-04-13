@@ -9,7 +9,7 @@ import { SEO } from "@/components/SEO";
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
-      <SEO title="The Sovereign Intelligence Standard" description="Costloci: AI-driven contract governance, forensic risk mapping, and autonomic compliance for global enterprises." />
+      <SEO title="AI Contract Governance & Regional Compliance Software | Costloci" description="Costloci provides AI-driven contract governance, forensic risk mapping, and autonomic compliance (KDPA, POPIA, GDPR) for MSPs and global enterprises." />
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
@@ -46,13 +46,12 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8">
               <Zap className="w-3 h-3 animate-pulse" /> Now with Autonomic Compliance Engines
             </div>
-            <h1 className="text-6xl md:text-8xl font-black text-white leading-[0.9] tracking-tighter mb-8 max-w-4xl mx-auto">
-              Costloci:<br />
-              <span className="text-emerald-500 italic drop-shadow-[0_0_30px_rgba(16,185,129,0.4)]">Intelligence</span><br />
-              Sovereignty.
+            <h1 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter mb-6 max-w-5xl mx-auto">
+              AI Contract Governance & <br />
+              <span className="text-emerald-500 italic drop-shadow-[0_0_30px_rgba(16,185,129,0.4)]">Regional Compliance</span>
             </h1>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-12 font-medium">
-              The high-fidelity standard for contract governance, automated regional compliance (KDPA, POPIA), and forensic risk mapping for MSPs and Global 2000 DPOs.
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed mb-10 font-medium">
+              The Sovereign Intelligence Standard for identifying forensic contract risks, streamlining KDPA & POPIA compliance, and maximizing enterprise vendor ROI. Built for MSPs and Global 2000 DPOs.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/auth">

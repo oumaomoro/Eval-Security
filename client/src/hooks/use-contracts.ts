@@ -112,5 +112,11 @@ export function useUploadContractFile() {
       }
       return api.contracts.upload.responses[200].parse(await res.json());
     },
+    onSuccess: async () => {
+      const { toast } = (await import("@/hooks/use-toast")).useToast();
+      const queryClient = (await import("@tanstack/react-query")).useQueryClient();
+      queryClient.invalidateQueries({ queryKey: [api.contracts.list.path] });
+    },
   });
 }
+

@@ -4,6 +4,7 @@
  * preventing 'failed to fetch' errors caused by relative path mismatches on cross-domain hosts.
  */
 
+// Sovereign Connectivity: Use relative paths by default to avoid CORS preflight blocks.
 const VITE_API_URL = import.meta.env.VITE_API_URL || "";
 
 /**

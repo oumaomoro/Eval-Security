@@ -1,37 +1,16 @@
 import { type Express, type Request, type Response, type NextFunction } from "express";
-import session from "express-session";
-import connectPg from "connect-pg-simple";
 import { adminClient as supabase } from "../../services/supabase";
 import { authStorage } from "./storage";
 
-const PostgresStore = connectPg(session);
-
 /**
- * UNIFIED AUTHENTICATION MIDDLEWARE V2
- * Supports both Session (Browser) and Bearer (Mobile/App/Tests) authentication.
- * Populates req.user with the unified profile and clientId context.
+ * UNIFIED STATELESS AUTHENTICATION MIDDLEWARE V3
+ * 
+ * 100% Stateless: Resolves identity via Bearer JWT (Supabase Access Token).
+ * Removes express-session dependency to eliminate DB-connection points-of-failure.
  */
 export async function setupAuth(app: Express) {
-  // Initialize Session Middleware
-  const sessionSecret = process.env.SESSION_SECRET || "costloci-enterprise-default-secret";
-  
-  app.use(
-    session({
-      store: new PostgresStore({
-        conString: process.env.DATABASE_URL,
-        createTableIfMissing: true,
-        tableName: "session",
-      }),
-      secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      },
-    })
-  );
+  // We no longer initialize express-session here. 
+  // Identity is resolved on every request via the Authorization header.
 
   app.use(async (req: Request, res: Response, next: NextFunction) => {
     // 1. Resolve Identity (Session or Header)
@@ -72,6 +51,7 @@ export async function setupAuth(app: Express) {
         firstName: localUser?.firstName ?? user.user_metadata?.first_name ?? "",
         lastName: localUser?.lastName ?? user.user_metadata?.last_name ?? "",
         clientId: localUser?.clientId ?? null,
+        organizationId: localUser?.organizationId ?? null, // Added for Phase 25
         role: localUser?.role ?? "viewer",
         subscriptionTier: localUser?.subscriptionTier ?? "starter",
         contractsCount: localUser?.contractsCount ?? 0,

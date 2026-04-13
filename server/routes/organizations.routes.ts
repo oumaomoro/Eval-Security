@@ -9,13 +9,21 @@ const router = Router();
 // GET /api/org/members - Fetch users in the active organization
 router.get("/api/org/members", isAuthenticated, async (req: any, res) => {
   try {
+    const orgId = req.user.organizationId;
     const clientId = req.user.clientId;
-    if (!clientId) {
+    
+    if (!orgId && !clientId) {
       return res.status(400).json({ message: "User is not associated with any organization" });
     }
-    const members = await storage.getUsersByClientId(clientId);
+
+    // Provisioning fallback: If we have an Org ID, use it. Else fallback to legacy Client ID.
+    const members = orgId 
+      ? await storage.getUsersByOrganizationId(orgId)
+      : await storage.getUsersByClientId(clientId);
+      
     res.json(members);
   } catch (error) {
+    console.error("[ORG ROUTES] Member listing failed:", error);
     res.status(500).json({ message: "Failed to fetch organization members" });
   }
 });
@@ -23,8 +31,10 @@ router.get("/api/org/members", isAuthenticated, async (req: any, res) => {
 // POST /api/org/invite - Send an invite (Simulated as direct creation for now)
 router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
   try {
+    const orgId = req.user.organizationId;
     const clientId = req.user.clientId;
-    if (!clientId) {
+
+    if (!orgId && !clientId) {
       return res.status(400).json({ message: "Unauthorized to invite to this organization" });
     }
 
@@ -55,6 +65,7 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
       firstName,
       lastName,
       clientId,
+      organizationId: orgId
     });
 
     res.status(201).json(newUser);
@@ -72,15 +83,23 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
 // PUT /api/org/member - Update a member's role
 router.put("/api/org/member", isAuthenticated, async (req: any, res) => {
   try {
+    const orgId = req.user.organizationId;
     const clientId = req.user.clientId;
-    if (!clientId) {
+
+    if (!orgId && !clientId) {
       return res.status(400).json({ message: "Unauthorized" });
     }
 
     const { userId, role } = api.workspaces.members.updateRole.input.parse(req.body);
 
     const targetUser = await storage.getUser(userId);
-    if (!targetUser || targetUser.clientId !== clientId) {
+    if (!targetUser) {
+      return res.status(404).json({ message: "Member not found" });
+    }
+
+    // Security check: Match either ID anchor
+    const isMemberOfOrg = (orgId && targetUser.organizationId === orgId) || (clientId && targetUser.clientId === clientId);
+    if (!isMemberOfOrg) {
       return res.status(404).json({ message: "Member not found in your organization" });
     }
 

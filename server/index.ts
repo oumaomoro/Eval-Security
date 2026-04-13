@@ -11,19 +11,40 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// ── PHASE 27 HOTFIX: CROSS-DOMAIN PRODUCTION CONNECTIVITY ─────────
-// Allows costloci.com (Frontend) to communicate with api.costloci.com (Backend)
+// ── PHASE 27 INFRASTRUCTURE HARDENING: UNIFIED API GATEWAY ─────────
+// Support for Stateless Bearer Identity and same-origin relative proxying.
 app.use(cors({
-  origin: [
-    "https://costloci.com",
-    "https://www.costloci.com",
-    "http://localhost:5173",
-    "http://localhost:5000"
-  ],
+  origin: (origin, callback) => {
+    // Quality focus: Dynamically allow localhost and the production domains
+    const allowedOrigins = [
+      "https://costloci.com",
+      "https://www.costloci.com",
+      "http://localhost:3001",
+      "http://localhost:5173"
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS-REJECTION: Origin not allowed for Enterprise Infrastructure"));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type"]
 }));
+
+// ── PHASE 27: PREFLIGHT OPTIMIZATION ─────────
+// Explicitly capture all OPTIONS requests to ensure the preflight always returns 200 with allowed headers.
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-requested-with, x-p25-status, Authorization, Content-Type');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Logging Hook
 app.use((req, res, next) => {

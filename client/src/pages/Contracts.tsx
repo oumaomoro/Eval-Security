@@ -112,17 +112,18 @@ function CreateContractDialog() {
 
   const onSubmit = async (data: InsertContract) => {
     try {
-      let fileUrl = "";
       if (file) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await uploadFile(formData);
-        fileUrl = res.url;
+        toast({ title: "Uploading...", description: "AI is analyzing your contract." });
+        await uploadFile(formData);
+        setIsOpen(false);
+        return;
       }
       
       createContract({
         ...data,
-        fileUrl,
+        fileUrl: "",
         clientId: 1, // Hardcoded for demo simplicity
         annualCost: Number(data.annualCost),
         contractTermMonths: Number(data.contractTermMonths),
@@ -146,7 +147,7 @@ function CreateContractDialog() {
         }
       });
     } catch (e: any) {
-      toast({ title: "Process Error", description: e.message, variant: "destructive" });
+      toast({ title: "Process Error", description: e.message || "Upload failed. Try manual entry.", variant: "destructive" });
     }
   };
 

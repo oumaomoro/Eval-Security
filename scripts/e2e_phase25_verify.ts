@@ -67,15 +67,43 @@ async function runVerify() {
   try {
     // ─── Step 1: Create a confirmed test user ─────────────────────────────────
     console.log(`1. Provisioning confirmed test user: ${testEmail}`);
-    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+    let authData: any, authError: any;
+    
+    // Attempt creation with auto-confirmation
+    const result = await adminClient.auth.admin.createUser({
       email: testEmail,
       password: testPassword,
       email_confirm: true,
       user_metadata: { first_name: 'Verify', last_name: 'Robot' }
     });
+    
+    authData = result.data;
+    authError = result.error;
 
-    if (authError) throw new Error(`User creation failed: ${authError.message}`);
+    if (authError && authError.message.includes("confirmation email")) {
+      console.log("   ⚠️  Auto-confirm creation failed with email error. Retrying with manual update...");
+      const retryResult = await adminClient.auth.admin.createUser({
+        email: testEmail,
+        password: testPassword,
+        email_confirm: false,
+        user_metadata: { first_name: 'Verify', last_name: 'Robot' }
+      });
+      
+      if (retryResult.error) throw new Error(`User creation retry failed: ${retryResult.error.message}`);
+      
+      const userId = retryResult.data.user.id;
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(userId, { 
+        email_confirm: true 
+      });
+      
+      if (updateError) throw new Error(`User manual confirmation failed: ${updateError.message}`);
+      authData = retryResult.data;
+    } else if (authError) {
+      throw new Error(`User creation failed: ${authError.message}`);
+    }
+
     const userId = authData.user.id;
+
     console.log(`   ✅ Test user created: ${userId}`);
 
     // ─── Step 2: Sign in to get an access token ───────────────────────────────

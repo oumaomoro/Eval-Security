@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, FileText, Download, Plus } from "lucide-react";
+import { Loader2, FileText, Download, Plus, ShieldAlert, Cpu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
@@ -72,58 +72,121 @@ export default function Reports() {
                     </div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
-                        <Button>
+                        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase italic tracking-tighter">
                             <Plus className="w-4 h-4 mr-2" />
-                            Generate Report
+                            Initialize Report
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent className="sm:max-w-[425px] bg-slate-950 border-slate-800">
                         <DialogHeader>
-                            <DialogTitle>Generate Regulatory Report</DialogTitle>
-                            <DialogDescription>
-                                Create a specialized compliance report for a specific regulatory body.
+                            <DialogTitle className="text-white uppercase tracking-tighter italic">Generate Regulatory Intelligence</DialogTitle>
+                            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px]">
+                                Configure jurisdictional parameters for autonomic report generation.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4">
+                        <div className="grid gap-6 py-4">
                             <div className="grid gap-2">
-                                <Label>Report Title</Label>
-                                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Annual DPIA Review" />
+                                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Report Title</Label>
+                                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Q3 Jurisdictional Audit" className="bg-slate-900 border-slate-800" />
                             </div>
                             <div className="grid gap-2">
-                                <Label>Report Type</Label>
+                                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Analytical Framework</Label>
                                 <Select value={type} onValueChange={setType}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="compliance">Compliance</SelectItem>
-                                        <SelectItem value="risk_assessment">Risk Assessment</SelectItem>
-                                        <SelectItem value="audit">Full Audit</SelectItem>
+                                    <SelectTrigger className="bg-slate-900 border-slate-800"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800">
+                                        <SelectItem value="compliance">Jurisdictional Compliance</SelectItem>
+                                        <SelectItem value="risk_assessment">Forrensic Risk Assessment</SelectItem>
+                                        <SelectItem value="evidence_pack">Strategic Evidence Pack</SelectItem>
+                                        <SelectItem value="audit">Full Autonomic Audit</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label>Regulatory Body</Label>
+                                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Regulatory Standard</Label>
                                 <Select value={regulatoryBody} onValueChange={setRegulatoryBody}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="ODPC">ODPC (Kenya KDPA)</SelectItem>
-                                        <SelectItem value="CBK">CBK (Kenya Cyber Security)</SelectItem>
-                                        <SelectItem value="POPIA">Information Regulator (SA POPIA)</SelectItem>
+                                    <SelectTrigger className="bg-slate-900 border-slate-800"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800">
+                                        <SelectItem value="KDPA">KDPA (Kenya Act 2019)</SelectItem>
+                                        <SelectItem value="CBK">CBK (Cybersecurity Guidance)</SelectItem>
+                                        <SelectItem value="POPIA">POPIA (South Africa)</SelectItem>
+                                        <SelectItem value="GDPR">GDPR (EU Standard)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <div className="flex justify-end gap-3 mt-4">
+                            <Button variant="ghost" onClick={() => setOpen(false)} className="text-[10px] font-black uppercase text-slate-500 hover:text-white tracking-widest">Abort</Button>
                             <Button
-                                onClick={() => generateReport.mutate({ title, type, regulatoryBody })}
+                                onClick={() => generateReport.mutate({ title, type, regulatoryBody: regulatoryBody })}
                                 disabled={!title || generateReport.isPending}
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase italic tracking-tighter"
                             >
-                                {generateReport.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Generate
+                                {generateReport.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Cpu className="w-4 h-4 mr-2" />}
+                                Begin Generation
                             </Button>
                         </div>
                     </DialogContent>
                 </Dialog>
+            </div>
+
+            {/* Evidence Pack Strategic Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <Card className="bg-slate-950 border-slate-800 shadow-2xl overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <ShieldAlert className="w-32 h-32 text-emerald-500" />
+                    </div>
+                    <CardHeader>
+                        <CardTitle className="text-lg font-black uppercase tracking-tighter italic flex items-center gap-2">
+                             <Cpu className="w-5 h-5 text-emerald-500" /> Strategic Evidence Pack
+                        </CardTitle>
+                        <CardDescription className="text-slate-500 font-bold uppercase text-[10px]">
+                            Generate a board-ready executive brief for jurisdictional verification.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                            Compiles all recent autonomic rescans, risk mitigations, and legal speed metrics into a cryptographically signed PDF dashboard.
+                        </p>
+                        <div className="flex items-center gap-4">
+                            <Select value={regulatoryBody} onValueChange={setRegulatoryBody}>
+                                <SelectTrigger className="w-48 bg-slate-900 border-slate-800 text-[10px] font-bold uppercase h-9"><SelectValue /></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800">
+                                    <SelectItem value="KDPA">Standard: KDPA</SelectItem>
+                                    <SelectItem value="POPIA">Standard: POPIA</SelectItem>
+                                    <SelectItem value="CBK">Standard: CBK</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button 
+                                variant="outline" 
+                                className="h-9 border-slate-800 hover:bg-slate-900 text-slate-300 font-black uppercase text-[10px] tracking-widest italic"
+                                onClick={() => generateReport.mutate({ 
+                                    title: `Board Evidence Pack - ${regulatoryBody}`, 
+                                    type: "evidence_pack", 
+                                    standard: regulatoryBody 
+                                })}
+                                disabled={generateReport.isPending}
+                            >
+                                {generateReport.isPending ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : "Deploy Pack"}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-emerald-500/5 border-emerald-500/20 backdrop-blur-xl">
+                    <CardHeader>
+                        <CardTitle className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                            <ShieldAlert className="w-4 h-4" /> Integrity Verification
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                            Every generated report is indexed against the Sovereign Integrity Ledger. Reports can be verified using the unique Forensic Hash found in the document footer.
+                        </p>
+                        <div className="mt-4 flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase italic">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Ledger Sync Active: Node-Cluster-01
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <Card className="bg-card/50 backdrop-blur border-primary/10">

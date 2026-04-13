@@ -21,6 +21,7 @@ export const users = pgTable("profiles", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   clientId: integer("client_id"),
+  organizationId: varchar("organization_id"),
   role: varchar("role").default("analyst"), // admin, analyst, executive
   profileImageUrl: varchar("profile_image_url"),
   webauthnId: varchar("webauthn_id"),
@@ -28,7 +29,9 @@ export const users = pgTable("profiles", {
   mfaEnabled: boolean("mfa_enabled").default(false),
   subscriptionTier: varchar("subscription_tier").default("starter"), // starter, pro, enterprise
   contractsCount: integer("contracts_count").default(0),
+  apiKey: text("api_key"),
   createdAt: timestamp("created_at").defaultNow(),
+
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

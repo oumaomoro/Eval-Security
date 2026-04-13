@@ -94,8 +94,7 @@ export class RemediationEngine {
             contractId,
             category: cls.category,
             content: cls.text || cls.content,
-            riskLevel: 'low',
-            complianceStatus: 'compliant'
+            riskLevel: 'low'
           });
         }
       } else {
@@ -104,8 +103,7 @@ export class RemediationEngine {
           contractId,
           category: "General Remediation",
           content: result.addendumContent,
-          riskLevel: 'low',
-          complianceStatus: 'compliant'
+          riskLevel: 'low'
         });
       }
       

@@ -8,13 +8,15 @@ import {
     PieChart, BarChart3, Globe, Briefcase, 
     ChevronRight, Loader2, ArrowUpRight, Target
 } from "lucide-react";
+import { useVendorBenchmarks } from "@/hooks/use-dashboard";
 import { ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { SEO } from "@/components/SEO";
 
 export default function ExecutiveROI() {
     const { data: stats, isLoading } = useDashboardStats();
+    const { data: benchmarks, isLoading: isBenchLoading } = useVendorBenchmarks();
 
-    if (isLoading) {
+    if (isLoading || isBenchLoading) {
         return <Layout><div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
     }
 
@@ -136,22 +138,31 @@ export default function ExecutiveROI() {
                     <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm self-start">
                         <CardHeader>
                             <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                                <Globe className="w-4 h-4 text-cyan-400" /> Peer Benchmarking
+                                <Globe className="w-4 h-4 text-cyan-400" /> Sector Benchmarking
                             </CardTitle>
-                            <CardDescription className="text-[10px] uppercase font-bold">Sector Focus: Enterprise SaaS / FinTech</CardDescription>
+                            <CardDescription className="text-[10px] uppercase font-bold">Category: All Vendors (Internal Org)</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <BenchmarkItem label="Avg. Legal Spend/Contract" current="$2,400" target="$1,850" status="ahead" />
-                            <BenchmarkItem label="Compliance Maturity" current="84%" target="92%" status="tracking" />
-                            <BenchmarkItem label="Vendor Risk Velocity" current="4.2d" target="3.0d" status="optimizing" />
+                            {(benchmarks || []).slice(0, 4).map((b: any, i: number) => (
+                                <BenchmarkItem 
+                                    key={i}
+                                    label={`${b.vendor} Risk Score`} 
+                                    current={`${b.riskScore}`} 
+                                    target={`${b.highestRisk}`} 
+                                    status={b.riskScore < 30 ? "ahead" : b.riskScore < 60 ? "tracking" : "optimizing"} 
+                                />
+                            ))}
+                            {(benchmarks || []).length === 0 && (
+                                <p className="text-[10px] text-slate-500 font-bold uppercase py-4 text-center">No cross-vendor data identified</p>
+                            )}
                             <div className="pt-4 border-t border-slate-800">
                                 <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                                     <div className="flex items-start gap-3">
                                         <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
                                         <div>
-                                            <p className="text-[10px] font-black text-primary uppercase tracking-tight">Strategic Advantage</p>
+                                            <p className="text-[10px] font-black text-primary uppercase tracking-tight">Analytics Velocity</p>
                                             <p className="text-[11px] text-slate-400 font-medium leading-relaxed mt-1">
-                                                Your legal analysis velocity is **32% faster** than the sector average for Enterprise SaaS.
+                                                Your legal risk posture is currently **{(stats?.technicalMetrics?.aiAccuracyRate || 0) > 95 ? 'OPTIMIZED' : 'STABILIZING'}** across all jurisdictions.
                                             </p>
                                         </div>
                                     </div>

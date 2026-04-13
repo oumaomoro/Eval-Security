@@ -17,3 +17,19 @@ export function useDashboardStats() {
     refetchInterval: 5000, // Refresh every 5s for high-frequency real-time dashboard telemetry
   });
 }
+
+export function useVendorBenchmarks() {
+  return useQuery({
+    queryKey: [api.vendors.benchmarks.path],
+    queryFn: async () => {
+      const token = localStorage.getItem("costloci_token");
+      const res = await fetch(getApiUrl(api.vendors.benchmarks.path), { 
+        credentials: "include",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error("Failed to fetch vendor benchmarks");
+      return res.json();
+    },
+    refetchInterval: 10000, 
+  });
+}

@@ -1,8 +1,9 @@
 import type { Express } from "express";
-import { supabase } from "../../services/supabase";
+import { supabase, adminClient } from "../../services/supabase";
 import { storage } from "../../storage";
 import { authStorage } from "./storage";
 import { WebAuthnService } from "../../services/WebAuthn";
+import { randomUUID } from "crypto";
 
 export function registerAuthRoutes(app: Express): void {
   // Get current authenticated user
@@ -21,6 +22,7 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/register", async (req: any, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
+      // 1. Supabase Auth Signup
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -29,43 +31,87 @@ export function registerAuthRoutes(app: Express): void {
         }
       });
 
-      if (error) throw error;
-      if (!data.user) throw new Error("Registration failed");
+      if (error) {
+        if (error.message.includes("already registered")) {
+          return res.status(409).json({ message: "Identity already exists. Please sign in to initialize your hub." });
+        }
+        throw error;
+      }
+      
+      if (!data.user) throw new Error("Registration failed: Supabase Identity Engine did not return a valid user.");
 
-      // Sync with local DB
-      await authStorage.upsertUser({
-        id: data.user.id,
-        email: data.user.email!,
-        firstName,
-        lastName
-      });
+      console.log(`[AUTH-DIAG] Registration Success: ${data.user.id}. Provisioning enterprise assets...`);
 
-      // Seeding Initial Workspace & Client for Enterprise Onboarding
-      const client = await storage.createClient({
-        companyName: `${firstName}'s Enterprise Hub`,
-        industry: "Professional Services",
-        contactName: `${firstName} ${lastName}`,
-        contactEmail: email,
-        status: "active"
-      });
-
-      await storage.createWorkspace({
-        name: "Main Workspace",
-        plan: "enterprise"
-      });
-
-      // Update local user with client relationship
+      // 2. Initial Profile Sync (Basic)
       await authStorage.upsertUser({
         id: data.user.id,
         email: data.user.email!,
         firstName,
         lastName,
-        clientId: client.id,
         role: "admin"
       });
 
-      res.status(201).json({ message: "Registration successful. Please verify your email." });
+      // 3. Enterprise Provisioning (Org -> Client -> Workspace)
+      try {
+        const orgName = `${firstName}'s Organization`;
+        const slug = `${email.split('@')[0]}-${Date.now().toString(36)}`;
+        
+        console.log(`[AUTH-DIAG] Provisioning Org via Admin Client: ${orgName} (slug: ${slug})`);
+        const { data: orgData, error: orgError } = await adminClient.from('organizations')
+          .insert([{ name: orgName, slug, tier: 'free' }])
+          .select().single();
+        
+        if (orgError) throw new Error(`Organization provisioning failed: ${orgError.message}`);
+
+        console.log(`[AUTH-DIAG] Provisioning Client...`);
+        const client = await storage.createClient({
+          companyName: `${firstName}'s Enterprise Hub`,
+          industry: "Professional Services",
+          contactName: `${firstName} ${lastName}`,
+          contactEmail: email,
+          status: "active"
+        });
+
+        console.log(`[AUTH-DIAG] Provisioning Workspace...`);
+        await storage.createWorkspace({
+          name: "Main Workspace",
+          ownerId: data.user.id,
+          plan: "starter"
+        });
+
+        // 4. Harden Local User with full Enterprise Context
+        await authStorage.upsertUser({
+          id: data.user.id,
+          email: data.user.email!,
+          firstName,
+          lastName,
+          clientId: client.id,
+          organizationId: orgData?.id,
+          role: "admin",
+          subscriptionTier: "starter"
+        });
+
+        await storage.createInfrastructureLog({
+          component: "IdentityOnboarding",
+          event: "ENTERPRISE_HUB_INITIALIZED",
+          status: "resolved",
+          actionTaken: `Success: Provisioned Org, Client, and Workspace for ${email}`
+        });
+
+      } catch (provisionErr: any) {
+        console.error(`[AUTH-DIAG] Partial Provisioning Failure for ${data.user.id}:`, provisionErr.message);
+        await storage.createInfrastructureLog({
+          component: "IdentityOnboarding",
+          event: "PARTIAL_PROVISIONING_DETECTED",
+          status: "analyzing",
+          actionTaken: `Partial failure for ${email}: ${provisionErr.message}. Self-healing will occur on first login.`
+        });
+        // We don't throw here — the user is created in Auth, and login will self-heal.
+      }
+
+      res.status(201).json({ message: "Registration successful. Welcome to the Enterprise Intelligence Hub." });
     } catch (err: any) {
+      console.error(`[AUTH-DIAG] Registration Critical Error:`, err.message);
       res.status(400).json({ message: err.message });
     }
   });
@@ -91,31 +137,75 @@ export function registerAuthRoutes(app: Express): void {
       // 84. Sync with local DB (Harmonized Onboarding)
       let localUser = await authStorage.getUser(data.user.id).catch(() => null);
 
-      if (!localUser || !localUser.clientId) {
-        console.log(`[AUTH-DIAG] Provisioning required for user ${data.user.id}`);
-        // First login or missing org — Provision Client -> Workspace -> User
-        const client = await storage.createClient({
-          companyName: `${data.user.user_metadata?.first_name || "New"}'s Enterprise Hub`,
-          industry: "Professional Services",
-          contactName: `${data.user.user_metadata?.first_name || "Enterprise"} ${data.user.user_metadata?.last_name || "User"}`,
-          contactEmail: data.user.email!,
-          status: "active"
-        });
+      if (!localUser || !localUser.organizationId || !localUser.clientId) {
+        console.log(`[AUTH-DIAG] Self-Healing Identity for user ${data.user.id}`);
+        // Missing critical Enterprise linkage — provision missing assets
+        try {
+          const userMeta = data.user.user_metadata || {};
+          const firstName = userMeta.first_name || "Enterprise";
+          const lastName = userMeta.last_name || "User";
+          
+          let organizationId = localUser?.organizationId;
+          let clientId = localUser?.clientId;
 
-        await storage.createWorkspace({
-          name: "Main Workspace",
-          ownerId: data.user.id,
-          plan: "enterprise"
-        });
+          if (!organizationId) {
+            const orgName = `${firstName}'s Organization`;
+            const slug = `${email.split('@')[0]}-${Date.now().toString(36)}`;
+            
+            const { data: orgData, error: orgError } = await adminClient.from('organizations')
+              .insert([{ name: orgName, slug, tier: 'free' }])
+              .select().single();
+            
+            if (orgError) throw new Error(`Healing: Org creation failed: ${orgError.message}`);
+            organizationId = orgData.id;
+          }
 
-        localUser = await authStorage.upsertUser({
-          id: data.user.id,
-          email: data.user.email!,
-          firstName: data.user.user_metadata?.first_name,
-          lastName: data.user.user_metadata?.last_name,
-          clientId: client.id,
-          role: "admin"
-        });
+          if (!clientId) {
+            const client = await storage.createClient({
+              companyName: `${firstName}'s Enterprise Hub`,
+              industry: "Professional Services",
+              contactName: `${firstName} ${lastName}`,
+              contactEmail: data.user.email!,
+              status: "active"
+            });
+            clientId = client.id;
+
+            await storage.createWorkspace({
+              name: "Main Workspace",
+              ownerId: data.user.id,
+              plan: "starter"
+            });
+          }
+
+          localUser = await authStorage.upsertUser({
+            id: data.user.id,
+            email: data.user.email!,
+            firstName,
+            lastName,
+            clientId,
+            organizationId,
+            role: localUser?.role || "admin",
+            subscriptionTier: "starter"
+          });
+
+          await storage.createInfrastructureLog({
+            component: "IdentityHealing",
+            event: "IDENTITY_REPAIRED",
+            status: "resolved",
+            actionTaken: `Healed missing organization/client for user ${email}`
+          });
+          
+          console.log(`[AUTH-DIAG] Identity Successfully Healed for ${email}`);
+        } catch (healErr: any) {
+          console.error(`[AUTH-DIAG] Identity Healing Failed:`, healErr.message);
+          // Don't block login, but log the critical failure
+          await storage.createInfrastructureLog({
+            component: "IdentityHealing",
+            event: "HEALING_FAILURE",
+            status: "critical",
+            actionTaken: `Critical: Could not heal identity for ${email}: ${healErr.message}`
+          });
+        }
       }
 
       res.json(localUser);
@@ -156,6 +246,20 @@ export function registerAuthRoutes(app: Express): void {
       if (err) return res.status(500).json({ message: "Logout failed" });
       res.json({ message: "Logout successful" });
     });
+  });
+
+  // API Key Rotation
+  app.post("/api/auth/api-key", async (req: any, res) => {
+    try {
+      if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+      const newApiKey = `sk_live_${randomUUID().replace(/-/g, '')}`;
+      const updatedUser = await storage.updateUser(req.user.id, {
+        apiKey: newApiKey
+      });
+      res.json({ message: "API key rotated", apiKey: newApiKey });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // --- WEBAUTHN / PASSKEY MFA ---
