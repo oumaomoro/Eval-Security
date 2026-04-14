@@ -10,7 +10,10 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "deploy": "node deploy_all.js",
-    "deploy:frontend": "npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true"
+    "deploy:frontend": "npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true",
+    "test:e2e": "playwright test tests/auth.spec.ts --reporter=list",
+    "test:e2e:headed": "playwright test tests/auth.spec.ts --headed",
+    "test:e2e:report": "playwright show-report"
   },
   "engines": {
     "node": "22.x"
@@ -103,6 +106,7 @@
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",

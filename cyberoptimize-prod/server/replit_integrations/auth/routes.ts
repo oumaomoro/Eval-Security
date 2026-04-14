@@ -116,6 +116,114 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  // --- SSO / GOOGLE AUTH ---
+  app.get("/api/auth/google", async (req: any, res) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${process.env.FRONTEND_URL || 'https://costloci.com'}/api/auth/google/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
+      });
+      if (error) throw error;
+      res.redirect(data.url);
+    } catch (err: any) {
+      console.error(`[AUTH-DIAG] Google SSO Initiation Error:`, err.message);
+      res.status(500).json({ message: "SSO Initiation Failed" });
+    }
+  });
+
+  app.get("/api/auth/google/callback", async (req: any, res) => {
+    const code = req.query.code as string;
+    const error = req.query.error as string;
+
+    if (error) {
+      console.error(`[AUTH-DIAG] Google Auth Callback Error:`, error);
+      return res.redirect("/auth?error=" + encodeURIComponent(error));
+    }
+
+    if (!code) {
+      return res.redirect("/auth");
+    }
+
+    try {
+      const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+      if (sessionError) throw sessionError;
+
+      const { user, session } = data;
+      
+      // Store session
+      if (req.session) {
+        req.session.supabase_token = session.access_token;
+        req.session.expires_at = session.expires_at;
+      }
+
+      console.log(`[AUTH-DIAG] Google SSO Success for ${user.email}. Running Identity Healing...`);
+
+      // 1. Identity Healing / Provisioning
+      let localUser = await authStorage.getUser(user.id).catch(() => null);
+
+      if (!localUser || !localUser.organizationId || !localUser.clientId) {
+        const userMeta = user.user_metadata || {};
+        const firstName = userMeta.full_name?.split(' ')[0] || userMeta.first_name || "Enterprise";
+        const lastName = userMeta.full_name?.split(' ').slice(1).join(' ') || userMeta.last_name || "User";
+        
+        let organizationId = localUser?.organizationId;
+        let clientId = localUser?.clientId;
+
+        if (!organizationId) {
+          const orgName = `${firstName}'s Organization`;
+          const slug = `${user.email!.split('@')[0]}-${Date.now().toString(36)}`;
+          
+          const { data: orgData, error: orgError } = await adminClient.from('organizations')
+            .insert([{ name: orgName, slug, tier: 'free' }])
+            .select().single();
+          
+          if (orgError) console.error(`[HEALING] Org creation failed:`, orgError.message);
+          else organizationId = orgData.id;
+        }
+
+        if (!clientId) {
+          const client = await storage.createClient({
+            companyName: `${firstName}'s Enterprise Hub`,
+            industry: "Professional Services",
+            contactName: `${firstName} ${lastName}`,
+            contactEmail: user.email!,
+            status: "active"
+          });
+          clientId = client.id;
+
+          await storage.createWorkspace({
+            name: "Main Workspace",
+            ownerId: user.id,
+            plan: "starter"
+          });
+        }
+
+        localUser = await authStorage.upsertUser({
+          id: user.id,
+          email: user.email!,
+          firstName,
+          lastName,
+          clientId,
+          organizationId,
+          role: localUser?.role || "admin",
+          subscriptionTier: "starter"
+        });
+      }
+
+      // Redirect to dashboard
+      res.redirect("/");
+    } catch (err: any) {
+      console.error(`[AUTH-DIAG] Google SSO Callback Processing Error:`, err.message);
+      res.redirect("/auth?error=callback_failed");
+    }
+  });
+
   // Login
   app.post("/api/auth/login", async (req: any, res) => {
     try {
