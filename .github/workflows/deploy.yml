@@ -99,9 +99,40 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 3: Deploy Frontend → Cloudflare Pages (DISABLED)
-  # Frontend is currently served and distributed via Vercel Edge.
+  # JOB 3: Deploy Frontend → Cloudflare Pages
+  # Runs in parallel with backend deploy after build succeeds.
   # ─────────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend → Cloudflare Pages
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Verify frontend output exists
+        run: |
+          if [ ! -d "dist/public" ]; then
+            echo "❌ dist/public missing from artifact"
+            exit 1
+          fi
+
+      - name: Install Wrangler CLI
+        run: npm install -g wrangler
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler pages deploy dist/public \
+            --project-name=costloci-frontend \
+            --branch=main \
+            --commit-dirty=true
+          echo "✅ Frontend deployed to Cloudflare Pages."
 
   # ─────────────────────────────────────────────────────────────
   # JOB 4: Deploy Backend → Vercel
