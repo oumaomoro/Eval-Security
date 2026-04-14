@@ -3,11 +3,10 @@ name: Deploy Costloci Enterprise
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  VERCEL_ORG_ID: "team_e3jJx67pD2yUoOEFo8QBBt2q"
+  VERCEL_PROJECT_ID: "prj_RQI3dWgrvHuw31ciB5GGaEmCOSEY"
 
 # Prevent concurrent deployments
 concurrency:
@@ -30,8 +29,6 @@ jobs:
           MISSING=()
 
           [[ -z "${{ secrets.VERCEL_TOKEN }}"              ]] && MISSING+=("VERCEL_TOKEN")
-          [[ -z "${{ secrets.VERCEL_ORG_ID }}"             ]] && MISSING+=("VERCEL_ORG_ID")
-          [[ -z "${{ secrets.VERCEL_BACKEND_PROJECT_ID }}" ]] && MISSING+=("VERCEL_BACKEND_PROJECT_ID")
           [[ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}"      ]] && MISSING+=("CLOUDFLARE_API_TOKEN")
           [[ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"     ]] && MISSING+=("CLOUDFLARE_ACCOUNT_ID")
           [[ -z "${{ secrets.VITE_API_URL }}"              ]] && MISSING+=("VITE_API_URL")
@@ -155,8 +152,6 @@ jobs:
       - name: Pull Vercel Environment Info
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
         run: |
           vercel pull \
             --yes \
@@ -167,8 +162,6 @@ jobs:
       - name: Deploy to Vercel Production
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
         run: |
           vercel deploy \
             --prod \
