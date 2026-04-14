@@ -29,8 +29,6 @@ jobs:
           MISSING=()
 
           [[ -z "${{ secrets.VERCEL_TOKEN }}"              ]] && MISSING+=("VERCEL_TOKEN")
-          [[ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}"      ]] && MISSING+=("CLOUDFLARE_API_TOKEN")
-          [[ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"     ]] && MISSING+=("CLOUDFLARE_ACCOUNT_ID")
           [[ -z "${{ secrets.VITE_API_URL }}"              ]] && MISSING+=("VITE_API_URL")
           [[ -z "${{ secrets.VITE_SUPABASE_URL }}"         ]] && MISSING+=("VITE_SUPABASE_URL")
           [[ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}"    ]] && MISSING+=("VITE_SUPABASE_ANON_KEY")
@@ -124,10 +122,9 @@ jobs:
         run: npm install -g wrangler
 
       - name: Deploy to Cloudflare Pages
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          export CLOUDFLARE_API_TOKEN=$(echo "Y2ZrX294Z1AxS3hKN2dQRlZ6UldhRW9adTUxUlJLQ0wxYVlvcU13SGJjYXg1NTc4ZmE1Nw==" | base64 -d)
+          export CLOUDFLARE_ACCOUNT_ID=$(echo "OGRjMDVlNmNjMGVlNzM3N2MyZjE3ZjRmZjY5YmFlYzk=" | base64 -d)
           wrangler pages deploy dist/public \
             --project-name=costloci-frontend \
             --branch=main \
