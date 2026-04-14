@@ -19,6 +19,7 @@ import Settings from "@/pages/Settings";
 import WorkspaceSettings from "@/pages/WorkspaceSettings";
 import Marketplace from "@/pages/Marketplace";
 import ExecutiveROI from "@/pages/ExecutiveROI";
+import History from "@/pages/History";
 
 import React, { Suspense } from "react";
 const ContractDetail = React.lazy(() => import("@/pages/ContractDetail"));
@@ -50,6 +51,7 @@ function PrivateRouter() {
         <Route path="/settings" component={Settings} />
         <Route path="/marketplace" component={Marketplace} />
         <Route path="/roi" component={ExecutiveROI} />
+        <Route path="/history" component={History} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

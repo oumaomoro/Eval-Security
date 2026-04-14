@@ -64,8 +64,7 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
       role,
       firstName,
       lastName,
-      clientId,
-      organizationId: orgId
+      clientId
     });
 
     res.status(201).json(newUser);
@@ -83,10 +82,9 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
 // PUT /api/org/member - Update a member's role
 router.put("/api/org/member", isAuthenticated, async (req: any, res) => {
   try {
-    const orgId = req.user.organizationId;
     const clientId = req.user.clientId;
 
-    if (!orgId && !clientId) {
+    if (!clientId) {
       return res.status(400).json({ message: "Unauthorized" });
     }
 
@@ -97,8 +95,8 @@ router.put("/api/org/member", isAuthenticated, async (req: any, res) => {
       return res.status(404).json({ message: "Member not found" });
     }
 
-    // Security check: Match either ID anchor
-    const isMemberOfOrg = (orgId && targetUser.organizationId === orgId) || (clientId && targetUser.clientId === clientId);
+    // Security check: Match Client ID anchor
+    const isMemberOfOrg = clientId && targetUser.clientId === clientId;
     if (!isMemberOfOrg) {
       return res.status(404).json({ message: "Member not found in your organization" });
     }

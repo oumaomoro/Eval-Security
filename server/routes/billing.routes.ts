@@ -1,22 +1,26 @@
 import { Router } from "express";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { storage } from "../storage";
-import crypto from "crypto";
-// import fetch from "node-fetch";
 
 const billingRouter = Router();
 
-// In a real-world scenario, you would authenticate with PayPal using client_id and secret
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "AWIX4jl-Ok4RWEIoZQXPaWMBuJVrwc7FMbCPqzhLQ1ZRGpkKWTY20Ul755zOQd75TdFJfMQV682OrtAg";
-const PAYPAL_SECRET = process.env.PAYPAL_SECRET || "EO4h4hE_qGu-v9O1NtftHCFcG40q6fMoZHZ0m5vWWnzdfDSkjshskvUZTqBZGtbTqIGvaHWos1YVqPCw";
-const PAYPAL_API_BASE = "https://api-m.paypal.com"; // LIVE Endpoints, NOT sandbox
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
+const PAYPAL_API_BASE = "https://api-m.paypal.com";
 
-// Plans IDs (to be created in PayPal Dashboard)
 const PLANS = {
-  starter: process.env.PAYPAL_STARTER_PLAN_ID || "P-STARTER123",
-  pro: process.env.PAYPAL_PRO_PLAN_ID || "P-PRO123",
-  enterprise: process.env.PAYPAL_ENTERPRISE_PLAN_ID || "P-ENTERPRISE123"
+  starter: process.env.PAYPAL_STARTER_PLAN_ID,
+  pro: process.env.PAYPAL_PRO_PLAN_ID,
+  enterprise: process.env.PAYPAL_ENTERPRISE_PLAN_ID
 };
+
+// Validate PayPal configuration at module load time
+if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
+  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_SECRET not set — checkout will fail.");
+}
+if (!PLANS.starter || !PLANS.pro || !PLANS.enterprise) {
+  console.warn("[BILLING] WARNING: One or more PAYPAL_*_PLAN_ID env vars not set — subscription creation will fail.");
+}
 
 /**
  * Generate a PayPal access token
@@ -42,9 +46,12 @@ async function getPayPalAccessToken() {
  */
 billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, res) => {
   try {
-    const { planType } = req.body; // 'starter', 'pro', or 'enterprise'
+    const { planType } = req.body;
     const planId = PLANS[planType as keyof typeof PLANS];
     if (!planId) return res.status(400).json({ message: "Invalid plan selected" });
+    if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
+      return res.status(503).json({ message: "Billing is not yet configured on this server. Please contact support." });
+    }
 
     const accessToken = await getPayPalAccessToken();
 

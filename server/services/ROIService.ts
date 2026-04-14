@@ -74,8 +74,8 @@ export class ROIService {
 
   static getPlanPrice(tier: string) {
     if (tier === 'enterprise') return 999;
-    if (tier === 'pro') return 399;
-    if (tier === 'starter') return 149;
-    return 199;
+    if (tier === 'pro') return 299;
+    if (tier === 'starter') return 99;
+    return 99;
   }
 }

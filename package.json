@@ -10,10 +10,7 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "deploy": "node deploy_all.js",
-    "deploy:frontend": "npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true",
-    "test:e2e": "playwright test tests/auth.spec.ts --reporter=list",
-    "test:e2e:headed": "playwright test tests/auth.spec.ts --headed",
-    "test:e2e:report": "playwright show-report"
+    "deploy:frontend": "npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true"
   },
   "engines": {
     "node": "22.x"
@@ -54,6 +51,7 @@
     "@simplewebauthn/types": "^12.0.0",
     "@supabase/supabase-js": "^2.101.1",
     "@tanstack/react-query": "^5.60.5",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/memoizee": "^0.4.12",
     "@types/multer": "^2.0.0",
     "@types/pdf-parse": "^1.1.5",
@@ -72,6 +70,7 @@
     "express-session": "^1.19.0",
     "framer-motion": "^11.18.2",
     "input-otp": "^1.4.2",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.453.0",
     "memoizee": "^0.4.17",

@@ -11,6 +11,8 @@ import { type InsertInfrastructureLog } from "@shared/schema";
 export class AutonomicEngine {
   private static heartbeatInterval: NodeJS.Timeout | null = null;
   private static pulseCount = 0;
+  private static lastLatencyMs = 0;
+  private static lastPulseAt: string | null = null;
 
   static start() {
     if (this.heartbeatInterval) return;
@@ -40,6 +42,8 @@ export class AutonomicEngine {
       // 1. Perform Postgres Health Check (via REST)
       const { error: pgError } = await supabase.from("profiles").select("count", { count: "exact", head: true });
       const postgresLatency = Date.now() - start;
+      this.lastLatencyMs = postgresLatency;
+      this.lastPulseAt = new Date().toISOString();
 
       // 2. Billing & Telemetry Resilience (Phase 2)
       // We wrap this specifically because telemetry tables are often missing in new envs.
@@ -89,8 +93,8 @@ export class AutonomicEngine {
     return {
       status: "healthy",
       pulseCount: this.pulseCount,
-      lastPulse: new Date().toISOString(),
-      postgresLatency: "sampled",
+      lastPulse: this.lastPulseAt || new Date().toISOString(),
+      postgresLatency: `${this.lastLatencyMs}ms`,
       version: "2.1.0-sovereign"
     };
   }

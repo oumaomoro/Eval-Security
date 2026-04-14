@@ -428,6 +428,7 @@ export const api = {
         200: z.object({
           subscriptionTier: z.string().optional(),
           contractsCount: z.number().optional(),
+          activeStandards: z.array(z.string()).optional(),
           totalContracts: z.number(),
           totalAnnualCost: z.number(),
           totalPotentialSavings: z.number(),

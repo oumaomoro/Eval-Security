@@ -17,10 +17,14 @@ import governanceRouter from "./routes/governance.routes.js";
 import regulatoryRouter from "./routes/regulatory.routes.js";
 import integrationsRouter from "./routes/integrations.routes.js";
 import intelligenceRouter from "./routes/intelligence.routes.js";
+import signnowRouter from "./routes/signnow.routes.js";
+import marketplaceRouter from "./routes/marketplace.routes.js";
 import { telemetryMiddleware } from "./middleware/telemetry";
 
 import multer from "multer";
 import pdf from "pdf-parse";
+import fs from "fs";
+import path from "path";
 import memoize from "memoizee";
 import { requireRole } from "./middleware/rbac";
 import { requireWorkspacePermission } from "./middleware/workspace-rbac";
@@ -31,7 +35,20 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Setup permanent storage for contracts
+const storageDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(storageDir)) {
+  fs.mkdirSync(storageDir, { recursive: true });
+}
+const diskStorage = multer.diskStorage({
+  destination: (req, res, cb) => cb(null, storageDir),
+  filename: (req, file, cb) => {
+    // Generate a secure, unique filename to avoid collision
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  }
+});
+const upload = multer({ storage: diskStorage });
 
 // Cache AI responses 60 min to reduce latency and cost
 const cachedCompletion = memoize(
@@ -66,6 +83,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use(regulatoryRouter);
   app.use(intelligenceRouter);
   app.use(integrationsRouter);
+  app.use(signnowRouter);
+  app.use(marketplaceRouter);
 
 
   // Rate limiting for mutations
@@ -226,7 +245,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       if (!checkContractLimit(req, res)) return;
 
-      const pdfData = await pdf(req.file.buffer);
+      // Read file securely from disk for AI extraction
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const pdfData = await pdf(fileBuffer);
 
       const extractedText = pdfData.text.substring(0, 15000);
 
@@ -269,7 +290,7 @@ Analyze the contract text and return JSON with exactly these fields:
         category: analysis.category || "General Provider",
         annualCost: analysis.annualCost || 0,
         status: analysis.vendorName === "Pending AI Review" ? "pending" : "active",
-        fileUrl: `uploads/${req.file.originalname}`,
+        fileUrl: `uploads/${req.file.filename}`, // Save the actual disk filename
         aiAnalysis: {
           riskScore: analysis.riskScore,
           riskFlags: analysis.riskFlags || [],
@@ -348,7 +369,7 @@ Analyze the contract text and return JSON with exactly these fields:
     }
   });
 
-  app.get("/api/clause-library", async (_req, res) => {
+  app.get("/api/clause-library", isAuthenticated, async (_req, res) => {
     try {
       const library = await storage.getClauseLibrary();
       res.json(library);

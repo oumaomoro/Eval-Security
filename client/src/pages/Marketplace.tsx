@@ -21,6 +21,7 @@ import {
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboardStats } from "@/hooks/use-dashboard";
 
 const PLAYBOOKS = [
   {
@@ -77,13 +78,32 @@ const PLAYBOOKS = [
 
 export default function Marketplace() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("all");
+  const { data: stats } = useDashboardStats();
+  const activeStandards = stats?.activeStandards || [];
 
-  const handleActivate = (name: string) => {
-    toast({
-      title: "Playbook Activated",
-      description: `${name} has been merged into your active governance engine.`,
-    });
+  const handleActivate = async (name: string) => {
+    try {
+      const response = await fetch("/api/marketplace/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ standardName: name }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update governance engine");
+
+      const isActivating = !activeStandards.includes(name);
+
+      toast({
+        title: isActivating ? "Playbook Activated" : "Playbook Deactivated",
+        description: `${name} has been ${isActivating ? "merged into" : "removed from"} your active governance engine.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Sync Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -117,58 +137,62 @@ export default function Marketplace() {
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pt-4">
-          {PLAYBOOKS.map((pb, idx) => (
-            <motion.div
-              key={pb.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-            >
-              <Card className="bg-slate-950/50 border-slate-900 hover:border-primary/50 transition-all group relative overflow-hidden rounded-3xl h-full flex flex-col">
-                <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="rounded-full bg-slate-900/50 backdrop-blur-md">
-                        <Heart className="w-4 h-4" />
-                    </Button>
-                </div>
-                
-                <CardHeader>
-                  <div className="mb-4 bg-slate-900/50 w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800 group-hover:scale-110 transition-transform duration-500">
-                    {pb.icon}
+          {PLAYBOOKS.map((pb, idx) => {
+            const isActive = activeStandards.includes(pb.name);
+            return (
+              <motion.div
+                key={pb.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+              >
+                <Card className="bg-slate-950/50 border-slate-900 hover:border-primary/50 transition-all group relative overflow-hidden rounded-3xl h-full flex flex-col">
+                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="rounded-full bg-slate-900/50 backdrop-blur-md">
+                          <Heart className="w-4 h-4" />
+                      </Button>
                   </div>
-                  <div className="space-y-1">
-                    <CardTitle className="text-xl font-black text-white italic tracking-tight uppercase">{pb.name}</CardTitle>
-                    <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md">
-                        {pb.category}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4 flex-1">
-                  <p className="text-xs text-slate-400 font-bold leading-relaxed">{pb.description}</p>
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {pb.tags.map(tag => (
-                        <span key={tag} className="text-[9px] font-black text-slate-500 uppercase tracking-tighter bg-slate-900 px-2 py-1 rounded-md border border-slate-800">
-                            #{tag}
-                        </span>
-                    ))}
-                  </div>
-                </CardContent>
+                  
+                  <CardHeader>
+                    <div className="mb-4 bg-slate-900/50 w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800 group-hover:scale-110 transition-transform duration-500">
+                      {pb.icon}
+                    </div>
+                    <div className="space-y-1">
+                      <CardTitle className="text-xl font-black text-white italic tracking-tight uppercase">{pb.name}</CardTitle>
+                      <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md">
+                          {pb.category}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-4 flex-1">
+                    <p className="text-xs text-slate-400 font-bold leading-relaxed">{pb.description}</p>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {pb.tags.map(tag => (
+                          <span key={tag} className="text-[9px] font-black text-slate-500 uppercase tracking-tighter bg-slate-900 px-2 py-1 rounded-md border border-slate-800">
+                              #{tag}
+                          </span>
+                      ))}
+                    </div>
+                  </CardContent>
 
-                <CardFooter className="border-t border-slate-900 p-6 flex items-center justify-between bg-slate-900/10">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pricing</span>
-                    <span className="text-sm font-black text-white italic tracking-tight">{pb.price}</span>
-                  </div>
-                  <Button 
-                    onClick={() => handleActivate(pb.name)}
-                    className="bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-tighter italic h-10 px-6 rounded-xl shadow-lg shadow-primary/10 transition-all hover:translate-x-1"
-                  >
-                    Activate <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          ))}
+                  <CardFooter className="border-t border-slate-900 p-6 flex items-center justify-between bg-slate-900/10">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pricing</span>
+                      <span className="text-sm font-black text-white italic tracking-tight">{pb.price}</span>
+                    </div>
+                    <Button 
+                      onClick={() => handleActivate(pb.name)}
+                      variant={isActive ? "secondary" : "default"}
+                      className={`font-black uppercase tracking-tighter italic h-10 px-6 rounded-xl shadow-lg transition-all hover:translate-x-1 ${isActive ? "bg-slate-800 text-slate-400" : "bg-primary text-white shadow-primary/10"}`}
+                    >
+                      {isActive ? "Deactivate" : "Activate"} <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            );
+          })}
         </section>
 
         <section className="bg-blue-600 rounded-[2.5rem] p-12 relative overflow-hidden mt-12 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">

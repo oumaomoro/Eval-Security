@@ -21,7 +21,6 @@ class AuthRESTStorage implements IAuthStorage {
       lastName: row.last_name,
       role: row.role,
       clientId: row.client_id,
-      organizationId: row.organization_id, // Added for Phase 25
       profileImageUrl: row.profile_image_url,
       subscriptionTier: row.subscription_tier ?? "starter",
       contractsCount: row.contracts_count ?? 0,
@@ -33,7 +32,7 @@ class AuthRESTStorage implements IAuthStorage {
   async getUser(id: string): Promise<User | undefined> {
     const { data, error } = await adminClient
       .from("profiles")
-      .select("id, email, first_name, last_name, role, client_id, organization_id, profile_image_url, subscription_tier, contracts_count, api_key, updated_at")
+      .select("id, email, first_name, last_name, role, client_id, profile_image_url, subscription_tier, contracts_count, api_key, updated_at")
       .eq("id", id)
       .maybeSingle();
 
@@ -54,7 +53,6 @@ class AuthRESTStorage implements IAuthStorage {
       last_name: userData.lastName,
       role: userData.role,
       client_id: userData.clientId,
-      organization_id: userData.organizationId, // Added for Phase 25
       subscription_tier: userData.subscriptionTier || "starter",
       contracts_count: userData.contractsCount || 0,
       api_key: userData.apiKey,
@@ -63,11 +61,11 @@ class AuthRESTStorage implements IAuthStorage {
 
 
 
-    console.log(`[AUTH-DIAG] upsertUser Payload: id=${userData.id} clientId=${userData.clientId} orgId=${userData.organizationId}`);
+    console.log(`[AUTH-DIAG] upsertUser Payload: id=${userData.id} clientId=${userData.clientId}`);
     const { data, error } = await adminClient
       .from("profiles")
       .upsert(profilePayload, { onConflict: 'id' })
-      .select("id, email, first_name, last_name, role, client_id, organization_id, profile_image_url, subscription_tier, contracts_count, api_key, updated_at")
+      .select("id, email, first_name, last_name, role, client_id, profile_image_url, subscription_tier, contracts_count, api_key, updated_at")
       .single();
 
 

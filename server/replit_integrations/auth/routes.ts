@@ -4,6 +4,7 @@ import { storage } from "../../storage";
 import { authStorage } from "./storage";
 import { WebAuthnService } from "../../services/WebAuthn";
 import { randomUUID } from "crypto";
+import jwt from "jsonwebtoken";
 
 export function registerAuthRoutes(app: Express): void {
   // Get current authenticated user
@@ -53,15 +54,8 @@ export function registerAuthRoutes(app: Express): void {
 
       // 3. Enterprise Provisioning (Org -> Client -> Workspace)
       try {
-        const orgName = `${firstName}'s Organization`;
-        const slug = `${email.split('@')[0]}-${Date.now().toString(36)}`;
-        
-        console.log(`[AUTH-DIAG] Provisioning Org via Admin Client: ${orgName} (slug: ${slug})`);
-        const { data: orgData, error: orgError } = await adminClient.from('organizations')
-          .insert([{ name: orgName, slug, tier: 'free' }])
-          .select().single();
-        
-        if (orgError) throw new Error(`Organization provisioning failed: ${orgError.message}`);
+        // Note: Organization hierarchy has been unified into Workspaces/Clients (Phase 25)
+        // No need to create a legacy 'organization' record.
 
         console.log(`[AUTH-DIAG] Provisioning Client...`);
         const client = await storage.createClient({
@@ -86,7 +80,6 @@ export function registerAuthRoutes(app: Express): void {
           firstName,
           lastName,
           clientId: client.id,
-          organizationId: orgData?.id,
           role: "admin",
           subscriptionTier: "starter"
         });
@@ -137,7 +130,7 @@ export function registerAuthRoutes(app: Express): void {
       // 84. Sync with local DB (Harmonized Onboarding)
       let localUser = await authStorage.getUser(data.user.id).catch(() => null);
 
-      if (!localUser || !localUser.organizationId || !localUser.clientId) {
+      if (!localUser || !localUser.clientId) {
         console.log(`[AUTH-DIAG] Self-Healing Identity for user ${data.user.id}`);
         // Missing critical Enterprise linkage — provision missing assets
         try {
@@ -145,20 +138,10 @@ export function registerAuthRoutes(app: Express): void {
           const firstName = userMeta.first_name || "Enterprise";
           const lastName = userMeta.last_name || "User";
           
-          let organizationId = localUser?.organizationId;
           let clientId = localUser?.clientId;
 
-          if (!organizationId) {
-            const orgName = `${firstName}'s Organization`;
-            const slug = `${email.split('@')[0]}-${Date.now().toString(36)}`;
-            
-            const { data: orgData, error: orgError } = await adminClient.from('organizations')
-              .insert([{ name: orgName, slug, tier: 'free' }])
-              .select().single();
-            
-            if (orgError) throw new Error(`Healing: Org creation failed: ${orgError.message}`);
-            organizationId = orgData.id;
-          }
+          // Note: Organization hierarchy has been unified into Workspaces/Clients (Phase 25)
+          // No need to create a legacy 'organization' record.
 
           if (!clientId) {
             const client = await storage.createClient({
@@ -183,7 +166,6 @@ export function registerAuthRoutes(app: Express): void {
             firstName,
             lastName,
             clientId,
-            organizationId,
             role: localUser?.role || "admin",
             subscriptionTier: "starter"
           });
@@ -310,8 +292,31 @@ export function registerAuthRoutes(app: Express): void {
       const verification = await WebAuthnService.verifyAuthentication(userId, req.body, challenge);
       
       if (verification.verified) {
-        // Here we would also handle the login session creation
-        res.json({ verified: true, message: "Biometric verification successful" });
+        const user = await storage.getUser(userId);
+        if (!user) throw new Error("User verification succeeded but profile not found");
+
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) throw new Error("JWT_SECRET not configured on server");
+
+        // Sign a persistent token for the session
+        // Supabase expects specific claims for its auth getUser() to work
+        const payload = {
+          sub: user.id,
+          email: user.email,
+          role: "authenticated",
+          iss: "supabase", // Impersonate Supabase issuer for stateless setupAuth
+        };
+
+        const token = jwt.sign(payload, jwtSecret, { expiresIn: '7d' });
+
+        if (req.session) {
+          req.session.supabase_token = token;
+          req.session.expires_at = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
+          delete req.session.currentChallenge;
+          delete req.session.pendingAuthUser;
+        }
+
+        res.json({ verified: true, token, message: "Biometric verification successful" });
       } else {
         res.status(401).json({ verified: false, message: "Verification failed" });
       }

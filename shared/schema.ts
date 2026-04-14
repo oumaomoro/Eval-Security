@@ -20,6 +20,7 @@ export const workspaces = pgTable("workspaces", {
   webhookEnabled: boolean("webhook_enabled").default(false),
   apiUsageCount: integer("api_usage_count").default(0),
   apiUsageResetDate: timestamp("api_usage_reset_date"),
+  activeStandards: jsonb("active_standards").default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -292,7 +293,7 @@ export const infrastructureLogs = pgTable("infrastructure_logs", {
 
 export const billingTelemetry = pgTable("billing_telemetry", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id),
   metricType: text("metric_type").notNull(), // api_call, storage_gb, audit_runtime
   value: doublePrecision("value").notNull(),
   cost: doublePrecision("cost"),

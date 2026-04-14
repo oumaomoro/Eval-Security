@@ -191,6 +191,7 @@ export class SupabaseRESTStorage implements IStorage {
       webhookEnabled: d.webhook_enabled,
       apiUsageCount: d.api_usage_count,
       apiUsageResetDate: d.api_usage_reset_date ? new Date(d.api_usage_reset_date) : null,
+      activeStandards: d.active_standards || [],
       createdAt: d.created_at ? new Date(d.created_at) : new Date()
     };
   }
@@ -204,7 +205,6 @@ export class SupabaseRESTStorage implements IStorage {
       lastName: row.last_name,
       role: row.role,
       clientId: row.client_id,
-      organizationId: row.organization_id,
       profileImageUrl: row.profile_image_url,
       subscriptionTier: row.subscription_tier,
       contractsCount: row.contracts_count,
@@ -511,14 +511,17 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- DASHBOARD & ANALYTICS ---
   async getDashboardStats(clientId?: number, userId?: string): Promise<any> {
-    const [contracts, risks, savings, users, logs, infraLogs] = await Promise.all([
+    const [contracts, risks, savings, users, logs, infraLogs, workspace] = await Promise.all([
       this.getContracts({ clientId }),
       this.getRisks(),
       this.getSavingsOpportunities(),
       supabase.from("profiles").select("*").then(r => r.data || []),
       this.getAuditLogs(clientId),
-      this.getInfrastructureLogs()
+      this.getInfrastructureLogs(),
+      clientId ? this.getWorkspace(clientId) : Promise.resolve(null)
     ]);
+
+    const activeStandards = Array.isArray(workspace?.activeStandards) ? workspace.activeStandards : [];
 
     const totalContracts = contracts.length;
     const totalAnnualCost = contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0);
@@ -559,6 +562,7 @@ export class SupabaseRESTStorage implements IStorage {
     return {
       subscriptionTier,
       contractsCount,
+      activeStandards,
       totalContracts,
       totalAnnualCost,
       totalPotentialSavings,
@@ -966,7 +970,6 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.lastName !== undefined) payload.last_name = updates.lastName;
     if (updates.role !== undefined) payload.role = updates.role;
     if (updates.clientId !== undefined) payload.client_id = updates.clientId;
-    if (updates.organizationId !== undefined) payload.organization_id = updates.organizationId;
     if (updates.profileImageUrl !== undefined) payload.profile_image_url = updates.profileImageUrl;
     if (updates.subscriptionTier !== undefined) payload.subscription_tier = updates.subscriptionTier;
     if (updates.contractsCount !== undefined) payload.contracts_count = updates.contractsCount;
@@ -992,13 +995,37 @@ export class SupabaseRESTStorage implements IStorage {
           first_name: user.firstName,
           last_name: user.lastName,
           role: user.role,
-          client_id: user.clientId,
-          organization_id: user.organizationId
+          client_id: user.clientId
         })
         .select("*")
         .single()
     );
     return this.mapProfileToUser(data);
+  }
+
+  async getWorkspace(id: number): Promise<Workspace | undefined> {
+    const data = await this.handleResponse<any>(
+      supabase.from("workspaces").select("*").eq("id", id).single()
+    );
+    return data ? this.mapWorkspace(data) : undefined;
+  }
+
+  async updateWorkspace(id: number, workspace: Partial<InsertWorkspace & { activeStandards: any }>): Promise<Workspace> {
+    const updateData: any = { ...workspace };
+    // Map camelCase to snake_case if necessary
+    if (workspace.activeStandards) {
+        updateData.active_standards = workspace.activeStandards;
+        delete updateData.activeStandards;
+    }
+
+    const data = await this.handleResponse<any>(
+      supabase.from("workspaces")
+        .update(updateData)
+        .eq("id", id)
+        .select("*")
+        .single()
+    );
+    return this.mapWorkspace(data);
   }
 
   // --- WORKSPACES ---

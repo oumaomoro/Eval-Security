@@ -51,7 +51,6 @@ export async function setupAuth(app: Express) {
         firstName: localUser?.firstName ?? user.user_metadata?.first_name ?? "",
         lastName: localUser?.lastName ?? user.user_metadata?.last_name ?? "",
         clientId: localUser?.clientId ?? null,
-        organizationId: localUser?.organizationId ?? null, // Added for Phase 25
         role: localUser?.role ?? "viewer",
         subscriptionTier: localUser?.subscriptionTier ?? "starter",
         contractsCount: localUser?.contractsCount ?? 0,

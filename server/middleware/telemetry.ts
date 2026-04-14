@@ -18,8 +18,8 @@ export async function telemetryMiddleware(req: Request, res: Response, next: Nex
     const status = res.statusCode;
     requestCount++;
 
-    // Threshold-based logging to prevent DB bloat
-    if (requestCount % 100 === 0 || status >= 400) {
+    // Log every 25th request or any error for visibility in low/high traffic environments
+    if (requestCount % 25 === 0 || status >= 400) {
       const user = (req as any).user;
       storage.createInfrastructureLog({
         status: status >= 500 ? 'critical' : status >= 400 ? 'resolving' : 'healed',

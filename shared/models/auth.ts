@@ -21,7 +21,6 @@ export const users = pgTable("profiles", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   clientId: integer("client_id"),
-  organizationId: varchar("organization_id"),
   role: varchar("role").default("analyst"), // admin, analyst, executive
   profileImageUrl: varchar("profile_image_url"),
   webauthnId: varchar("webauthn_id"),

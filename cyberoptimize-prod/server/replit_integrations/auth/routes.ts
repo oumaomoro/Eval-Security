@@ -37,7 +37,7 @@ export function registerAuthRoutes(app: Express): void {
         }
         throw error;
       }
-      
+
       if (!data.user) throw new Error("Registration failed: Supabase Identity Engine did not return a valid user.");
 
       console.log(`[AUTH-DIAG] Registration Success: ${data.user.id}. Provisioning enterprise assets...`);
@@ -55,12 +55,12 @@ export function registerAuthRoutes(app: Express): void {
       try {
         const orgName = `${firstName}'s Organization`;
         const slug = `${email.split('@')[0]}-${Date.now().toString(36)}`;
-        
+
         console.log(`[AUTH-DIAG] Provisioning Org via Admin Client: ${orgName} (slug: ${slug})`);
         const { data: orgData, error: orgError } = await adminClient.from('organizations')
           .insert([{ name: orgName, slug, tier: 'free' }])
           .select().single();
-        
+
         if (orgError) throw new Error(`Organization provisioning failed: ${orgError.message}`);
 
         console.log(`[AUTH-DIAG] Provisioning Client...`);
@@ -155,7 +155,7 @@ export function registerAuthRoutes(app: Express): void {
       if (sessionError) throw sessionError;
 
       const { user, session } = data;
-      
+
       // Store session
       if (req.session) {
         req.session.supabase_token = session.access_token;
@@ -171,18 +171,18 @@ export function registerAuthRoutes(app: Express): void {
         const userMeta = user.user_metadata || {};
         const firstName = userMeta.full_name?.split(' ')[0] || userMeta.first_name || "Enterprise";
         const lastName = userMeta.full_name?.split(' ').slice(1).join(' ') || userMeta.last_name || "User";
-        
+
         let organizationId = localUser?.organizationId;
         let clientId = localUser?.clientId;
 
         if (!organizationId) {
           const orgName = `${firstName}'s Organization`;
           const slug = `${user.email!.split('@')[0]}-${Date.now().toString(36)}`;
-          
+
           const { data: orgData, error: orgError } = await adminClient.from('organizations')
             .insert([{ name: orgName, slug, tier: 'free' }])
             .select().single();
-          
+
           if (orgError) console.error(`[HEALING] Org creation failed:`, orgError.message);
           else organizationId = orgData.id;
         }
@@ -235,7 +235,7 @@ export function registerAuthRoutes(app: Express): void {
         console.error(`[AUTH-DIAG] Supabase signIn error:`, error.message);
         throw error;
       }
-      
+
       // Store session in express-session
       if (req.session) {
         req.session.supabase_token = data.session.access_token;
@@ -252,18 +252,18 @@ export function registerAuthRoutes(app: Express): void {
           const userMeta = data.user.user_metadata || {};
           const firstName = userMeta.first_name || "Enterprise";
           const lastName = userMeta.last_name || "User";
-          
+
           let organizationId = localUser?.organizationId;
           let clientId = localUser?.clientId;
 
           if (!organizationId) {
             const orgName = `${firstName}'s Organization`;
             const slug = `${email.split('@')[0]}-${Date.now().toString(36)}`;
-            
+
             const { data: orgData, error: orgError } = await adminClient.from('organizations')
               .insert([{ name: orgName, slug, tier: 'free' }])
               .select().single();
-            
+
             if (orgError) throw new Error(`Healing: Org creation failed: ${orgError.message}`);
             organizationId = orgData.id;
           }
@@ -302,7 +302,7 @@ export function registerAuthRoutes(app: Express): void {
             status: "resolved",
             actionTaken: `Healed missing organization/client for user ${email}`
           });
-          
+
           console.log(`[AUTH-DIAG] Identity Successfully Healed for ${email}`);
         } catch (healErr: any) {
           console.error(`[AUTH-DIAG] Identity Healing Failed:`, healErr.message);
@@ -416,7 +416,7 @@ export function registerAuthRoutes(app: Express): void {
       if (!userId) return res.status(400).json({ message: "Authentication sequence context missing" });
 
       const verification = await WebAuthnService.verifyAuthentication(userId, req.body, challenge);
-      
+
       if (verification.verified) {
         // Here we would also handle the login session creation
         res.json({ verified: true, message: "Biometric verification successful" });
