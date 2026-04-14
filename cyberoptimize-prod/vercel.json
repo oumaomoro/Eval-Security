@@ -1,0 +1,13 @@
+{
+  "name": "Costloci-frontend",
+  "framework": "vite",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist/public",
+  "env": {
+    "VITE_API_URL": "https://api.costloci.com"
+  },
+  "rewrites": [
+    { "source": "/api/api/:path*", "destination": "https://api.costloci.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://api.costloci.com/api/:path*" }
+  ]
+}

@@ -1,0 +1,43 @@
+﻿≡ƒÜÇ Starting Phase 25 E2E Verification (Native Fetch)...
+
+1. Provisioning confirmed test user: verify_p25_34643790_1775554474836@cyberoptimize.test
+Γ£à User created: 397d5ebe-4a3b-45d2-8120-3baa1c615e3a
+
+2. Logging in to obtain session token...
+Γ£à Login response: {"id":"397d5ebe-4a3b-45d2-8120-3baa1c615e3a","email":"verify_p25_34643790_1775554474836@cyberoptimize.test","firstName":"Verify","lastName":"Robot","role":"admin","clientId":20,"profileImageUrl":null,"subscriptionTier":"starter","contractsCount":0,"updatedAt":"2026-04-07T09:34:37.103Z"}
+
+3. Verifying Organization Management Hub (/api/org/members)...
+Γ£à Organization Hub reachable. Members count: 1
+
+4. Verifying Invite logic (/api/org/invite)...
+node.exe : 
+At C:\Program 
+Files\nodejs\npx.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (:St  
+  ring) [], RemoteExcept   
+ ion
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+Γ¥î VERIFICATION FAILED: 
+Invite failed: 
+{"message":"User already 
+exists"}
+Error: Invite failed: 
+{"message":"User already 
+exists"}
+    at runVerify (C:\Users\
+Jack.Ouma\Downloads\New fol
+der\Cyber-Optimize\Cyber-Op
+timize\scripts\e2e_phase25_
+verify.ts:95:30)
+    at process.processTicks
+AndRejections (node:interna
+l/process/task_queues:105:5
+)

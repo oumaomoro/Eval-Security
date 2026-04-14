@@ -1,0 +1,43 @@
+﻿
+ Γ¢à∩╕Å wrangler 4.80.0
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+node.exe : [33mΓû▓ [43
+;33m[[43;30mWARNING[43
+;33m][0m [1mWarning: 
+Your working directory 
+is a git repo and has 
+uncommitted changes[0m
+At C:\Program 
+Files\nodejs\npx.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo      
+        : NotSpecified: 
+([3    3mΓû▓ 
+[43;3...ted cha    
+nges[0m:String) [], R  
+  emoteException
+    + 
+FullyQualifiedErrorI    
+d : NativeCommandError
+ 
+
+  To silence this 
+warning, pass in 
+--commit-dirty=true
+
+
+Uploading... (4/19)
+Uploading... (9/19)
+Uploading... (14/19)
+Uploading... (19/19)
+Γ£¿ Success! Uploaded 15 files (4 already uploaded) (3.15 sec)
+
+Γ£¿ Uploading _redirects
+Γ£¿ Compiled Worker successfully
+Γ£¿ Uploading Worker bundle
+≡ƒîÄ Deploying...
+Γ£¿ Deployment complete! Take a peek over at https://27085381.costloci-frontend.pages.dev

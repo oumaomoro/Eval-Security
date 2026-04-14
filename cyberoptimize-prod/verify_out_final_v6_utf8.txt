@@ -1,0 +1,53 @@
+﻿≡ƒÜÇ Starting Phase 25 E2E Verification (Native Fetch)...
+
+1. Provisioning confirmed test user: verify_p25_95e34deb_1775556165602@cyberoptimize.test
+Γ£à User created: 68bd9a61-bb27-4db1-9a65-f329c18613f4
+
+2. Logging in to obtain session token...
+Γ£à Login response: {"id":"68bd9a61-bb27-4db1-9a65-f329c18613f4","email":"verify_p25_95e34deb_1775556165602@cyberoptimize.test","firstName":"Verify","lastName":"Robot","role":"admin","clientId":31,"profileImageUrl":null,"subscriptionTier":"starter","contractsCount":0,"updatedAt":"2026-04-07T10:02:47.125Z"}
+
+3. Verifying Organization Management Hub (/api/org/members)...
+Γ£à Organization Hub reachable. Members count: 1
+
+4. Verifying Invite logic (/api/org/invite)...
+node.exe : 
+At C:\Program 
+Files\nodejs\npx.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo      
+        : NotSpecified  
+  : (:String) [], Rem   
+ oteException
+    + FullyQualifiedErr 
+   orId : NativeComman  
+  dError
+ 
+Γ¥î VERIFICATION 
+FAILED: Invite failed: 
+{"message":"Failed to 
+send invite: Failed to 
+provision user: new row 
+violates row-level 
+security policy for 
+table \"profiles\""}
+Error: Invite failed: 
+{"message":"Failed to 
+send invite: Failed to 
+provision user: new row 
+violates row-level 
+security policy for 
+table \"profiles\""}
+    at runVerify (C:\Use
+rs\Jack.Ouma\Downloads\N
+ew folder\Cyber-Optimize
+\Cyber-Optimize\scripts\
+e2e_phase25_verify.ts:95
+:30)
+    at process.processTi
+cksAndRejections (node:i
+nternal/process/task_que
+ues:105:5)
