@@ -152,8 +152,7 @@ jobs:
         run: |
           vercel pull \
             --yes \
-            --environment=production \
-            --token=${{ secrets.VERCEL_TOKEN }}
+            --environment=production
         working-directory: ./
 
       - name: Deploy to Vercel Production
@@ -162,7 +161,6 @@ jobs:
         run: |
           vercel deploy \
             --prod \
-            --yes \
-            --token=${{ secrets.VERCEL_TOKEN }}
+            --yes
           echo "✅ Backend deployed to Vercel."
         working-directory: ./

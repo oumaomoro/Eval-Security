@@ -1,5 +1,4 @@
 {
-  "name": "Costloci-frontend",
   "framework": "vite",
   "buildCommand": "vite build",
   "outputDirectory": "dist/public",
