@@ -228,6 +228,52 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  // Magic Link / OTP
+  app.post("/api/auth/magic-link", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/callback`,
+        }
+      });
+      
+      if (error) throw error;
+      res.json({ message: "Magic link sent successfully." });
+    } catch (err: any) {
+      console.error("[AUTH-DIAG] Magic Link Error:", err.message);
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  // Google SSO
+  app.get("/api/auth/google", async (req, res) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/callback`,
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.url) {
+        res.redirect(data.url);
+      } else {
+        res.status(500).json({ message: "Could not generate Google Auth URL" });
+      }
+    } catch (err: any) {
+      console.error("[AUTH-DIAG] Google SSO Error:", err.message);
+      res.status(500).json({ message: "Google SSO initialization failed" });
+    }
+  });
+
   // Reset Password
   app.post("/api/auth/reset-password", async (req: any, res) => {
     try {

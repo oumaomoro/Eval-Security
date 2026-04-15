@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 // ─── Shared helper: register a new user and land on the dashboard ────────────
 async function registerAndLogin(page: Page): Promise<string> {
-  await page.goto('/');
+  await page.goto('/auth');
   const randomSuffix = Date.now();
   const testEmail = `playwright-${randomSuffix}@enterprise-test.com`;
 
@@ -18,7 +18,7 @@ async function registerAndLogin(page: Page): Promise<string> {
   if (await pwFields.count() > 1) await pwFields.nth(1).fill('SecurePass123!');
 
   await page.locator('button').filter({ hasText: /deploy enterprise identity/i }).click();
-  await page.waitForURL('**/dashboard', { timeout: 25000 }).catch(() => {});
+  await page.waitForURL(url => url.pathname === '/', { timeout: 25000 }).catch(() => {});
 
   return testEmail;
 }

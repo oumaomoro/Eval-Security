@@ -109,6 +109,15 @@ export interface IStorage {
   getUserByApiKey(apiKey: string): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   createUser(user: Partial<User>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
+
+  // Playbooks (Marketplace / E2E test fix)
+  getPlaybooks(): Promise<Playbook[]>;
+
+  // Notification Channels (Feature Option C)
+  getNotificationChannels(clientId: number): Promise<any[]>;
+  createNotificationChannel(channel: any): Promise<any>;
+  updateNotificationChannel(id: number, updates: any): Promise<any>;
 
   // Regulatory
   getRegulatoryAlerts(status?: string): Promise<RegulatoryAlert[]>;
@@ -413,6 +422,42 @@ export class SupabaseRESTStorage implements IStorage {
 
   async deleteAuditRuleset(id: number): Promise<void> {
     await this.handleResponse(supabase.from("audit_rulesets").delete().eq("id", id));
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await this.handleResponse(supabase.from("users").delete().eq("id", id));
+  }
+
+  // --- PLAYBOOKS (Marketplace E2E tests dependency) --- //
+  async getPlaybooks(): Promise<Playbook[]> {
+    return this.handleResponse<Playbook[]>(supabase.from("playbooks").select("*"));
+  }
+
+  // --- NOTIFICATION CHANNELS (Enterprise Webhooks Option C) --- //
+  async getNotificationChannels(clientId: number): Promise<any[]> {
+    return this.handleResponse<any[]>(supabase.from("notification_channels").select("*").eq("client_id", clientId));
+  }
+
+  async createNotificationChannel(channel: any): Promise<any> {
+    const data = await this.handleResponse<any[]>(supabase.from("notification_channels").insert({
+      client_id: channel.clientId,
+      provider: channel.provider,
+      webhook_url: channel.webhookUrl,
+      events: channel.events,
+      is_active: channel.isActive ?? true
+    }).select());
+    return data[0];
+  }
+
+  async updateNotificationChannel(id: number, updates: any): Promise<any> {
+    const payload: any = {};
+    if (updates.webhookUrl !== undefined) payload.webhook_url = updates.webhookUrl;
+    if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+    if (updates.events !== undefined) payload.events = updates.events;
+    if (updates.provider !== undefined) payload.provider = updates.provider;
+
+    const data = await this.handleResponse<any[]>(supabase.from("notification_channels").update(payload).eq("id", id).select());
+    return data[0];
   }
 
   async getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]> {

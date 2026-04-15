@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: contract-workflow.spec.ts >> Contract Lifecycle Management >> should allow marketplace playbook activation
-- Location: tests\e2e\contract-workflow.spec.ts:79:3
+- Name: contract-workflow.spec.ts >> Contract Lifecycle Management >> should enforce contract upload limit for free-tier users
+- Location: tests\e2e\contract-workflow.spec.ts:120:3
 
 # Error details
 

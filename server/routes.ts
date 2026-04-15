@@ -300,14 +300,13 @@ Analyze the contract text and return JSON with exactly these fields:
           upsert: false,
         });
 
-      let fileUrl = "#";
       if (storageError) {
-        console.warn("[UPLOAD] Supabase Storage upload failed, contract saved without file URL:", storageError.message);
-      } else {
-        const { data: urlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
-        fileUrl = urlData?.publicUrl || "#";
+        throw new Error(`Failed to upload sovereign persistence pack: ${storageError.message}`);
       }
 
+      const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
+
+      // Now create the database record with the URL
       const contract = await storage.createContract({
         clientId,
         vendorName: analysis.vendorName || "Unknown Vendor",
@@ -658,6 +657,29 @@ Analyze the contract text and return JSON with exactly these fields:
       }));
       res.json(monitoring);
     } catch { res.status(500).json({ message: "Monitoring failed" }); }
+  });
+
+  // ─── NOTIFICATION CHANNELS (Option C) ───────────────────────────────────────
+  app.get("/api/notifications/channels", isAuthenticated, async (req: any, res) => {
+    try {
+      const channels = await storage.getNotificationChannels(req.user.clientId);
+      res.json(channels);
+    } catch { res.status(500).json({ message: "Failed to fetch notification channels" }); }
+  });
+
+  app.post("/api/notifications/channels", isAuthenticated, async (req: any, res) => {
+    try {
+      const { provider, webhookUrl, events } = req.body;
+      const channel = await storage.createNotificationChannel({
+        clientId: req.user.clientId,
+        provider,
+        webhookUrl,
+        events
+      });
+      res.status(201).json(channel);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
   });
 
   // ─── RISKS ──────────────────────────────────────────────────────────────────
@@ -1015,6 +1037,16 @@ Analyze the contract text and return JSON with exactly these fields:
       }
       res.json(optimizations);
     } catch { res.status(500).json({ message: "Optimization report failed" }); }
+  });
+
+  app.get("/api/playbooks", isAuthenticated, async (req: any, res) => {
+    try {
+      // Return global/marketplace playbooks
+      const data = await storage.getPlaybooks();
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch playbooks" });
+    }
   });
 
   app.get("/api/vendors/:id/savings-strategy", isAuthenticated, async (req, res) => {

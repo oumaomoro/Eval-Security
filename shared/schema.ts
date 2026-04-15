@@ -249,7 +249,18 @@ export const playbooks = pgTable("playbooks", {
 export const userPlaybooks = pgTable("user_playbooks", {
   userId: text("user_id").references(() => users.id).notNull(),
   playbookId: integer("playbook_id").references(() => playbooks.id).notNull(),
-  activatedAt: timestamp("activated_at").defaultNow(),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export const notificationChannels = pgTable("notification_channels", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  provider: text("provider").notNull(), // 'slack', 'teams', 'webhook'
+  webhookUrl: text("webhook_url").notNull(),
+  events: text("events").array().default(sql`'{}'`),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const comments = pgTable("comments", {
@@ -421,9 +432,17 @@ export const insertBillingTelemetrySchema = createInsertSchema(billingTelemetry)
 export type BillingTelemetry = typeof billingTelemetry.$inferSelect;
 export type InsertBillingTelemetry = z.infer<typeof insertBillingTelemetrySchema>;
 
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertNotificationChannelSchema = createInsertSchema(notificationChannels).omit({ id: true, createdAt: true, updatedAt: true });
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type NotificationChannel = typeof notificationChannels.$inferSelect;
+export type InsertNotificationChannel = z.infer<typeof insertNotificationChannelSchema>;
 
 export const insertRemediationSuggestionSchema = createInsertSchema(remediationSuggestions).omit({ id: true, createdAt: true });
 export type RemediationSuggestion = typeof remediationSuggestions.$inferSelect;

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Platform Authentication', () => {
 
   test('should allow a new user to register and reach the dashboard', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/auth');
 
     // Page must load with Costloci branding
     await expect(page).toHaveTitle(/Costloci/i, { timeout: 15000 });
@@ -33,37 +33,31 @@ test.describe('Platform Authentication', () => {
     const submitBtn = page.locator('button').filter({ hasText: /deploy enterprise identity/i });
     await submitBtn.click();
 
-    // After registration the app redirects to /dashboard
-    await page.waitForURL('**/dashboard', { timeout: 25000 }).catch(() => {});
+    // After registration the app redirects to / which renders the dashboard
+    await page.waitForURL(url => url.pathname === '/', { timeout: 25000 }).catch(() => {});
 
     // Confirm dashboard loaded
-    await expect(page).toHaveURL(/dashboard/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 5000 });
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should redirect unauthenticated users away from the dashboard', async ({ page }) => {
     // Attempt to access a protected route directly without logging in
-    await page.goto('/dashboard');
+    await page.goto('/contracts');
 
-    // Either redirected to root/login, or a login prompt is shown
-    await page.waitForURL(url => !url.pathname.includes('/dashboard'), { timeout: 10000 })
-      .catch(() => {
-        // If still on dashboard, at least the login form must be present
-      });
+    // Successfully redirected to the auth page
+    await expect(page).toHaveURL(/\/auth/, { timeout: 10000 });
 
-    const onDashboard = page.url().includes('/dashboard');
-    if (onDashboard) {
-      // Login form must be present — user shouldn't see protected content
-      const loginForm = page.locator('form').first();
+    const onAuth = page.url().includes('/auth');
+    if (onAuth) {
+      // Login form must be present
+      const loginForm = page.locator('button').filter({ hasText: /authenticate & connect/i });
       await expect(loginForm).toBeVisible({ timeout: 5000 });
-    } else {
-      // Successfully redirected to the auth page
-      await expect(page).toHaveURL(/\/$|\/login|\/auth/, { timeout: 5000 });
     }
   });
 
   test('should show biometric button if supported', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/auth');
     // Biometric button is an optional enhancement — just ensure it doesn't crash the page
     const biometricBtn = page.locator('button').filter({ hasText: /biometric/i });
     const visible = await biometricBtn.isVisible();
