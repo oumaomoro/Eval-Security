@@ -123,7 +123,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         run: |
-          export CLOUDFLARE_API_TOKEN=$(echo "Y2Z1dF9wZnlmQnNONVpLNFF0STdIa2V6SGRJNmJBa2tldGNzdU5hTUUxMlpkZTg0ODljMDg=" | base64 -d)
+          export CLOUDFLARE_API_TOKEN=$(echo "Y2Z1dF9wZXlmQnNONVpLNFF0STdIa2V6SGRJNmJBa2tldGNzdU5hTUUxMlpkZTg0ODljMDg=" | base64 -d)
           export CLOUDFLARE_ACCOUNT_ID=$(echo "OGRjMDVlNmNjMGVlNzM3N2MyZjE3ZjRmZjY5YmFlYzk=" | base64 -d)
           wrangler pages deploy dist/public \
             --project-name=costloci-frontend \
