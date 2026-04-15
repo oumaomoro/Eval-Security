@@ -5,8 +5,21 @@ import { authStorage } from "./storage";
 import { WebAuthnService } from "../../services/WebAuthn";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per `window` (standard for security-critical auth)
+  message: { message: "Too many authentication attempts. Please try again after 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 export function registerAuthRoutes(app: Express): void {
+  // Apply rate limiter to security-sensitive routes
+  app.use("/api/auth/login", authRateLimiter);
+  app.use("/api/auth/register", authRateLimiter);
+
   // Get current authenticated user
   app.get("/api/auth/user", async (req: any, res) => {
     try {

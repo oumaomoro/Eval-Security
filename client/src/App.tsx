@@ -65,8 +65,11 @@ function AnalyticsWrapper() {
   return null;
 }
 
+import { useLocation } from "wouter";
+
 function AuthWrapper() {
   const { user, isLoading, isError } = useAuth();
+  const [, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -87,8 +90,10 @@ function AuthWrapper() {
         <Route component={() => {
           // If trying to access protected route while unauth, go to /auth
           const path = window.location.pathname;
-          if (path !== "/" && path !== "/reset-password") {
-             window.location.href = "/auth";
+          if (path !== "/" && path !== "/reset-password" && path !== "/auth") {
+             React.useEffect(() => {
+               setLocation("/auth");
+             }, []);
              return null;
           }
           return <LandingPage />;

@@ -37,7 +37,7 @@ export class ROIService {
     // 3. Financial Exposure Mitigated
     let mitigatedExposure = 0;
     risks.forEach(risk => {
-      if (risk.mitigationStatus === 'mitigated' || risk.mitigationStatus === 'verified') {
+      if (risk.mitigationStatus === 'mitigated' || risk.mitigationStatus === 'accepted') {
          // Proxy financial estimate based on severity
          if (risk.severity === 'critical') mitigatedExposure += 55000;
          else if (risk.severity === 'high') mitigatedExposure += 25000;

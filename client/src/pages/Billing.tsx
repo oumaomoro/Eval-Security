@@ -56,7 +56,22 @@ export default function Billing() {
       return res.json();
     },
     onSuccess: (data) => {
-      if (data.approvalUrl) {
+      if (data.accessCode && (window as any).PaystackPop) {
+        const handler = (window as any).PaystackPop.setup({
+          key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+          email: user?.email,
+          amount: data.amount,
+          access_code: data.accessCode,
+          onClose: () => {
+            toast({ title: "Checkout Closed", description: "You closed the payment window." });
+          },
+          callback: (response: any) => {
+            toast({ title: "Payment Received", description: "Verifying and upgrading your account..." });
+            window.location.href = `/billing?success=true&reference=${response.reference}`;
+          }
+        });
+        handler.openIframe();
+      } else if (data.approvalUrl) {
         window.location.href = data.approvalUrl;
       }
     },

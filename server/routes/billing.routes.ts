@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { storage } from "../storage";
+import crypto from "crypto";
 
 const billingRouter = Router();
 
@@ -14,12 +15,17 @@ const PLANS = {
   enterprise: process.env.PAYPAL_ENTERPRISE_PLAN_ID
 };
 
-// Validate PayPal configuration at module load time
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const PAYSTACK_API_BASE = "https://api.paystack.co";
+
 if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
-  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_SECRET not set — checkout will fail.");
+  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_SECRET not set — PayPal checkout will fail.");
+}
+if (!PAYSTACK_SECRET_KEY) {
+  console.warn("[BILLING] WARNING: PAYSTACK_SECRET_KEY not set — Paystack checkout will fail.");
 }
 if (!PLANS.starter || !PLANS.pro || !PLANS.enterprise) {
-  console.warn("[BILLING] WARNING: One or more PAYPAL_*_PLAN_ID env vars not set — subscription creation will fail.");
+  console.warn("[BILLING] WARNING: One or more PAYPAL_*_PLAN_ID env vars not set — PayPal subscription creation will fail.");
 }
 
 /**
@@ -47,6 +53,40 @@ async function getPayPalAccessToken() {
 billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, res) => {
   try {
     const { planType } = req.body;
+    
+    // Check if we should use Paystack (Priority if key exists)
+    if (PAYSTACK_SECRET_KEY) {
+      const response = await fetch(`${PAYSTACK_API_BASE}/transaction/initialize`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: req.user.email,
+          amount: planType === 'enterprise' ? 99900 : planType === 'pro' ? 29900 : 9900, // Amount in Kobo/Cents
+          callback_url: `${req.protocol}://${req.get("host")}/billing?success=true`,
+          metadata: {
+            userId: req.user.id,
+            planType: planType,
+            custom_fields: [
+              { display_name: "Plan", variable_name: "plan", value: planType }
+            ]
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Paystack initialization failed");
+      
+      return res.json({ 
+        approvalUrl: data.data.authorization_url, 
+        accessCode: data.data.access_code,
+        reference: data.data.reference
+      });
+    }
+
+    // Fallback to PayPal
     const planId = PLANS[planType as keyof typeof PLANS];
     if (!planId) return res.status(400).json({ message: "Invalid plan selected" });
     if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
@@ -104,11 +144,11 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        auth_algo: req.headers['paypal-auth-algo'],
-        cert_url: req.headers['paypal-cert-url'],
-        transmission_id: req.headers['paypal-transmission-id'],
-        transmission_sig: req.headers['paypal-transmission-sig'],
-        transmission_time: req.headers['paypal-transmission-time'],
+        auth_algo: req.headers['paypal-auth-algo'] as string,
+        cert_url: req.headers['paypal-cert-url'] as string,
+        transmission_id: req.headers['paypal-transmission-id'] as string,
+        transmission_sig: req.headers['paypal-transmission-sig'] as string,
+        transmission_time: req.headers['paypal-transmission-time'] as string,
         webhook_id: process.env.PAYPAL_WEBHOOK_ID || "LIVE_WEBHOOK_ID",
         webhook_event: req.body
       })
@@ -152,6 +192,50 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
     res.status(200).send("OK");
   } catch (err: any) {
     console.error("[Costloci Billing] Webhook Error:", err.message);
+    res.status(500).send("Webhook Error");
+  }
+});
+
+/**
+ * Handle Paystack Webhooks
+ */
+billingRouter.post("/api/billing/paystack-webhook", async (req, res) => {
+  try {
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!secret) return res.sendStatus(500);
+
+    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+    if (hash !== req.headers['x-paystack-signature']) {
+      console.warn("[Costloci Billing] SECURITY ALERT: Invalid Paystack Webhook Signature!");
+      return res.sendStatus(400);
+    }
+
+    const event = req.body;
+    if (event.event === 'charge.success') {
+      const { userId, planType } = event.data.metadata;
+      
+      if (userId && planType) {
+        await storage.updateUser(userId, { subscriptionTier: planType });
+        console.log(`[Costloci Billing] Paystack: Upgraded user ${userId} to ${planType} tier.`);
+
+        await storage.createAuditLog({
+          userId: userId,
+          action: "SUBSCRIPTION_UPGRADE_PAYSTACK",
+          details: JSON.stringify({ reference: event.data.reference, tier: planType }),
+        });
+
+        await storage.createBillingTelemetry({
+          clientId: 0,
+          metricType: "mrr_capture_paystack",
+          value: planType === 'pro' ? 299 : planType === 'enterprise' ? 999 : 99,
+          cost: 0,
+        });
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err: any) {
+    console.error("[Costloci Billing] Paystack Webhook Error:", err.message);
     res.status(500).send("Webhook Error");
   }
 });
