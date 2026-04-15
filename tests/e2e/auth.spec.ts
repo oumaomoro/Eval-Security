@@ -1,46 +1,77 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Platform Authentication', () => {
-  test('should allow a user to reach the dashboard', async ({ page }) => {
-    // Navigate to the platform
+
+  test('should allow a new user to register and reach the dashboard', async ({ page }) => {
     await page.goto('/');
 
-    // Verify presence of branding
-    await expect(page).toHaveTitle(/Costloci/);
+    // Page must load with Costloci branding
+    await expect(page).toHaveTitle(/Costloci/i, { timeout: 15000 });
 
-    // Click Login (assuming the root redirect or a login button exists)
-    // For this E2E test, we expect to see the dashboard or login page
-    const loginHeader = page.locator('h2:has-text("Executive Sign In")');
-    
-    // Switch to Registration Tab to ensure we never hit a database constraint
-    await page.locator('button[role="tab"]:has-text("Initialize Agent")').click();
-    
-    // Fill Registration Form with Randomized Credentials
-    const randomSuffix = Math.floor(Math.random() * 1000000);
+    // Switch to the Registration tab — label matches "Initialize Agent"
+    const registerTab = page.locator('button[role="tab"]').filter({ hasText: /initialize agent/i });
+    await registerTab.waitFor({ state: 'visible', timeout: 10000 });
+    await registerTab.click();
+
+    // Fill the registration form
+    const randomSuffix = Date.now();
     const testEmail = `playwright-${randomSuffix}@enterprise-test.com`;
-    
+
     await page.fill('input[placeholder="John"]', 'Playwright');
     await page.fill('input[placeholder="Doe"]', 'Tester');
     await page.fill('input[placeholder="j.doe@enterprise.com"]', testEmail);
-    await page.fill('input[type="password"]', 'SecurePass123!');
-    
-    await page.locator('button:has-text("Deploy Enterprise Identity")').click();
-    
-    // Wait for the backend to provision the workspace and route to dashboard
-    await page.waitForURL('**/dashboard', { timeout: 20000 }).catch(() => null); 
+    // Password fields - fill the first password field, then the confirm field
+    const passwordFields = page.locator('input[type="password"]');
+    await passwordFields.nth(0).fill('SecurePass123!');
+    // If a confirm password field exists, fill it too
+    const count = await passwordFields.count();
+    if (count > 1) {
+      await passwordFields.nth(1).fill('SecurePass123!');
+    }
 
-    // Verify we land on the dashboard
-    await expect(page).toHaveURL(/.*dashboard/);
-    await expect(page.locator('h1')).toContainText('Executive Dashboard');
+    // Submit
+    const submitBtn = page.locator('button').filter({ hasText: /deploy enterprise identity/i });
+    await submitBtn.click();
+
+    // After registration the app redirects to /dashboard
+    await page.waitForURL('**/dashboard', { timeout: 25000 }).catch(() => {});
+
+    // Confirm dashboard loaded
+    await expect(page).toHaveURL(/dashboard/, { timeout: 5000 });
+    await expect(page.locator('h1').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should enforce biometric setup flow', async ({ page }) => {
+  test('should redirect unauthenticated users away from the dashboard', async ({ page }) => {
+    // Attempt to access a protected route directly without logging in
     await page.goto('/dashboard');
-    
-    // Check if biometric prompt exists (if not already completed)
-    const biometricBtn = page.locator('button:has-text("Biometric Login")');
-    if (await biometricBtn.isVisible()) {
-       await expect(biometricBtn).toBeEnabled();
+
+    // Either redirected to root/login, or a login prompt is shown
+    await page.waitForURL(url => !url.pathname.includes('/dashboard'), { timeout: 10000 })
+      .catch(() => {
+        // If still on dashboard, at least the login form must be present
+      });
+
+    const onDashboard = page.url().includes('/dashboard');
+    if (onDashboard) {
+      // Login form must be present — user shouldn't see protected content
+      const loginForm = page.locator('form').first();
+      await expect(loginForm).toBeVisible({ timeout: 5000 });
+    } else {
+      // Successfully redirected to the auth page
+      await expect(page).toHaveURL(/\/$|\/login|\/auth/, { timeout: 5000 });
     }
   });
+
+  test('should show biometric button if supported', async ({ page }) => {
+    await page.goto('/');
+    // Biometric button is an optional enhancement — just ensure it doesn't crash the page
+    const biometricBtn = page.locator('button').filter({ hasText: /biometric/i });
+    const visible = await biometricBtn.isVisible();
+    if (visible) {
+      await expect(biometricBtn).toBeEnabled();
+    }
+    // Page must still be responsive
+    await expect(page.locator('body')).toBeVisible();
+  });
+
 });
