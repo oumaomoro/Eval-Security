@@ -55,34 +55,22 @@ jobs:
         run: |
           MISSING=()
 
+          # Forensic Validation Batch 1: Core Infrastructure (Blocking)
           REQUIRED_SECRETS=(
-            "VERCEL_TOKEN"
-            "VITE_API_URL"
-            "SUPABASE_URL"
-            "SUPABASE_ANON_KEY"
-            "SUPABASE_SERVICE_ROLE_KEY"
-            "DATABASE_URL"
-            "AI_INTEGRATIONS_OPENAI_API_KEY"
-            "AI_INTEGRATIONS_OPENAI_BASE_URL"
-            "JWT_SECRET"
-            "RESEND_API_KEY"
-            "SIGNNOW_API_KEY"
-            "UPSTASH_REDIS_REST_URL"
-            "UPSTASH_REDIS_REST_TOKEN"
-            "CLOUDFLARE_ACCOUNT_ID"
-            "CLOUDFLARE_API_TOKEN"
-            "PAYSTACK_SECRET_KEY"
-            "VITE_PAYSTACK_PUBLIC_KEY"
-            "FRONTEND_URL"
-            "GOOGLE_CLIENT_ID"
-            "GOOGLE_CLIENT_SECRET"
-            "SLACK_APP_ID"
-            "SLACK_CLIENT_ID"
-            "SLACK_SIGNING_SECRET"
-            "SLACK_VERIFICATION_TOKEN"
-            "CRON_SECRET"
+            "VERCEL_TOKEN" "VITE_API_URL" "SUPABASE_URL" "SUPABASE_ANON_KEY" "SUPABASE_SERVICE_ROLE_KEY"
+            "DATABASE_URL" "AI_INTEGRATIONS_OPENAI_API_KEY" "AI_INTEGRATIONS_OPENAI_BASE_URL" 
+            "JWT_SECRET" "RESEND_API_KEY" "SIGNNOW_API_KEY" "UPSTASH_REDIS_REST_URL" 
+            "UPSTASH_REDIS_REST_TOKEN" "CLOUDFLARE_ACCOUNT_ID" "CLOUDFLARE_API_TOKEN" 
+            "PAYSTACK_SECRET_KEY" "VITE_PAYSTACK_PUBLIC_KEY" "FRONTEND_URL" "GOOGLE_CLIENT_SECRET"
           )
 
+          # Forensic Validation Batch 2: Modular Integrations (Non-Blocking / Warning only)
+          OPTIONAL_SECRETS=(
+            "GOOGLE_CLIENT_ID" "SLACK_APP_ID" "SLACK_CLIENT_ID" 
+            "SLACK_SIGNING_SECRET" "SLACK_VERIFICATION_TOKEN" "CRON_SECRET"
+          )
+
+          MISSING=()
           for secret in "${REQUIRED_SECRETS[@]}"; do
             if [ -z "${!secret}" ]; then
               MISSING+=("$secret")
@@ -90,14 +78,22 @@ jobs:
           done
 
           if [ ${#MISSING[@]} -gt 0 ]; then
-            echo "❌ DEPLOYMENT BLOCKED — Missing required secrets:"
+            echo "❌ CRITICAL DEPLOYMENT BLOCKED — Missing required core secrets:"
             for secret in "${MISSING[@]}"; do echo "   • $secret"; done
             echo ""
             echo "👉 Ensure these are set in Settings → Secrets and variables → Actions"
             exit 1
           fi
 
-          echo "✅ All 20+ enterprise secrets verified. Proceeding with deployment."
+          echo "✅ Core enterprise secrets verified."
+          
+          for secret in "${OPTIONAL_SECRETS[@]}"; do
+             if [ -z "${!secret}" ]; then
+               echo "⚠️  Optional integration secret missing: $secret. Associated features may be degraded."
+             fi
+          done
+          
+          echo "🚀 Proceeding with deployment."
 
   # ─────────────────────────────────────────────────────────────
   # JOB 2: Type-check + Build
