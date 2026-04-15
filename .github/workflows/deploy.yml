@@ -44,6 +44,13 @@ jobs:
           PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
           VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SLACK_APP_ID: ${{ secrets.SLACK_APP_ID }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+          SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
+          SLACK_VERIFICATION_TOKEN: ${{ secrets.SLACK_VERIFICATION_TOKEN }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         shell: bash
         run: |
           MISSING=()
@@ -67,6 +74,13 @@ jobs:
             "PAYSTACK_SECRET_KEY"
             "VITE_PAYSTACK_PUBLIC_KEY"
             "FRONTEND_URL"
+            "GOOGLE_CLIENT_ID"
+            "GOOGLE_CLIENT_SECRET"
+            "SLACK_APP_ID"
+            "SLACK_CLIENT_ID"
+            "SLACK_SIGNING_SECRET"
+            "SLACK_VERIFICATION_TOKEN"
+            "CRON_SECRET"
           )
 
           for secret in "${REQUIRED_SECRETS[@]}"; do
@@ -183,6 +197,13 @@ jobs:
           VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SLACK_APP_ID: ${{ secrets.SLACK_APP_ID }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+          SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
+          SLACK_VERIFICATION_TOKEN: ${{ secrets.SLACK_VERIFICATION_TOKEN }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           NODE_ENV: production
         run: |
           vercel pull --yes --environment=production
