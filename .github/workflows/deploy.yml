@@ -95,6 +95,24 @@ jobs:
           
           echo "🚀 Proceeding with deployment."
 
+      - name: Verify Cloudflare Connectivity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "📡 Testing Cloudflare API connectivity..."
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type:application/json")
+            if [ "$RESPONSE" != "200" ]; then
+              echo "❌ Cloudflare API Token verification failed (HTTP $RESPONSE). Check your token permissions."
+              exit 1
+            fi
+            echo "✅ Cloudflare API verified."
+          else
+            echo "⚠️  Cloudflare Integration skipped: Token not set."
+          fi
+
   # ─────────────────────────────────────────────────────────────
   # JOB 2: Type-check + Build
   # ─────────────────────────────────────────────────────────────
