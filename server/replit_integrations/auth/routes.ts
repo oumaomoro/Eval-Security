@@ -23,13 +23,12 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/register", async (req: any, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
-      // 1. Supabase Auth Signup
-      const { data, error } = await supabase.auth.signUp({
+      // 1. Supabase Auth Secure Admin Provisioning (Auto-Confirms Email)
+      const { data, error } = await adminClient.auth.admin.createUser({
         email,
         password,
-        options: {
-          data: { first_name: firstName, last_name: lastName }
-        }
+        email_confirm: true,
+        user_metadata: { first_name: firstName, last_name: lastName }
       });
 
       if (error) {
@@ -188,9 +187,10 @@ export function registerAuthRoutes(app: Express): void {
             actionTaken: `Critical: Could not heal identity for ${email}: ${healErr.message}`
           });
         }
-      }
-
-      res.json(localUser);
+      res.json({
+        user: localUser,
+        token: data.session.access_token
+      });
     } catch (err: any) {
       res.status(401).json({ message: err.message });
     }
