@@ -258,7 +258,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let analysis: any = {};
       try {
         const response = await cachedCompletion({
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o",
           messages: [
             {
               role: "system",
@@ -877,7 +877,7 @@ Analyze the contract text and return JSON with exactly these fields:
           ]);
 
           const response = await cachedCompletion({
-            model: "gpt-3.5-turbo",
+            model: "gpt-4o",
             messages: [
               {
                 role: "system",
