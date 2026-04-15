@@ -187,6 +187,8 @@ export function registerAuthRoutes(app: Express): void {
             actionTaken: `Critical: Could not heal identity for ${email}: ${healErr.message}`
           });
         }
+      }
+
       res.json({
         user: localUser,
         token: data.session.access_token

@@ -137,7 +137,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ─── CLIENTS ──────────────────────────────────────────────────────────────
 
 
-  app.get(api.clients.list.path, async (_req, res) => {
+  app.get(api.clients.list.path, isAuthenticated, requireRole(['admin']), async (_req, res) => {
     try {
       const clients = await storage.getClients();
       res.json(clients);
@@ -163,9 +163,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get(api.clients.get.path, async (req, res) => {
+  app.get(api.clients.get.path, isAuthenticated, async (req: any, res) => {
     try {
-      const client = await storage.getClient(Number(req.params.id));
+      const clientId = Number(req.params.id);
+      if (req.user.role !== 'admin' && req.user.clientId !== clientId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const client = await storage.getClient(clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
       res.json(client);
     } catch { res.status(500).json({ message: "Failed to fetch client" }); }
@@ -232,10 +236,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get(api.contracts.get.path, isAuthenticated, async (req, res) => {
+  app.get(api.contracts.get.path, isAuthenticated, async (req: any, res) => {
     try {
       const contract = await storage.getContract(Number(req.params.id));
       if (!contract) return res.status(404).json({ message: "Contract not found" });
+      
+      // Multi-tenancy Isolation: Ensure user belongs to the contract's client
+      if (req.user.role !== 'admin' && contract.clientId !== req.user.clientId) {
+        return res.status(403).json({ message: "Access denied to this contract resource." });
+      }
+      
       res.json(contract);
     } catch { res.status(500).json({ message: "Failed to fetch contract" }); }
   });
@@ -360,8 +370,15 @@ Analyze the contract text and return JSON with exactly these fields:
   // ─── COMPLIANCE REMEDIATION ────────────────────────────────────────────────
   app.post("/api/contracts/:id/remediate", isAuthenticated, async (req: any, res) => {
     try {
+      const contractId = Number(req.params.id);
+      const contract = await storage.getContract(contractId);
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      if (req.user.role !== 'admin' && contract.clientId !== req.user.clientId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const { RemediationEngine } = await import("./services/RemediationEngine");
-      const result = await RemediationEngine.remediateContract(Number(req.params.id));
+      const result = await RemediationEngine.remediateContract(contractId);
       res.json(result);
     } catch (err: any) {
       console.error("[REMEDIATION ERROR]", err);
@@ -379,11 +396,15 @@ Analyze the contract text and return JSON with exactly these fields:
   });
 
   // AI Re-Analysis for existing contract
-  app.post(api.contracts.analyze.path, isAuthenticated, async (req, res) => {
+  app.post(api.contracts.analyze.path, isAuthenticated, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
       const contract = await storage.getContract(id);
       if (!contract) return res.status(404).json({ message: "Contract not found" });
+      
+      if (req.user.role !== 'admin' && contract.clientId !== req.user.clientId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
 
       const response = await cachedCompletion({
         model: "gpt-3.5-turbo",
@@ -421,9 +442,16 @@ Analyze the contract text and return JSON with exactly these fields:
   });
 
   // Contract Comparisons
-  app.get(api.contracts.comparisons.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.contracts.comparisons.list.path, isAuthenticated, async (req: any, res) => {
     try {
-      const comparisons = await storage.getContractComparisons(Number(req.params.id));
+      const contractId = Number(req.params.id);
+      const contract = await storage.getContract(contractId);
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      if (req.user.role !== 'admin' && contract.clientId !== req.user.clientId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const comparisons = await storage.getContractComparisons(contractId);
       res.json(comparisons);
     } catch { res.status(500).json({ message: "Failed to fetch comparisons" }); }
   });
@@ -602,9 +630,10 @@ Analyze the contract text and return JSON with exactly these fields:
     }
   });
 
-  app.get(api.compliance.monitoring.path, isAuthenticated, async (_req, res) => {
+  app.get(api.compliance.monitoring.path, isAuthenticated, async (req: any, res) => {
     try {
-      const contracts = await storage.getContracts();
+      // Security: Must filter monitoring data by clientId
+      const contracts = await storage.getContracts({ clientId: req.user?.clientId });
       const monitoring = contracts.map((c) => ({
         contractId: c.id,
         vendorName: c.vendorName,
@@ -636,16 +665,29 @@ Analyze the contract text and return JSON with exactly these fields:
     }
   });
 
-  app.patch(api.risks.mitigate.path, isAuthenticated, async (req, res) => {
+  app.patch(api.risks.mitigate.path, isAuthenticated, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
       const { status, strategy } = api.risks.mitigate.input.parse(req.body);
-      const risk = await storage.updateRisk(id, {
+      
+      // Ownership Check: Risk -> Contract -> Client
+      const risks = await storage.getRisks(); // FetchING all to find it (Suboptimal but safe)
+      const risk = risks.find(r => r.id === id);
+      if (!risk) return res.status(404).json({ message: "Risk not found" });
+      
+      const contract = await storage.getContract(risk.contractId);
+      if (!contract || (req.user.role !== 'admin' && contract.clientId !== req.user.clientId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedRisk = await storage.updateRisk(id, {
         mitigationStatus: status,
         mitigationStrategies: strategy ? [strategy] : undefined,
       } as any);
-      res.json(risk);
-    } catch { res.status(500).json({ message: "Mitigation failed" }); }
+      res.json(updatedRisk);
+    } catch (err: any) { 
+      res.status(500).json({ message: "Mitigation failed: " + err.message }); 
+    }
   });
 
   // ─── CLAUSES ────────────────────────────────────────────────────────────────
@@ -1004,6 +1046,20 @@ Analyze the contract text and return JSON with exactly these fields:
       const workspace = await storage.createWorkspace({ name, plan: "enterprise" });
       res.status(201).json(workspace);
     } catch { res.status(500).json({ message: "Failed to create workspace" }); }
+  });
+
+  app.get(api.contracts.comparisons.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const contractId = Number(req.params.id);
+      const contract = await storage.getContract(contractId);
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      if (req.user.role !== 'admin' && contract.clientId !== req.user.clientId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const comparisons = await storage.getContractComparisons(contractId);
+      res.json(comparisons);
+    } catch { res.status(500).json({ message: "Failed to fetch comparisons" }); }
   });
 
   app.get(api.workspaces.members.list.path, isAuthenticated, async (req: any, res) => {
