@@ -8,6 +8,7 @@ import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { serveStatic } from "./static.js";
 
 const app = express();
+app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

@@ -16,9 +16,12 @@ const authRateLimiter = rateLimit({
 });
 
 export function registerAuthRoutes(app: Express): void {
-  // Apply rate limiter to security-sensitive routes
+  // Apply rate limiters to authentication endpoints
   app.use("/api/auth/login", authRateLimiter);
   app.use("/api/auth/register", authRateLimiter);
+  app.use("/api/auth/forgot-password", authRateLimiter);
+  app.use("/api/auth/reset-password", authRateLimiter);
+  app.use("/api/auth/webauthn", authRateLimiter);
 
   // Get current authenticated user
   app.get("/api/auth/user", async (req: any, res) => {
