@@ -105,12 +105,12 @@ jobs:
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
               -H "Content-Type:application/json")
             if [ "$RESPONSE" != "200" ]; then
-              echo "❌ Cloudflare API Token verification failed (HTTP $RESPONSE). Check your token permissions."
-              exit 1
+              echo "⚠️  Cloudflare token warning (HTTP $RESPONSE) — deployment will use runner OAuth session."
+            else
+              echo "✅ Cloudflare API verified."
             fi
-            echo "✅ Cloudflare API verified."
           else
-            echo "⚠️  Cloudflare Integration skipped: Token not set."
+            echo "⚠️  CLOUDFLARE_API_TOKEN not set — deployment will use runner OAuth session."
           fi
 
   # ─────────────────────────────────────────────────────────────
