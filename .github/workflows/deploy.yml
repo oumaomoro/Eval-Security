@@ -206,6 +206,28 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           NODE_ENV: production
         run: |
+          echo "📡 Syncing enterprise secrets to Vercel dashboard..."
+          
+          # Iterate through core secrets and update Vercel env
+          # Note: We use 'vercel env add' to ensure the dashboard matches the build context
+          CORE_SECRETS=(
+            "DATABASE_URL" "SUPABASE_URL" "SUPABASE_ANON_KEY" "SUPABASE_SERVICE_ROLE_KEY"
+            "AI_INTEGRATIONS_OPENAI_API_KEY" "AI_INTEGRATIONS_OPENAI_BASE_URL" "JWT_SECRET"
+            "RESEND_API_KEY" "SIGNNOW_API_KEY" "UPSTASH_REDIS_REST_URL" "UPSTASH_REDIS_REST_TOKEN"
+            "PAYSTACK_SECRET_KEY" "VITE_PAYSTACK_PUBLIC_KEY" "FRONTEND_URL" "VITE_API_URL"
+            "GOOGLE_CLIENT_ID" "GOOGLE_CLIENT_SECRET" "SLACK_APP_ID" "SLACK_CLIENT_ID"
+            "SLACK_SIGNING_SECRET" "SLACK_VERIFICATION_TOKEN" "CRON_SECRET"
+          )
+
+          for secret in "${CORE_SECRETS[@]}"; do
+            val="${!secret}"
+            if [ ! -z "$val" ]; then
+              # Attempt to remove existing to avoid conflict, then add
+              vercel env rm "$secret" production -y || true
+              echo "$val" | vercel env add "$secret" production
+            fi
+          done
+
           vercel pull --yes --environment=production
           vercel build --prod
           vercel deploy --prebuilt --prod --yes
