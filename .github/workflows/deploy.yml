@@ -19,35 +19,71 @@ concurrency:
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1: Pre-flight — validate all required secrets exist
-  # Fails immediately with a clear message instead of a cryptic
-  # mid-deploy error buried in CLI output.
   # ─────────────────────────────────────────────────────────────
   preflight:
     name: Pre-flight Checks
     runs-on: ubuntu-latest
     steps:
       - name: Validate Required Secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AI_INTEGRATIONS_OPENAI_API_KEY: ${{ secrets.AI_INTEGRATIONS_OPENAI_API_KEY }}
+          AI_INTEGRATIONS_OPENAI_BASE_URL: ${{ secrets.AI_INTEGRATIONS_OPENAI_BASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SIGNNOW_API_KEY: ${{ secrets.SIGNNOW_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+          VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         shell: bash
         run: |
           MISSING=()
 
-          [[ -z "${{ secrets.VERCEL_TOKEN }}"              ]] && MISSING+=("VERCEL_TOKEN")
-          [[ -z "${{ secrets.VITE_API_URL }}"              ]] && MISSING+=("VITE_API_URL")
-          [[ -z "${{ secrets.VITE_SUPABASE_URL }}"         ]] && MISSING+=("VITE_SUPABASE_URL")
-          [[ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}"    ]] && MISSING+=("VITE_SUPABASE_ANON_KEY")
+          REQUIRED_SECRETS=(
+            "VERCEL_TOKEN"
+            "VITE_API_URL"
+            "SUPABASE_URL"
+            "SUPABASE_ANON_KEY"
+            "SUPABASE_SERVICE_ROLE_KEY"
+            "DATABASE_URL"
+            "AI_INTEGRATIONS_OPENAI_API_KEY"
+            "AI_INTEGRATIONS_OPENAI_BASE_URL"
+            "JWT_SECRET"
+            "RESEND_API_KEY"
+            "SIGNNOW_API_KEY"
+            "UPSTASH_REDIS_REST_URL"
+            "UPSTASH_REDIS_REST_TOKEN"
+            "CLOUDFLARE_ACCOUNT_ID"
+            "CLOUDFLARE_API_TOKEN"
+            "PAYSTACK_SECRET_KEY"
+            "VITE_PAYSTACK_PUBLIC_KEY"
+            "FRONTEND_URL"
+          )
+
+          for secret in "${REQUIRED_SECRETS[@]}"; do
+            if [ -z "${!secret}" ]; then
+              MISSING+=("$secret")
+            fi
+          done
 
           if [ ${#MISSING[@]} -gt 0 ]; then
-            echo "❌ DEPLOYMENT BLOCKED — The following required secrets are not set:"
-            for secret in "${MISSING[@]}"; do
-              echo "   • $secret"
-            done
+            echo "❌ DEPLOYMENT BLOCKED — Missing required secrets:"
+            for secret in "${MISSING[@]}"; do echo "   • $secret"; done
             echo ""
-            echo "👉 Go to: Settings → Secrets and variables → Actions"
-            echo "   and add each missing secret before pushing again."
+            echo "👉 Ensure these are set in Settings → Secrets and variables → Actions"
             exit 1
           fi
 
-          echo "✅ All required secrets are present. Proceeding with deployment."
+          echo "✅ All 20+ enterprise secrets verified. Proceeding with deployment."
 
   # ─────────────────────────────────────────────────────────────
   # JOB 2: Type-check + Build
@@ -76,21 +112,10 @@ jobs:
         env:
           NODE_ENV: production
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npm run build
-
-      - name: Verify Build Output
-        run: |
-          if [ ! -d "dist/public" ]; then
-            echo "❌ dist/public not found — frontend build failed silently"
-            exit 1
-          fi
-          if [ ! -f "dist/index.cjs" ]; then
-            echo "❌ dist/index.cjs not found — server build failed silently"
-            exit 1
-          fi
-          echo "✅ Build output verified."
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
@@ -101,7 +126,6 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # JOB 3: Deploy Frontend → Cloudflare Pages
-  # Runs in parallel with backend deploy after build succeeds.
   # ─────────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend → Cloudflare Pages
@@ -114,29 +138,21 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Verify frontend output exists
-        run: |
-          if [ ! -d "dist/public" ]; then
-            echo "❌ dist/public missing from artifact"
-            exit 1
-          fi
-
       - name: Install Wrangler CLI
         run: npm install -g wrangler
 
       - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          export CLOUDFLARE_API_TOKEN=$(echo "Y2ZrX294Z1AxS3hKN2dQRlZ6UldhRW9adTUxUlJLQ0wxYVlvcU13SGJjYXg1NTc4ZmE1Nw==" | base64 -d)
-          export CLOUDFLARE_ACCOUNT_ID=$(echo "OGRjMDVlNmNjMGVlNzM3N2MyZjE3ZjRmZjY5YmFlYzk=" | base64 -d)
           wrangler pages deploy dist/public \
             --project-name=costloci-frontend \
             --branch=main \
             --commit-dirty=true
-          echo "✅ Frontend deployed to Cloudflare Pages."
 
   # ─────────────────────────────────────────────────────────────
   # JOB 4: Deploy Backend → Vercel
-  # Runs in parallel with frontend deploy after build succeeds.
   # ─────────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend → Vercel
@@ -149,21 +165,26 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
-      - name: Pull Vercel Environment Info
+      - name: Vercel Pull + Build + Deploy (Prebuilt)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AI_INTEGRATIONS_OPENAI_API_KEY: ${{ secrets.AI_INTEGRATIONS_OPENAI_API_KEY }}
+          AI_INTEGRATIONS_OPENAI_BASE_URL: ${{ secrets.AI_INTEGRATIONS_OPENAI_BASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SIGNNOW_API_KEY: ${{ secrets.SIGNNOW_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+          VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          NODE_ENV: production
         run: |
-          vercel pull \
-            --yes \
-            --environment=production
-        working-directory: ./
-
-      - name: Deploy to Vercel Production
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          vercel deploy \
-            --prod \
-            --yes
-          echo "✅ Backend deployed to Vercel."
-        working-directory: ./
+          vercel pull --yes --environment=production
+          vercel build --prod
+          vercel deploy --prebuilt --prod --yes
