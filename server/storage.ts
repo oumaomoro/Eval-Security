@@ -50,6 +50,7 @@ export interface IStorage {
 
   // Risks
   getRisks(contractId?: number): Promise<Risk[]>;
+  getRisksByClientId(clientId: number): Promise<Risk[]>;
   createRisk(risk: InsertRisk): Promise<Risk>;
   updateRisk(id: number, updates: Partial<Risk>): Promise<Risk>;
 
@@ -417,7 +418,7 @@ export class SupabaseRESTStorage implements IStorage {
   async getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]> {
     let query = supabase.from("compliance_audits").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
-    return this.handleResponse<ComplianceAudit[]>(query.order("audit_date", { ascending: false }));
+    return this.handleResponse<ComplianceAudit[]>(query.order("created_at", { ascending: false }));
   }
 
   async createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit> {
@@ -434,6 +435,32 @@ export class SupabaseRESTStorage implements IStorage {
     if (contractId) query = query.eq("contract_id", contractId);
     else query = query.order("risk_score", { ascending: false });
     return this.handleResponse<Risk[]>(query);
+  }
+
+  /**
+   * Tenant-scoped risk retrieval.
+   * Fetches risks only for contracts belonging to a specific clientId.
+   * Used by the /api/risks list endpoint to prevent cross-tenant data leaks.
+   */
+  async getRisksByClientId(clientId: number): Promise<Risk[]> {
+    // Step 1: Get all contract IDs for this client
+    const { data: contractData } = await supabase
+      .from("contracts")
+      .select("id")
+      .eq("client_id", clientId);
+
+    if (!contractData || contractData.length === 0) return [];
+
+    const contractIds = contractData.map((c: any) => c.id);
+
+    // Step 2: Fetch risks that belong to those contracts only
+    const data = await this.handleResponse<Risk[]>(
+      supabase.from("risks")
+        .select("*")
+        .in("contract_id", contractIds)
+        .order("risk_score", { ascending: false })
+    );
+    return data || [];
   }
 
   async createRisk(risk: InsertRisk): Promise<Risk> {

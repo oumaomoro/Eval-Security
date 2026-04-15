@@ -23,8 +23,6 @@ import { telemetryMiddleware } from "./middleware/telemetry";
 
 import multer from "multer";
 import pdf from "pdf-parse";
-import fs from "fs";
-import path from "path";
 import memoize from "memoizee";
 import { requireRole } from "./middleware/rbac";
 import { requireWorkspacePermission } from "./middleware/workspace-rbac";
@@ -35,20 +33,12 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-// Setup permanent storage for contracts
-const storageDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(storageDir)) {
-  fs.mkdirSync(storageDir, { recursive: true });
-}
-const diskStorage = multer.diskStorage({
-  destination: (req, res, cb) => cb(null, storageDir),
-  filename: (req, file, cb) => {
-    // Generate a secure, unique filename to avoid collision
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  }
+// Use memory storage — files are streamed directly to Supabase Storage.
+// NEVER use disk storage on Vercel: the ephemeral filesystem is wiped on every cold start.
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
 });
-const upload = multer({ storage: diskStorage });
 
 // Cache AI responses 60 min to reduce latency and cost
 const cachedCompletion = memoize(
@@ -217,9 +207,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const input = api.contracts.create.input.parse(req.body);
 
+      const resolvedClientId = input.clientId || req.user?.clientId;
+      if (!resolvedClientId) {
+        return res.status(400).json({ message: "Account provisioning incomplete — clientId missing. Please contact support." });
+      }
+
       const contract = await storage.createContract({
         ...input,
-        clientId: input.clientId || req.user?.clientId || 1,
+        clientId: resolvedClientId,
       }, req.user?.id);
       await storage.createAuditLog({
         action: "CONTRACT_CREATED",
@@ -255,9 +250,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       if (!checkContractLimit(req, res)) return;
 
-      // Read file securely from disk for AI extraction
-      const fileBuffer = fs.readFileSync(req.file.path);
-      const pdfData = await pdf(fileBuffer);
+      // Buffer is available directly from multer memoryStorage — no disk I/O needed
+      const pdfData = await pdf(req.file.buffer);
 
       const extractedText = pdfData.text.substring(0, 15000);
 
@@ -290,8 +284,29 @@ Analyze the contract text and return JSON with exactly these fields:
         };
       }
 
-      // Extract clientId from the request context
-      const clientId = req.user?.clientId || 1;
+      // Extract clientId from the authenticated request context
+      const clientId = req.user?.clientId;
+      if (!clientId) {
+        return res.status(400).json({ message: "Account provisioning incomplete — clientId missing. Please contact support." });
+      }
+
+      // ── Upload to Supabase Storage (persistent, Vercel-safe) ──────────────
+      const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
+      const storagePath = `contracts/${clientId}/${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error: storageError } = await supabaseAdmin.storage
+        .from("contracts")
+        .upload(storagePath, req.file.buffer, {
+          contentType: req.file.mimetype || "application/pdf",
+          upsert: false,
+        });
+
+      let fileUrl = "#";
+      if (storageError) {
+        console.warn("[UPLOAD] Supabase Storage upload failed, contract saved without file URL:", storageError.message);
+      } else {
+        const { data: urlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
+        fileUrl = urlData?.publicUrl || "#";
+      }
 
       const contract = await storage.createContract({
         clientId,
@@ -300,7 +315,7 @@ Analyze the contract text and return JSON with exactly these fields:
         category: analysis.category || "General Provider",
         annualCost: analysis.annualCost || 0,
         status: analysis.vendorName === "Pending AI Review" ? "pending" : "active",
-        fileUrl: `uploads/${req.file.filename}`, // Save the actual disk filename
+        fileUrl, // ── Supabase Storage URL (persistent)
         aiAnalysis: {
           riskScore: analysis.riskScore,
           riskFlags: analysis.riskFlags || [],
@@ -650,8 +665,22 @@ Analyze the contract text and return JSON with exactly these fields:
   app.get(api.risks.list.path, isAuthenticated, async (req: any, res) => {
     try {
       const contractId = req.query.contractId ? Number(req.query.contractId) : undefined;
-      res.json(await storage.getRisks(contractId));
-    } catch { res.status(500).json({ message: "Failed to fetch risks" }); }
+
+      if (contractId) {
+        // Verify the requesting user owns this contract before returning its risks
+        const contract = await storage.getContract(contractId);
+        if (!contract || (req.user.role !== 'admin' && contract.clientId !== req.user.clientId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        return res.json(await storage.getRisks(contractId));
+      }
+
+      // No contractId — scope risks to just this user's client tenant
+      if (req.user.role === 'admin') {
+        return res.json(await storage.getRisks());
+      }
+      res.json(await storage.getRisksByClientId(req.user.clientId));
+    } catch (err: any) { res.status(500).json({ message: "Failed to fetch risks" }); }
   });
 
   app.post(api.risks.create.path, isAuthenticated, async (req, res) => {
