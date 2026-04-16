@@ -28,7 +28,45 @@ export function registerAuthRoutes(app: Express): void {
     try {
       res.setHeader("X-P25-Status", "Harmonized-V1");
       if (!req.user) return res.status(401).json({ message: "Unauthorized" });
-      const user = await authStorage.getUser(req.user.id);
+      let user = await authStorage.getUser(req.user.id).catch(() => null);
+
+      if (!user || !user.clientId) {
+        console.log(`[AUTH-DIAG] Implicit OAuth Self-Healing Identity for user ${req.user.id}`);
+        try {
+          const firstName = req.user.firstName || "Enterprise";
+          const lastName = req.user.lastName || "User";
+          let clientId = user?.clientId;
+
+          if (!clientId) {
+             const client = await storage.createClient({
+               companyName: `${firstName}'s Enterprise Hub`,
+               industry: "Professional Services",
+               contactName: `${firstName} ${lastName}`,
+               contactEmail: req.user.email!,
+               status: "active"
+             });
+             clientId = client.id;
+             await storage.createWorkspace({
+               name: "Main Workspace",
+               ownerId: req.user.id,
+               plan: "starter"
+             });
+          }
+
+          user = await authStorage.upsertUser({
+             id: req.user.id,
+             email: req.user.email!,
+             firstName,
+             lastName,
+             clientId,
+             role: user?.role || "admin",
+             subscriptionTier: "starter"
+          });
+        } catch (healErr: any) {
+          console.error(`[AUTH-DIAG] Identity Healing Failed in GET /user:`, healErr.message);
+        }
+      }
+
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
