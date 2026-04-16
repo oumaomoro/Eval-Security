@@ -39,8 +39,14 @@ const url = getEnvKey("SUPABASE_URL") || "https://ulercnwyckrcjcnrenzz.supabase.
 const serviceKey = getEnvKey("SUPABASE_SERVICE_ROLE_KEY");
 const anonKey = getEnvKey("SUPABASE_ANON_KEY") || serviceKey; // Fallback if anon is not set
 
+// RESILIENT INITIALIZATION
+// During CI builds (esbuild bundling), env vars may not be present.
+// We use a non-empty placeholder so createClient doesn't throw at import time.
+// The real keys MUST be present at runtime (Vercel injects them).
+const PLACEHOLDER_KEY = "placeholder-key-for-build-only";
+
 // STANDARD CLIENT (User Auth)
-export const supabase = createClient(url, anonKey, {
+export const supabase = createClient(url, anonKey || PLACEHOLDER_KEY, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
@@ -49,7 +55,7 @@ export const supabase = createClient(url, anonKey, {
 });
 
 // ADMIN CLIENT (Sovereign Operations)
-export const adminClient = createClient(url, serviceKey, {
+export const adminClient = createClient(url, serviceKey || PLACEHOLDER_KEY, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
@@ -58,7 +64,7 @@ export const adminClient = createClient(url, serviceKey, {
 });
 
 if (!serviceKey) {
-  console.warn("⚠️  SUPABASE_SERVICE_ROLE_KEY is missing. Autonomic provisioning will fail.");
+  console.warn("⚠️  SUPABASE_SERVICE_ROLE_KEY is missing. Autonomic provisioning will fail at runtime.");
 } else {
   console.log(`[DIAGNOSTIC] Isolated Admin Client initialized. RLS bypass enabled.`);
   console.log(`[DIAGNOSTIC] Target URL: ${url}`);
