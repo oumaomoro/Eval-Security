@@ -37,7 +37,7 @@ export default function AuditLog() {
     doc.text(`Compliance: SOC 2 Type II`, 20, 35);
 
     let y = 50;
-    filteredLogs?.forEach((log, i) => {
+    filteredLogs?.forEach((log: any, i: number) => {
       if (y > 270) { doc.addPage(); y = 20; }
       doc.setFontSize(12);
       doc.text(`${log.action.replace(/_/g, ' ')}`, 20, y);
@@ -50,7 +50,7 @@ export default function AuditLog() {
     doc.save(`Costloci_Audit_Ledger_${new Date().getTime()}.pdf`);
   };
 
-  const filteredLogs = logs?.filter(log => 
+  const filteredLogs = logs?.filter((log: any) => 
     log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
     log.details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     log.resourceType?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -103,7 +103,7 @@ export default function AuditLog() {
                 </Card>
               </motion.div>
             ) : (
-              filteredLogs?.map((log, index) => (
+              filteredLogs?.map((log: any, index: number) => (
                 <motion.div
                   key={log.id}
                   layout

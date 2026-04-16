@@ -24,7 +24,8 @@ import {
   infrastructureLogs,
   billingTelemetry,
   auditLogs,
-  users
+  users,
+  notificationChannels,
 } from './schema';
 
 // === SHARED ERROR SCHEMAS ===
@@ -597,6 +598,15 @@ export const api = {
       },
     },
   },
+  auditLogs: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/audit-logs' as const,
+      responses: {
+        200: z.array(z.custom<typeof auditLogs.$inferSelect>()),
+      },
+    },
+  },
   infrastructure: {
     logs: {
       method: 'GET' as const,
@@ -660,12 +670,35 @@ export const api = {
       },
     },
   },
-  auditLogs: {
-    list: {
-      method: "GET" as const,
-      path: "/api/audit-logs" as const,
-      responses: {
-        200: z.array(z.custom<typeof auditLogs.$inferSelect>()),
+  notifications: {
+    channels: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/notifications/channels' as const,
+        responses: {
+          200: z.array(z.custom<typeof notificationChannels.$inferSelect>()),
+        },
+      },
+      create: {
+        method: 'POST' as const,
+        path: '/api/notifications/channels' as const,
+        input: z.object({
+          provider: z.string(),
+          webhookUrl: z.string().url(),
+          events: z.array(z.string()).optional(),
+        }),
+        responses: {
+          201: z.custom<typeof notificationChannels.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      delete: {
+        method: 'DELETE' as const,
+        path: '/api/notifications/channels/:id' as const,
+        responses: {
+          200: z.any(),
+          404: errorSchemas.notFound,
+        },
       },
     },
   },

@@ -12,23 +12,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const supabase = new Proxy(adminClient, {
   get(target, prop: keyof SupabaseClient) {
     const store = storageContext.getStore();
-    const activeClient = store?.client || adminClient;
-    
-    // If we have a workspace ID in the context, we must ensure the DB session knows it.
-    // In Supabase REST / PostgREST, we can't easily run a SET command per request 
-    // unless we use a custom header or RPC. Here we proxy the .from() call.
-    if (prop === 'from' && store?.client) {
-        return (relation: string) => {
-            const query = activeClient.from(relation);
-            // We use a custom header 'X-Workspace-ID' that the DB can read via 
-            // current_setting('request.headers')::json->>'x-workspace-id'
-            // OR we rely on the Proxy to swap the client which has the user JWT.
-            return query;
-        };
-    }
+    const activeClient = (store?.client as SupabaseClient) || adminClient;
 
     const value = activeClient[prop];
-    return typeof value === 'function' ? value.bind(activeClient) : value;
+    if (typeof value === "function") {
+      return (...args: any[]) => {
+        const result = (value as Function).apply(activeClient, args);
+        // If we're calling .from(), we want the resulting builder to also be proxied if needed
+        // but for now, simple binding is enough as activeClient is already the right one.
+        return result;
+      };
+    }
+    return value;
   }
 }) as SupabaseClient;
 import {
@@ -438,17 +433,34 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   // --- COMPLIANCE ---
+  async getAuditRulesets(): Promise<AuditRuleset[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("audit_rulesets").select("*");
+    // Only return global rulesets (isCustom=false) OR those belonging to current workspace
+    if (workspaceId) {
+      query = query.or(`is_custom.eq.false,workspace_id.eq.${workspaceId}`);
+    } else {
+      query = query.eq("is_custom", false);
+    }
+    return this.handleResponse<AuditRuleset[]>(query);
+  }
+
   async getAuditRuleset(id: number): Promise<AuditRuleset | undefined> {
     const data = await this.handleResponse<any | null>(supabase.from("audit_rulesets").select("*").eq("id", id).maybeSingle());
     return data || undefined;
   }
 
-  async getAuditRulesets(): Promise<AuditRuleset[]> {
-    return this.handleResponse<AuditRuleset[]>(supabase.from("audit_rulesets").select("*").order("created_at", { ascending: false }));
-  }
-
   async createAuditRuleset(ruleset: InsertAuditRuleset): Promise<AuditRuleset> {
-    return this.handleResponse(supabase.from("audit_rulesets").insert(ruleset).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    return this.handleResponse<AuditRuleset>(
+      supabase.from("audit_rulesets")
+        .insert({
+          ...ruleset,
+          workspaceId: workspaceId || ruleset.workspaceId
+        })
+        .select()
+        .single()
+    );
   }
 
   async updateAuditRuleset(id: number, updates: Partial<AuditRuleset>): Promise<AuditRuleset> {
@@ -503,13 +515,25 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("compliance_audits").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
     return this.handleResponse<ComplianceAudit[]>(query.order("created_at", { ascending: false }));
   }
 
   async createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit> {
-    return this.handleResponse<ComplianceAudit>(supabase.from("compliance_audits").insert(audit).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    return this.handleResponse<ComplianceAudit>(
+      supabase.from("compliance_audits")
+        .insert({
+          ...audit,
+          workspaceId: workspaceId || audit.workspaceId
+        })
+        .select()
+        .single()
+    );
   }
 
   async updateComplianceAudit(id: number, updates: Partial<ComplianceAudit>): Promise<ComplianceAudit> {
@@ -518,10 +542,11 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- RISKS ---
   async getRisks(contractId?: number): Promise<Risk[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("risks").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
-    else query = query.order("risk_score", { ascending: false });
-    return this.handleResponse<Risk[]>(query);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    return this.handleResponse<Risk[]>(query.order("created_at", { ascending: false }));
   }
 
   /**
@@ -551,9 +576,10 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async createRisk(risk: InsertRisk): Promise<Risk> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     const payload = {
         ...risk,
-        workspace_id: storageContext.getStore()?.workspaceId || risk.workspaceId,
+        workspace_id: workspaceId || risk.workspaceId,
         contract_id: risk.contractId,
         risk_title: risk.riskTitle,
         risk_category: risk.riskCategory,
@@ -572,7 +598,7 @@ export class SupabaseRESTStorage implements IStorage {
     delete (payload as any).mitigationStrategies;
     delete (payload as any).workspaceId;
 
-    return this.handleResponse(supabase.from("risks").insert(payload).select().single());
+    return this.handleResponse<Risk>(supabase.from("risks").insert(payload).select().single());
   }
 
   async updateRisk(id: number, updates: Partial<Risk>): Promise<Risk> {
@@ -624,11 +650,23 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- REPORTS ---
   async getReports(): Promise<Report[]> {
-    return this.handleResponse<Report[]>(supabase.from("reports").select("*").order("created_at", { ascending: false }));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("reports").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    return this.handleResponse<Report[]>(query.order("created_at", { ascending: false }));
   }
 
   async createReport(report: InsertReport): Promise<Report> {
-    return this.handleResponse<Report>(supabase.from("reports").insert(report).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    return this.handleResponse<Report>(
+      supabase.from("reports")
+        .insert({
+          ...report,
+          workspaceId: workspaceId || report.workspaceId
+        })
+        .select()
+        .single()
+    );
   }
 
   async updateReport(id: number, updates: Partial<Report>): Promise<Report> {
@@ -637,14 +675,25 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- SCORECARDS ---
   async getVendorScorecards(vendorName?: string): Promise<VendorScorecard[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("vendor_scorecards").select("*");
     if (vendorName) query = query.eq("vendor_name", vendorName);
-    else query = query.order("last_assessment_date", { ascending: false });
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    query = query.order("last_assessment_date", { ascending: false });
     return this.handleResponse<VendorScorecard[]>(query);
   }
 
   async createVendorScorecard(scorecard: InsertVendorScorecard): Promise<VendorScorecard> {
-    return this.handleResponse<VendorScorecard>(supabase.from("vendor_scorecards").insert(scorecard).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    return this.handleResponse<VendorScorecard>(
+      supabase.from("vendor_scorecards")
+        .insert({
+          ...scorecard,
+          workspaceId: workspaceId || scorecard.workspaceId
+        })
+        .select()
+        .single()
+    );
   }
 
   // --- DASHBOARD & ANALYTICS ---
@@ -1078,13 +1127,24 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- REGULATORY ---
   async getRegulatoryAlerts(status?: string): Promise<RegulatoryAlert[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("regulatory_alerts").select("*");
     if (status) query = query.eq("status", status);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
     return this.handleResponse<RegulatoryAlert[]>(query.order("published_date", { ascending: false }));
   }
 
   async createRegulatoryAlert(alert: InsertRegulatoryAlert): Promise<RegulatoryAlert> {
-    return this.handleResponse<RegulatoryAlert>(supabase.from("regulatory_alerts").insert(alert).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    return this.handleResponse<RegulatoryAlert>(
+      supabase.from("regulatory_alerts")
+        .insert({
+          ...alert,
+          workspaceId: workspaceId || alert.workspaceId
+        })
+        .select()
+        .single()
+    );
   }
 
   // --- USERS ---

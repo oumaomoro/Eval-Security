@@ -90,6 +90,7 @@ export const contracts = pgTable("contracts", {
 
 export const auditRulesets = pgTable("audit_rulesets", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   name: text("name").notNull(),
   description: text("description"),
   standard: text("standard").notNull(), // PCI DSS, CCPA, GDPR, Custom, etc.

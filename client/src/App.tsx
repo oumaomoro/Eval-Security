@@ -20,6 +20,7 @@ import WorkspaceSettings from "@/pages/WorkspaceSettings";
 import Marketplace from "@/pages/Marketplace";
 import ExecutiveROI from "@/pages/ExecutiveROI";
 import History from "@/pages/History";
+import NotificationSettings from "@/pages/NotificationSettings";
 
 import React, { Suspense } from "react";
 const ContractDetail = React.lazy(() => import("@/pages/ContractDetail"));
@@ -27,6 +28,7 @@ const Risks = React.lazy(() => import("@/pages/Risks"));
 const Rulesets = React.lazy(() => import("@/pages/Rulesets"));
 
 import AuthPage from "@/pages/AuthPage";
+import { AuthCallback } from "@/pages/AuthCallback";
 import LandingPage from "@/pages/LandingPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
@@ -52,6 +54,7 @@ function PrivateRouter() {
         <Route path="/marketplace" component={Marketplace} />
         <Route path="/roi" component={ExecutiveROI} />
         <Route path="/history" component={History} />
+        <Route path="/notifications" component={NotificationSettings} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
@@ -66,6 +69,7 @@ function AnalyticsWrapper() {
 }
 
 import { useLocation } from "wouter";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function AuthWrapper() {
   const { user, isLoading, isError } = useAuth();
@@ -85,6 +89,7 @@ function AuthWrapper() {
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/reset-password" component={ResetPassword} />
         {/* Redirect unknown routes to Landing on auth-fail */}
         <Route component={() => {
@@ -107,13 +112,15 @@ function AuthWrapper() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AnalyticsWrapper />
-        <Toaster />
-        <AuthWrapper />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AnalyticsWrapper />
+          <Toaster />
+          <AuthWrapper />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -66,3 +66,17 @@ if (!serviceKey) {
 
 export const getSupabase = () => supabase;
 export const getAdminClient = () => adminClient;
+export const createUserClient = (jwtToken: string) => {
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${jwtToken}`,
+      },
+    },
+  });
+};

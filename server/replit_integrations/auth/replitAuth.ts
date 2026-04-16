@@ -1,6 +1,8 @@
 import { type Express, type Request, type Response, type NextFunction } from "express";
-import { adminClient as supabase } from "../../services/supabase";
+import { adminClient as supabase, createUserClient } from "../../services/supabase";
 import { authStorage } from "./storage";
+import { storageContext } from "../../services/storageContext";
+import { storage } from "../../storage.js";
 
 /**
  * UNIFIED STATELESS AUTHENTICATION MIDDLEWARE V3
@@ -63,7 +65,26 @@ export async function setupAuth(app: Express) {
       // Add Harmonization Header for Debugging (Phase 25)
       res.setHeader("X-P25-Status", "Harmonized-V2");
 
-      return next();
+      // 5. Resolve Active Workspace Context (Sovereign Mode)
+      // This ensures that the RLS Proxy can enforce workspace boundaries.
+      const defaultWorkspace = await storage.getDefaultWorkspace(user.id).catch(() => null);
+      const workspaceId = defaultWorkspace?.id;
+
+      const userClient = createUserClient(token);
+      
+      // If we have a workspace ID, we try to set it in the DB context 
+      // This is for the 'current_setting' RLS policies to work properly.
+      if (workspaceId) {
+          // Fire and forget, but handle error
+          try {
+            userClient.rpc('set_workspace_context', { wid: String(workspaceId) })
+              .then(({ error }) => { if (error) console.error("[AUTH] DB Context Error:", error.message); });
+          } catch (err: any) {
+            console.error("[AUTH] RPC Exception:", err.message);
+          }
+      }
+
+      return storageContext.run({ client: userClient, workspaceId }, () => next());
     } catch (err: any) {
       console.error("[AUTH] Identification failed:", err.message);
       return next();

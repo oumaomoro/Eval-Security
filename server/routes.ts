@@ -109,25 +109,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
     try {
       const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
-      const { data: files, error } = await supabaseAdmin.storage.from("contracts").list("", {
+      
+      // 1. Fetch all objects from storage
+      const { data: files, error: storageError } = await supabaseAdmin.storage.from("contracts").list("", {
           limit: 1000,
           sortBy: { column: 'created_at', order: 'asc' }
       });
+      if (storageError) throw storageError;
+
+      // 2. Fetch all contract file URLs from DB
+      const { data: contracts, error: dbError } = await supabaseAdmin.from("contracts").select("file_url");
+      if (dbError) throw dbError;
+
+      const validUrls = new Set(contracts?.map(c => c.file_url) || []);
       
-      if (error) throw error;
-      
-      const now = Date.now();
-      const cutoff = now - (7 * 24 * 60 * 60 * 1000); // 7 days
-      
-      const orphans = files?.filter(f => f.created_at && new Date(f.created_at).getTime() < cutoff);
-      
-      if (orphans && orphans.length > 0) {
-          // Ideally check DB before deleting, but keeping it simple for now:
-          // Files are path-prefixed with clientId. We can verify if URL exists in contracts table.
+      // 3. Identify orphans based on DB sync
+      const orphans = files?.filter(f => {
+        if (!f.name) return false;
+        // Construct the expected url part
+        // Depending on your bucket exposure, usually it ends with /contracts/${f.name}
+        return !validUrls.has(f.name) && !Array.from(validUrls).some(url => url && url.includes(`contracts/${f.name}`));
+      }) || [];
+
+      if (orphans.length > 0) {
           await supabaseAdmin.storage.from("contracts").remove(orphans.map(o => o.name));
       }
       
-      res.json({ success: true, purged: orphans?.length || 0 });
+      res.json({ success: true, purged: orphans.length });
     } catch (err: any) {
       res.status(500).json({ message: "Cleanup failed: " + err.message });
     }

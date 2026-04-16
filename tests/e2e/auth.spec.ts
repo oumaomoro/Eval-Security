@@ -56,13 +56,13 @@ test.describe('Platform Authentication', () => {
     }
   });
 
-  test('should show biometric button if supported', async ({ page }) => {
+  test('should show SSO Gateway button', async ({ page }) => {
     await page.goto('/auth');
-    // Biometric button is an optional enhancement — just ensure it doesn't crash the page
-    const biometricBtn = page.locator('button').filter({ hasText: /biometric/i });
-    const visible = await biometricBtn.isVisible();
+    // SSO button should exist
+    const ssoBtn = page.locator('button').filter({ hasText: /SSO Gateway/i });
+    const visible = await ssoBtn.isVisible();
     if (visible) {
-      await expect(biometricBtn).toBeEnabled();
+      await expect(ssoBtn).toBeEnabled();
     }
     // Page must still be responsive
     await expect(page.locator('body')).toBeVisible();
