@@ -38,11 +38,11 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
+  /* Run your local dev server before starting the tests (disabled in CI — tests hit deployed URL) */
+  webServer: process.env.CI ? undefined : {
     command: 'npm run dev',
     url: 'http://localhost:3001',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120 * 1000,
   },
 });
