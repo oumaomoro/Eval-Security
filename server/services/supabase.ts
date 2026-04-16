@@ -36,17 +36,17 @@ const getEnvKey = (keyName: string): string => {
 };
 
 const url = getEnvKey("SUPABASE_URL") || "https://ulercnwyckrcjcnrenzz.supabase.co";
+const DEFAULT_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsZXJjbnd5Y2tyY2pjbnJlbnp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNTMwMDUsImV4cCI6MjA4NjcyOTAwNX0.TBOo9DereNkd2ejJ9AHCMg1-TuQbg_dSC3SNQsXNo5o";
 const serviceKey = getEnvKey("SUPABASE_SERVICE_ROLE_KEY");
-const anonKey = getEnvKey("SUPABASE_ANON_KEY") || serviceKey; // Fallback if anon is not set
+const anonKey = getEnvKey("SUPABASE_ANON_KEY") || serviceKey || DEFAULT_ANON_KEY;
 
 // RESILIENT INITIALIZATION
-// During CI builds (esbuild bundling), env vars may not be present.
-// We use a non-empty placeholder so createClient doesn't throw at import time.
-// The real keys MUST be present at runtime (Vercel injects them).
-const PLACEHOLDER_KEY = "placeholder-key-for-build-only";
+// The anon key has a safe public default. The service_role key must come from env at runtime.
+// During CI builds, service_role may be absent — we use the anon key as a fallback so
+// createClient doesn't throw at import time. Actual admin operations will fail gracefully.
 
 // STANDARD CLIENT (User Auth)
-export const supabase = createClient(url, anonKey || PLACEHOLDER_KEY, {
+export const supabase = createClient(url, anonKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
@@ -54,8 +54,8 @@ export const supabase = createClient(url, anonKey || PLACEHOLDER_KEY, {
   }
 });
 
-// ADMIN CLIENT (Sovereign Operations)
-export const adminClient = createClient(url, serviceKey || PLACEHOLDER_KEY, {
+// ADMIN CLIENT (Sovereign Operations — requires SUPABASE_SERVICE_ROLE_KEY at runtime)
+export const adminClient = createClient(url, serviceKey || anonKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
