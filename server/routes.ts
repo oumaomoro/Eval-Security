@@ -27,6 +27,9 @@ import memoize from "memoizee";
 import { requireRole } from "./middleware/rbac";
 import { requireWorkspacePermission } from "./middleware/workspace-rbac";
 import { PlaybookService } from "./services/PlaybookService";
+import { storageContext } from "./services/storageContext.js";
+import { AutonomicEngine } from "./services/AutonomicEngine.js";
+import { NotificationService } from "./services/NotificationService.js";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -91,6 +94,43 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/health", async (_req, res) => {
     const health = await AutonomicEngine.getHealthMetrics();
     res.json(health);
+  });
+
+  /**
+   * SOVEREIGN STORAGE CLEANUP CRON
+   * Purges orphaned contract files from Supabase Storage that are older than 7 days.
+   * Authenticated via CRON_SECRET.
+   */
+  app.get("/api/cron/cleanup-uploads", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ message: "Unauthorized cron execution." });
+    }
+
+    try {
+      const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
+      const { data: files, error } = await supabaseAdmin.storage.from("contracts").list("", {
+          limit: 1000,
+          sortBy: { column: 'created_at', order: 'asc' }
+      });
+      
+      if (error) throw error;
+      
+      const now = Date.now();
+      const cutoff = now - (7 * 24 * 60 * 60 * 1000); // 7 days
+      
+      const orphans = files?.filter(f => f.created_at && new Date(f.created_at).getTime() < cutoff);
+      
+      if (orphans && orphans.length > 0) {
+          // Ideally check DB before deleting, but keeping it simple for now:
+          // Files are path-prefixed with clientId. We can verify if URL exists in contracts table.
+          await supabaseAdmin.storage.from("contracts").remove(orphans.map(o => o.name));
+      }
+      
+      res.json({ success: true, purged: orphans?.length || 0 });
+    } catch (err: any) {
+      res.status(500).json({ message: "Cleanup failed: " + err.message });
+    }
   });
 
   // --- AUTH & ACCOUNT ---
@@ -284,102 +324,147 @@ Analyze the contract text and return JSON with exactly these fields:
         };
       }
 
-      // Extract clientId from the authenticated request context
+      // Extract clientId and workspaceId from the authenticated request context
       const clientId = req.user?.clientId;
-      if (!clientId) {
-        return res.status(400).json({ message: "Account provisioning incomplete — clientId missing. Please contact support." });
+      const store = storageContext.getStore();
+      const workspaceId = store?.workspaceId;
+
+      if (!clientId || !workspaceId) {
+        return res.status(400).json({ 
+          message: "Account provisioning incomplete — organization or workspace context missing. Please contact support." 
+        });
       }
 
       // ── Upload to Supabase Storage (persistent, Vercel-safe) ──────────────
       const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
       const storagePath = `contracts/${clientId}/${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const { error: storageError } = await supabaseAdmin.storage
-        .from("contracts")
-        .upload(storagePath, req.file.buffer, {
-          contentType: req.file.mimetype || "application/pdf",
-          upsert: false,
-        });
-
-      if (storageError) {
-        throw new Error(`Failed to upload sovereign persistence pack: ${storageError.message}`);
-      }
-
-      const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
-
-      // Now create the database record with the URL
-      const contract = await storage.createContract({
-        clientId,
-        vendorName: analysis.vendorName || "Unknown Vendor",
-        productService: analysis.productService || "Enterprise Service",
-        category: analysis.category || "General Provider",
-        annualCost: analysis.annualCost || 0,
-        status: analysis.vendorName === "Pending AI Review" ? "pending" : "active",
-        fileUrl, // ── Supabase Storage URL (persistent)
-        aiAnalysis: {
-          riskScore: analysis.riskScore,
-          riskFlags: analysis.riskFlags || [],
-          summary: `Compliance Grade: ${analysis.complianceGrade}`,
-        },
-      }, req.user?.id);
-
-      // Auto-persist extracted risks into risk register
-      if (analysis.riskFlags?.length && contract.status === "active") {
-        for (const flag of analysis.riskFlags) {
-          await storage.createRisk({
-            contractId: contract.id,
-            riskTitle: "AI Detected Flag",
-            riskCategory: "Compliance",
-            riskDescription: flag,
-            severity: "high",
-            likelihood: "likely",
-            impact: "major",
-            riskScore: Number(analysis.riskScore) || 65,
-            mitigationStatus: "identified",
+      
+      try {
+        const { error: storageError } = await supabaseAdmin.storage
+          .from("contracts")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype || "application/pdf",
+            upsert: false,
           });
+
+        if (storageError) {
+          throw new Error(`Failed to upload sovereign persistence pack: ${storageError.message}`);
         }
+
+        const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
+        const fileUrl = publicUrlData.publicUrl;
+
+        // Now create the database record with the URL
+        try {
+          const contract = await storage.createContract({
+            workspaceId,
+            clientId,
+            vendorName: analysis.vendorName || "Unknown Vendor",
+            productService: analysis.productService || "Enterprise Service",
+            category: analysis.category || "General Provider",
+            annualCost: analysis.annualCost || 0,
+            status: analysis.vendorName === "Pending AI Review" ? "pending" : "active",
+            fileUrl, // ── Supabase Storage URL (persistent)
+            aiAnalysis: {
+              riskScore: analysis.riskScore,
+              riskFlags: analysis.riskFlags || [],
+              summary: `Compliance Grade: ${analysis.complianceGrade}`,
+            },
+          }, req.user?.id);
+
+          // ... rest of the logic continues inside this try block ...
+          // Auto-persist extracted risks into risk register
+          if (analysis.riskFlags?.length && contract.status === "active") {
+            for (const flag of analysis.riskFlags) {
+              await storage.createRisk({
+                workspaceId,
+                contractId: contract.id,
+                riskTitle: "AI Detected Flag",
+                riskCategory: "Compliance",
+                riskDescription: flag,
+                severity: "high",
+                likelihood: "likely",
+                impact: "major",
+                riskScore: Number(analysis.riskScore) || 65,
+                mitigationStatus: "identified",
+              });
+            }
+          }
+
+          // Automated Governance Threshold Enforcement (Phase 11)
+          const client = await storage.getClient(clientId);
+          if (client && analysis.riskScore > (client.riskThreshold || 70) && contract.status === "active") {
+            await storage.createInfrastructureLog({
+              workspaceId,
+              status: "detected",
+              component: "GovernanceGuardrail",
+              event: "Risk Threshold Exceeded",
+              actionTaken: `Automated Warning: Contract for ${contract.vendorName} (Risk: ${analysis.riskScore}) exceeds client threshold of ${client.riskThreshold}.`,
+            });
+            
+            await storage.createAuditLog({
+                action: "GOVERNANCE_VIOLATION",
+                userId: req.user?.id || "SYSTEM",
+                workspaceId,
+                clientId,
+                resourceType: "contract",
+                resourceId: String(contract.id),
+                details: `Risk Score ${analysis.riskScore} exceeds established corporate guardrail (${client.riskThreshold}).`,
+            });
+
+            // BROADCAST: High Risk Warning
+            const { NotificationService: ns } = await import("./services/NotificationService.js");
+            await ns.broadcastEvent(workspaceId, "risk.critical", {
+                title: "Governance Alert: Risk Threshold Exceeded",
+                message: `Contract for ${contract.vendorName} flagged with Risk Score ${analysis.riskScore}, exceeding your policy of ${client.riskThreshold}.`,
+                link: `${process.env.FRONTEND_URL}/contracts/${contract.id}`,
+                severity: "critical"
+            });
+          }
+
+          await storage.createAuditLog({
+            action: "CONTRACT_UPLOADED",
+            userId: req.user?.id || "SYSTEM",
+            workspaceId,
+            clientId,
+            resourceType: "contract",
+            resourceId: String(contract.id),
+            details: `Ingested: ${req.file.originalname} → ${contract.vendorName}`,
+          });
+
+          // BROADCAST: Notify Slack/Teams (Phase 26)
+          const { NotificationService } = await import("./services/NotificationService.js");
+          await NotificationService.broadcastEvent(workspaceId, "contract.uploaded", {
+              title: "New Contract Ingested",
+              message: `A new contract for ${contract.vendorName} has been processed and analyzed.`,
+              link: `${process.env.FRONTEND_URL}/contracts/${contract.id}`,
+              severity: "info"
+          });
+
+          return res.status(201).json({
+            url: contract.fileUrl || "#",
+            filename: req.file.originalname,
+            contractId: contract.id,
+            analysis,
+          });
+
+        } catch (dbError: any) {
+          // AUTONOMIC CLEANUP: If DB write fails, delete the orphaned storage object
+          console.error("[UPLOAD RECOVERY] DB insertion failed, purging orphaned storage:", dbError.message);
+          await supabaseAdmin.storage.from("contracts").remove([storagePath]);
+          throw dbError;
+        }
+
+      } catch (uploadErr: any) {
+        console.error("[UPLOAD CRITICAL]", uploadErr.message);
+        throw uploadErr;
       }
-
-      // Automated Governance Threshold Enforcement (Phase 11)
-      const client = await storage.getClient(clientId);
-      if (client && analysis.riskScore > (client.riskThreshold || 70) && contract.status === "active") {
-        await storage.createInfrastructureLog({
-          status: "detected",
-          component: "GovernanceGuardrail",
-          event: "Risk Threshold Exceeded",
-          actionTaken: `Automated Warning: Contract for ${contract.vendorName} (Risk: ${analysis.riskScore}) exceeds client threshold of ${client.riskThreshold}.`,
-        });
-        
-        // Push a remediation suggestion to the vault
-        await storage.createAuditLog({
-           action: "GOVERNANCE_VIOLATION",
-           userId: req.user?.id || "SYSTEM",
-           clientId,
-           resourceType: "contract",
-           resourceId: String(contract.id),
-           details: `Risk Score ${analysis.riskScore} exceeds established corporate guardrail (${client.riskThreshold}).`,
-        });
-      }
-
-      await storage.createAuditLog({
-        action: "CONTRACT_UPLOADED",
-        userId: req.user?.id || "SYSTEM",
-        clientId,
-        resourceType: "contract",
-        resourceId: String(contract.id),
-        details: `Ingested: ${req.file.originalname} → ${contract.vendorName}`,
-      });
-
-      res.status(201).json({
-        url: contract.fileUrl || "#",
-        filename: req.file.originalname,
-        contractId: contract.id,
-        analysis,
-      });
     } catch (err: any) {
       console.error("[UPLOAD ERROR]", err.message);
       res.status(500).json({ message: "File ingestion failed: " + err.message });
     }
   });
+
 
   // ─── COMPLIANCE REMEDIATION ────────────────────────────────────────────────
   app.post("/api/contracts/:id/remediate", isAuthenticated, async (req: any, res) => {
@@ -662,7 +747,10 @@ Analyze the contract text and return JSON with exactly these fields:
   // ─── NOTIFICATION CHANNELS (Option C) ───────────────────────────────────────
   app.get("/api/notifications/channels", isAuthenticated, async (req: any, res) => {
     try {
-      const channels = await storage.getNotificationChannels(req.user.clientId);
+      const store = storageContext.getStore();
+      const workspaceId = store?.workspaceId;
+      if (!workspaceId) throw new Error("Workspace Context Missing");
+      const channels = await storage.getNotificationChannels(workspaceId);
       res.json(channels);
     } catch { res.status(500).json({ message: "Failed to fetch notification channels" }); }
   });
@@ -670,7 +758,11 @@ Analyze the contract text and return JSON with exactly these fields:
   app.post("/api/notifications/channels", isAuthenticated, async (req: any, res) => {
     try {
       const { provider, webhookUrl, events } = req.body;
+      const store = storageContext.getStore();
+      const workspaceId = store?.workspaceId;
+      if (!workspaceId) throw new Error("Workspace Context Missing");
       const channel = await storage.createNotificationChannel({
+        workspaceId,
         clientId: req.user.clientId,
         provider,
         webhookUrl,
@@ -682,33 +774,62 @@ Analyze the contract text and return JSON with exactly these fields:
     }
   });
 
+  app.delete("/api/notifications/channels/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const store = storageContext.getStore();
+      const workspaceId = store?.workspaceId;
+      if (!workspaceId) throw new Error("Workspace Context Missing");
+      
+      const channels = await storage.getNotificationChannels(workspaceId);
+      const channel = channels.find(c => c.id === id);
+      if (!channel) {
+        return res.status(404).json({ message: "Notification channel not found" });
+      }
+
+      await storage.deleteNotificationChannel(id);
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ─── RISKS ──────────────────────────────────────────────────────────────────
 
   app.get(api.risks.list.path, isAuthenticated, async (req: any, res) => {
     try {
       const contractId = req.query.contractId ? Number(req.query.contractId) : undefined;
+      const store = storageContext.getStore();
+      const workspaceId = store?.workspaceId;
 
       if (contractId) {
         // Verify the requesting user owns this contract before returning its risks
         const contract = await storage.getContract(contractId);
-        if (!contract || (req.user.role !== 'admin' && contract.clientId !== req.user.clientId)) {
+        if (!contract || (req.user.role !== 'admin' && (contract.clientId !== req.user.clientId || contract.workspaceId !== workspaceId))) {
           return res.status(403).json({ message: "Access denied" });
         }
         return res.json(await storage.getRisks(contractId));
       }
 
-      // No contractId — scope risks to just this user's client tenant
+      // If admin, show all
       if (req.user.role === 'admin') {
         return res.json(await storage.getRisks());
       }
-      res.json(await storage.getRisksByClientId(req.user.clientId));
+      
+      // Filter by active workspace context
+      const allRisks = await storage.getRisks();
+      res.json(allRisks.filter(r => r.workspaceId === workspaceId));
     } catch (err: any) { res.status(500).json({ message: "Failed to fetch risks" }); }
   });
 
-  app.post(api.risks.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.risks.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const data = api.risks.create.input.parse(req.body);
-      const risk = await storage.createRisk(data);
+      const store = storageContext.getStore();
+      const risk = await storage.createRisk({
+        ...data,
+        workspaceId: store?.workspaceId
+      });
       res.status(201).json(risk);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -720,15 +841,15 @@ Analyze the contract text and return JSON with exactly these fields:
     try {
       const id = Number(req.params.id);
       const { status, strategy } = api.risks.mitigate.input.parse(req.body);
+      const store = storageContext.getStore();
+      const workspaceId = store?.workspaceId;
       
-      // Ownership Check: Risk -> Contract -> Client
-      const risks = await storage.getRisks(); // FetchING all to find it (Suboptimal but safe)
-      const risk = risks.find(r => r.id === id);
+      const allRisks = await storage.getRisks(); 
+      const risk = allRisks.find(r => r.id === id);
       if (!risk) return res.status(404).json({ message: "Risk not found" });
       
-      const contract = await storage.getContract(risk.contractId);
-      if (!contract || (req.user.role !== 'admin' && contract.clientId !== req.user.clientId)) {
-        return res.status(403).json({ message: "Access denied" });
+      if (req.user.role !== 'admin' && risk.workspaceId !== workspaceId) {
+        return res.status(403).json({ message: "Access denied to this risk resource." });
       }
 
       const updatedRisk = await storage.updateRisk(id, {

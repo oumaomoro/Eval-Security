@@ -1,7 +1,36 @@
 import { randomUUID } from "crypto";
 import { ROIService } from "./services/ROIService";
 import { AuditService } from "./services/AuditService";
-import { adminClient as supabase } from "./services/supabase";
+import { adminClient } from "./services/supabase";
+import { storageContext } from "./services/storageContext";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// RLS HARDENING: Dynamically resolve the Supabase Client from the current AsyncLocalStorage context.
+// This seamlessly enforces enterprise RLS by using the authenticated user's client instead of the sovereign bypass.
+// RLS HARDENING: Dynamically resolve the Supabase Client from the current AsyncLocalStorage context.
+// This seamlessly enforces enterprise RLS by using the authenticated user's client instead of the sovereign bypass.
+const supabase = new Proxy(adminClient, {
+  get(target, prop: keyof SupabaseClient) {
+    const store = storageContext.getStore();
+    const activeClient = store?.client || adminClient;
+    
+    // If we have a workspace ID in the context, we must ensure the DB session knows it.
+    // In Supabase REST / PostgREST, we can't easily run a SET command per request 
+    // unless we use a custom header or RPC. Here we proxy the .from() call.
+    if (prop === 'from' && store?.client) {
+        return (relation: string) => {
+            const query = activeClient.from(relation);
+            // We use a custom header 'X-Workspace-ID' that the DB can read via 
+            // current_setting('request.headers')::json->>'x-workspace-id'
+            // OR we rely on the Proxy to swap the client which has the user JWT.
+            return query;
+        };
+    }
+
+    const value = activeClient[prop];
+    return typeof value === 'function' ? value.bind(activeClient) : value;
+  }
+}) as SupabaseClient;
 import {
   type Client, type Contract, type AuditRuleset, type ComplianceAudit, type Risk, type SavingsOpportunity, type Report, type VendorScorecard, type Workspace, type Comment, type ContractComparison,
   type InfrastructureLog, type BillingTelemetry, type AuditLog,
@@ -115,9 +144,10 @@ export interface IStorage {
   getPlaybooks(): Promise<Playbook[]>;
 
   // Notification Channels (Feature Option C)
-  getNotificationChannels(clientId: number): Promise<any[]>;
+  getNotificationChannels(workspaceId?: number): Promise<any[]>;
   createNotificationChannel(channel: any): Promise<any>;
   updateNotificationChannel(id: number, updates: any): Promise<any>;
+  deleteNotificationChannel(id: number): Promise<void>;
 
   // Regulatory
   getRegulatoryAlerts(status?: string): Promise<RegulatoryAlert[]>;
@@ -151,6 +181,7 @@ export class SupabaseRESTStorage implements IStorage {
     if (!d) return d;
     return {
       id: d.id,
+      workspaceId: d.workspace_id,
       clientId: d.client_id,
       vendorName: d.vendor_name,
       productService: d.product_service,
@@ -176,6 +207,7 @@ export class SupabaseRESTStorage implements IStorage {
     if (!d) return d;
     return {
       id: d.id,
+      workspaceId: d.workspace_id,
       companyName: d.company_name,
       industry: d.industry,
       contactName: d.contact_name,
@@ -252,6 +284,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any>(
       supabase.from("clients")
         .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || client.workspaceId,
           company_name: client.companyName,
           industry: client.industry,
           contact_name: client.contactName,
@@ -287,7 +320,8 @@ export class SupabaseRESTStorage implements IStorage {
       details: d.details,
       ipAddress: d.ip_address || null,
       metadata: d.metadata || null,
-      timestamp: new Date(d.timestamp)
+      timestamp: new Date(d.timestamp),
+      workspaceId: d.workspace_id
     }));
   }
 
@@ -332,6 +366,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any>(
       supabase.from("contracts")
         .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || contract.workspaceId,
           client_id: contract.clientId,
           vendor_name: contract.vendorName,
           product_service: contract.productService,
@@ -434,13 +469,16 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   // --- NOTIFICATION CHANNELS (Enterprise Webhooks Option C) --- //
-  async getNotificationChannels(clientId: number): Promise<any[]> {
-    return this.handleResponse<any[]>(supabase.from("notification_channels").select("*").eq("client_id", clientId));
+  async getNotificationChannels(workspaceId?: number): Promise<any[]> {
+    let query = supabase.from("notification_channels").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    return this.handleResponse<any[]>(query);
   }
 
   async createNotificationChannel(channel: any): Promise<any> {
     const data = await this.handleResponse<any[]>(supabase.from("notification_channels").insert({
-      client_id: channel.clientId,
+      workspace_id: storageContext.getStore()?.workspaceId || channel.workspaceId,
+      client_id: channel.clientId, // keeping for legacy
       provider: channel.provider,
       webhook_url: channel.webhookUrl,
       events: channel.events,
@@ -458,6 +496,10 @@ export class SupabaseRESTStorage implements IStorage {
 
     const data = await this.handleResponse<any[]>(supabase.from("notification_channels").update(payload).eq("id", id).select());
     return data[0];
+  }
+
+  async deleteNotificationChannel(id: number): Promise<void> {
+    await this.handleResponse(supabase.from("notification_channels").delete().eq("id", id));
   }
 
   async getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]> {
@@ -509,7 +551,28 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async createRisk(risk: InsertRisk): Promise<Risk> {
-    return this.handleResponse(supabase.from("risks").insert(risk).select().single());
+    const payload = {
+        ...risk,
+        workspace_id: storageContext.getStore()?.workspaceId || risk.workspaceId,
+        contract_id: risk.contractId,
+        risk_title: risk.riskTitle,
+        risk_category: risk.riskCategory,
+        risk_description: risk.riskDescription,
+        risk_score: risk.riskScore,
+        mitigation_status: risk.mitigationStatus,
+        mitigation_strategies: risk.mitigationStrategies
+    };
+    // Clean up camelCase keys if they exist in spread for snake_case DB
+    delete (payload as any).contractId;
+    delete (payload as any).riskTitle;
+    delete (payload as any).riskCategory;
+    delete (payload as any).riskDescription;
+    delete (payload as any).riskScore;
+    delete (payload as any).mitigationStatus;
+    delete (payload as any).mitigationStrategies;
+    delete (payload as any).workspaceId;
+
+    return this.handleResponse(supabase.from("risks").insert(payload).select().single());
   }
 
   async updateRisk(id: number, updates: Partial<Risk>): Promise<Risk> {
@@ -523,6 +586,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any[]>(query);
     return (data || []).map(d => ({
       id: d.id,
+      workspaceId: d.workspace_id || null,
       contractId: d.contract_id,
       type: d.type,
       description: d.description,
@@ -536,6 +600,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any>(
       supabase.from("savings_opportunities")
         .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || savings.workspaceId,
           contract_id: savings.contractId,
           type: savings.type,
           description: savings.description,
@@ -547,6 +612,7 @@ export class SupabaseRESTStorage implements IStorage {
     );
     return {
       id: data.id,
+      workspaceId: data.workspace_id || null,
       contractId: data.contract_id,
       type: data.type,
       description: data.description,
@@ -767,7 +833,8 @@ export class SupabaseRESTStorage implements IStorage {
       content: d.content,
       resolved: d.resolved,
       createdAt: new Date(d.created_at),
-      user: userMap.get(d.user_id)
+      user: userMap.get(d.user_id),
+      workspaceId: d.workspace_id
     }));
   }
 
@@ -778,6 +845,7 @@ export class SupabaseRESTStorage implements IStorage {
           contract_id: comment.contractId,
           audit_id: comment.auditId,
           user_id: comment.userId,
+          workspace_id: storageContext.getStore()?.workspaceId || comment.workspaceId,
           content: comment.content
         })
         .select("*")
@@ -790,7 +858,8 @@ export class SupabaseRESTStorage implements IStorage {
       userId: data.user_id,
       content: data.content,
       resolved: data.resolved,
-      createdAt: new Date(data.created_at)
+      createdAt: new Date(data.created_at),
+      workspaceId: data.workspace_id
     };
   }
 
@@ -811,7 +880,8 @@ export class SupabaseRESTStorage implements IStorage {
       component: d.component,
       event: d.event,
       status: d.status,
-      actionTaken: d.action_taken
+      actionTaken: d.action_taken,
+      workspaceId: d.workspace_id
     }));
   }
 
@@ -819,6 +889,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any>(
       supabase.from("infrastructure_logs")
         .insert({
+          workspace_id: log.workspaceId,
           component: log.component,
           event: log.event,
           status: log.status || "active",
@@ -833,7 +904,8 @@ export class SupabaseRESTStorage implements IStorage {
       component: data.component,
       event: data.event,
       status: data.status,
-      actionTaken: data.action_taken || null
+      actionTaken: data.action_taken || null,
+      workspaceId: data.workspace_id
     };
   }
 
@@ -855,7 +927,8 @@ export class SupabaseRESTStorage implements IStorage {
       component: data.component,
       event: data.event,
       status: data.status,
-      actionTaken: data.action_taken || null
+      actionTaken: data.action_taken || null,
+      workspaceId: data.workspace_id
     };
   }
 
@@ -870,7 +943,8 @@ export class SupabaseRESTStorage implements IStorage {
       jurisdiction: d.jurisdiction,
       applicableStandards: d.applicable_standards,
       riskLevelIfMissing: d.risk_level_if_missing,
-      isMandatory: d.is_mandatory || false
+      isMandatory: d.is_mandatory || false,
+      workspaceId: d.workspace_id
     }));
   }
 
@@ -886,7 +960,8 @@ export class SupabaseRESTStorage implements IStorage {
       riskLevel: d.risk_level,
       category: d.category,
       isStandard: d.is_standard,
-      createdAt: d.created_at ? new Date(d.created_at) : null
+      createdAt: d.created_at ? new Date(d.created_at) : null,
+      workspaceId: d.workspace_id
     }));
 
   }
@@ -895,6 +970,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any>(
       supabase.from("clauses")
         .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || clause.workspaceId,
           contract_id: clause.contractId,
           title: clause.title,
           category: clause.category,
@@ -913,7 +989,8 @@ export class SupabaseRESTStorage implements IStorage {
       content: data.content,
       riskLevel: data.risk_level,
       isStandard: data.is_standard,
-      createdAt: data.created_at ? new Date(data.created_at) : null
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      workspaceId: data.workspace_id
     };
   }
 
@@ -953,7 +1030,8 @@ export class SupabaseRESTStorage implements IStorage {
       jurisdiction: data.jurisdiction,
       applicableStandards: data.applicable_standards,
       riskLevelIfMissing: data.risk_level_if_missing,
-      isMandatory: data.is_mandatory || false
+      isMandatory: data.is_mandatory || false,
+      workspaceId: data.workspace_id
     };
   }
 
@@ -968,7 +1046,8 @@ export class SupabaseRESTStorage implements IStorage {
       metricType: d.metric_type,
       value: d.value,
       cost: d.cost ? Number(d.cost) : 0,
-      timestamp: d.timestamp ? new Date(d.timestamp) : null
+      timestamp: d.timestamp ? new Date(d.timestamp) : null,
+      workspaceId: d.workspace_id
     }));
   }
 
@@ -976,6 +1055,7 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any>(
       supabase.from("billing_telemetry")
         .insert({
+          workspace_id: telemetry.workspaceId,
           client_id: telemetry.clientId,
           metric_type: telemetry.metricType,
           value: telemetry.value,
@@ -987,6 +1067,7 @@ export class SupabaseRESTStorage implements IStorage {
     return {
       id: data.id,
       clientId: data.client_id,
+      workspaceId: data.workspace_id,
       metricType: data.metric_type,
       value: data.value,
       cost: Number(data.cost),

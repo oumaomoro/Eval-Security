@@ -36,6 +36,7 @@ export const workspaceMembers = pgTable('workspace_members', {
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   companyName: text("company_name").notNull(),
   industry: text("industry").notNull(),
   contactName: text("contact_name").notNull(),
@@ -50,6 +51,7 @@ export const clients = pgTable("clients", {
 
 export const contracts = pgTable("contracts", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   clientId: integer("client_id").references(() => clients.id).notNull(),
   vendorName: text("vendor_name").notNull(),
   productService: text("product_service").notNull(),
@@ -103,6 +105,7 @@ export const auditRulesets = pgTable("audit_rulesets", {
 
 export const complianceAudits = pgTable("compliance_audits", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id),
   rulesetId: integer("ruleset_id").references(() => auditRulesets.id),
   auditName: text("audit_name").notNull(),
@@ -137,6 +140,7 @@ export const complianceAudits = pgTable("compliance_audits", {
 
 export const risks = pgTable("risks", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   riskTitle: text("risk_title").notNull(),
   riskCategory: text("risk_category").notNull(), // security, financial, operational, legal
@@ -159,6 +163,7 @@ export const risks = pgTable("risks", {
 
 export const clauseLibrary = pgTable("clause_library", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   clauseName: text("clause_name").notNull(),
   clauseCategory: text("clause_category").notNull(),
   standardLanguage: text("standard_language").notNull(),
@@ -170,6 +175,7 @@ export const clauseLibrary = pgTable("clause_library", {
 
 export const savingsOpportunities = pgTable("savings_opportunities", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   description: text("description").notNull(),
   type: text("type").notNull(),
@@ -180,6 +186,7 @@ export const savingsOpportunities = pgTable("savings_opportunities", {
 
 export const reports = pgTable("reports", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   userId: text("user_id"),
   organizationId: text("organization_id"),
   title: text("title").notNull(),
@@ -203,6 +210,7 @@ export const reports = pgTable("reports", {
 
 export const vendorScorecards = pgTable("vendor_scorecards", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   vendorName: text("vendor_name").notNull(),
   complianceScore: integer("compliance_score"),
@@ -216,6 +224,7 @@ export const vendorScorecards = pgTable("vendor_scorecards", {
 
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   clientId: integer("client_id").references(() => clients.id),
   userId: text("user_id").notNull(),
   action: text("action").notNull(),
@@ -229,6 +238,7 @@ export const auditLogs = pgTable("audit_logs", {
 
 export const remediationSuggestions = pgTable("remediation_suggestions", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   originalClause: text("original_clause").notNull(),
   suggestedClause: text("suggested_clause").notNull(),
@@ -239,6 +249,7 @@ export const remediationSuggestions = pgTable("remediation_suggestions", {
 
 export const playbooks = pgTable("playbooks", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull(),
@@ -265,6 +276,7 @@ export const notificationChannels = pgTable("notification_channels", {
 
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   userId: text("user_id").references(() => users.id).notNull(),
   contractId: integer("contract_id").references(() => contracts.id),
   auditId: integer("audit_id").references(() => complianceAudits.id),
@@ -275,6 +287,7 @@ export const comments = pgTable("comments", {
 
 export const contractComparisons = pgTable("contract_comparisons", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   comparisonType: text("comparison_type").notNull(), // market, internal, template
   overallScore: integer("overall_score"),
@@ -286,6 +299,7 @@ export const contractComparisons = pgTable("contract_comparisons", {
 
 export const regulatoryAlerts = pgTable("regulatory_alerts", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   standard: text("standard").notNull(),
   alertTitle: text("alert_title").notNull(),
   alertDescription: text("alert_description").notNull(),
@@ -295,6 +309,7 @@ export const regulatoryAlerts = pgTable("regulatory_alerts", {
 
 export const infrastructureLogs = pgTable("infrastructure_logs", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   component: text("component").notNull(),
   event: text("event").notNull(),
   status: text("status").notNull().default("detected"), // detected, analyzing, self_healing, resolved
@@ -304,6 +319,7 @@ export const infrastructureLogs = pgTable("infrastructure_logs", {
 
 export const billingTelemetry = pgTable("billing_telemetry", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   clientId: integer("client_id").references(() => clients.id),
   metricType: text("metric_type").notNull(), // api_call, storage_gb, audit_runtime
   value: doublePrecision("value").notNull(),
@@ -313,6 +329,7 @@ export const billingTelemetry = pgTable("billing_telemetry", {
 
 export const clauses = pgTable("clauses", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
   title: text("title"),
   content: text("content").notNull(),
@@ -452,7 +469,7 @@ export const insertPlaybookSchema = createInsertSchema(playbooks).omit({ id: tru
 export type Playbook = typeof playbooks.$inferSelect;
 export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
 
-export const insertUserPlaybookSchema = createInsertSchema(userPlaybooks).omit({ activatedAt: true });
+export const insertUserPlaybookSchema = createInsertSchema(userPlaybooks).omit({ assignedAt: true });
 export type UserPlaybook = typeof userPlaybooks.$inferSelect;
 export type InsertUserPlaybook = z.infer<typeof insertUserPlaybookSchema>;
 
