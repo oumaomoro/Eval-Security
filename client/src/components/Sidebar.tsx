@@ -13,35 +13,41 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
-
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/", group: "core" },
-  { label: "Contracts", icon: FileText, href: "/contracts", group: "core" },
-  { label: "DPO & Compliance", icon: ShieldCheck, href: "/compliance", group: "core" },
-  { label: "Risk Register", icon: AlertTriangle, href: "/risks", group: "core" },
-  { label: "Clause Library", icon: BookOpen, href: "/clauses", group: "intelligence" },
-  { label: "Vendor Governance", icon: Users, href: "/vendors", group: "intelligence" },
-  { label: "Compliance Policies", icon: ShieldCheck, href: "/policies", group: "intelligence" },
-  { label: "Executive ROI", icon: DollarSign, href: "/roi", group: "intelligence" },
-  { label: "Regulatory Reports", icon: BarChart, href: "/reports", group: "intelligence" },
-  { label: "Billing & Usage", icon: Zap, href: "/billing", group: "platform" },
-  { label: "System Health", icon: Server, href: "/system", group: "platform" },
-  { label: "Audit Ledger", icon: Fingerprint, href: "/audit", group: "platform" },
-  { label: "Governance Marketplace", icon: ShoppingBag, href: "/marketplace", group: "platform" },
-  { label: "Workspace & Team", icon: Users, href: "/workspace", group: "platform" },
-  { label: "Settings", icon: Settings, href: "/settings", group: "platform" },
-];
-
-const groups = [
-  { key: "core", label: "Core Modules" },
-  { key: "intelligence", label: "AI Intelligence" },
-  { key: "platform", label: "Platform" },
-];
+import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const { workspaces, activeWorkspaceId, switchWorkspace, isLoading: wsLoading } = useWorkspace();
+  const { t } = useTranslation();
+
+  const navItems = [
+    { label: t("nav.dashboard"), icon: LayoutDashboard, href: "/", group: "core" },
+    { label: t("nav.dpo_command"), icon: Globe, href: "/dpo-command", group: "core" },
+    { label: t("nav.contracts"), icon: FileText, href: "/contracts", group: "core" },
+    { label: t("nav.redline_studio"), icon: Zap, href: "/redline-studio", group: "core" },
+    { label: t("nav.risk_register"), icon: AlertTriangle, href: "/risks", group: "core" },
+    { label: t("nav.clause_library"), icon: BookOpen, href: "/clauses", group: "intelligence" },
+    { label: t("nav.vendor_governance"), icon: Users, href: "/vendors", group: "intelligence" },
+    { label: t("nav.compliance_policies"), icon: ShieldCheck, href: "/policies", group: "intelligence" },
+    { label: t("nav.cost_optimization"), icon: Zap, href: "/savings", group: "intelligence" },
+    { label: t("nav.market_benchmarking"), icon: BarChart, href: "/benchmarking", group: "intelligence" },
+    { label: t("nav.executive_roi"), icon: DollarSign, href: "/roi", group: "intelligence" },
+    { label: t("nav.regulatory_reports"), icon: BarChart, href: "/reports", group: "intelligence" },
+    { label: t("nav.billing_usage"), icon: Zap, href: "/billing", group: "platform" },
+    { label: t("nav.system_health"), icon: Server, href: "/system", group: "platform" },
+    { label: t("nav.audit_ledger"), icon: Fingerprint, href: "/audit", group: "platform" },
+    { label: t("nav.governance_marketplace"), icon: ShoppingBag, href: "/marketplace", group: "platform" },
+    { label: t("nav.workspace_team"), icon: Users, href: "/workspace", group: "platform" },
+    { label: t("nav.settings"), icon: Settings, href: "/settings", group: "platform" },
+  ];
+
+  const groups = [
+    { key: "core", label: t("nav.groups.core") },
+    { key: "intelligence", label: t("nav.groups.intelligence") },
+    { key: "platform", label: t("nav.groups.platform") },
+  ];
 
   return (
     <div className="h-screen w-64 flex flex-col fixed left-0 top-0 z-50 bg-[hsl(240,50%,5%)] border-r border-[hsl(240,25%,18%)]">
@@ -54,44 +60,24 @@ export function Sidebar() {
             <DiamondIcon className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-                <h1 className="text-lg font-black bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent leading-none tracking-tighter uppercase italic">
-                Costloci
-                </h1>
-                <Badge variant="outline" className="text-[7px] font-black uppercase tracking-tighter bg-primary/10 border-primary/20 text-primary py-0 px-1.5 h-3.5 leading-none italic shadow-lg shadow-primary/10">
-                    {user?.subscriptionTier || 'ENTERPRISE'}
-                </Badge>
-            </div>
-            <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5 italic">
-                <div className="w-1 h-1 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-                Sovereign Intelligence
-            </p>
+            <span className="text-xl font-black tracking-tighter text-white uppercase italic">Costloci</span>
+            <p className="text-[8px] text-emerald-500 font-black uppercase tracking-[0.2em] leading-tight mt-0.5">Intelligence</p>
           </div>
         </div>
       </div>
-      {/* Workspace Switcher */}
-      <div className="px-5 py-4 border-b border-[hsl(240,25%,18%)]">
-        <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 block px-1">
-          Active Workspace
-        </label>
-        <Select
-          value={activeWorkspaceId?.toString()}
-          onValueChange={(val) => switchWorkspace(parseInt(val))}
-          disabled={wsLoading}
-        >
-          <SelectTrigger className="w-full bg-slate-900/40 border-slate-800/60 hover:border-primary/40 transition-colors h-10 rounded-xl text-slate-200">
+
+      {/* Workspace Selector */}
+      <div className="px-4 py-4">
+        <Select value={activeWorkspaceId?.toString()} onValueChange={(val) => switchWorkspace(parseInt(val))}>
+          <SelectTrigger className="w-full bg-slate-900/40 border-slate-800/60 rounded-xl h-12 text-slate-300 focus:ring-primary/20">
             <SelectValue placeholder="Select Workspace" />
           </SelectTrigger>
-          <SelectContent className="bg-slate-900 border-slate-800 text-slate-200 rounded-xl overflow-hidden shadow-2xl">
+          <SelectContent className="bg-slate-950 border-slate-800 text-slate-300">
             {workspaces.map((ws) => (
-              <SelectItem 
-                key={ws.id} 
-                value={ws.id.toString()}
-                className="focus:bg-primary/10 transition-colors cursor-pointer"
-              >
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold">{ws.name}</span>
-                  <span className="text-[9px] text-slate-500 uppercase font-black">{ws.plan} Tier</span>
+              <SelectItem key={ws.id} value={ws.id.toString()} className="focus:bg-primary/10 focus:text-primary">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary/40" />
+                  <span className="text-xs font-semibold">{ws.name}</span>
                 </div>
               </SelectItem>
             ))}
@@ -149,6 +135,8 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-3 border-t border-[hsl(240,25%,18%)] space-y-2">
+        <LanguageSwitcher />
+
         {/* Live Compliance Region */}
         <div className="px-3 py-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
            <div className="flex items-center gap-2 mb-2">

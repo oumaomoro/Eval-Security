@@ -24,10 +24,9 @@ export default function Settings() {
   const handleRegisterPasskey = async () => {
     setIsRegistering(true);
     try {
-      const token = localStorage.getItem("costloci_token");
       const res = await fetch(getApiUrl('/api/auth/webauthn/generate-registration'), { 
         method: 'POST',
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        credentials: "include"
       });
       if (!res.ok) throw new Error("Failed to generate registration options");
       const options = await res.json();
@@ -36,9 +35,9 @@ export default function Settings() {
 
       const verifyRes = await fetch(getApiUrl('/api/auth/webauthn/verify-registration'), {
         method: 'POST',
+        credentials: "include",
         headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(attResp),
       });
@@ -57,9 +56,8 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("costloci_token");
     fetch(getApiUrl('/api/health/latency'), {
-      headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      credentials: "include"
     })
       .then(res => res.json())
       .then(data => setLatencyData(data));

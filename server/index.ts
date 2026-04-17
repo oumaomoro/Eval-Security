@@ -2,6 +2,9 @@ import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { createServer } from "http";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import { doubleCsrf } from "csrf-csrf";
 import { log } from "./vite.js";
 import { registerRoutes, seedDatabase } from "./routes.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
@@ -11,18 +14,34 @@ const app = express();
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 // ── PHASE 27 INFRASTRUCTURE HARDENING: UNIFIED API GATEWAY ─────────
-// Support for Stateless Bearer Identity and same-origin relative proxying.
-app.use(cors({
-  origin: (origin, callback) => {
-    // Quality focus: Dynamically allow localhost and the production domains
-    const allowedOrigins = [
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*.supabase.co", "*.google.com"],
+      "connect-src": ["'self'", "*.supabase.co", "*.google.com", "http://localhost:*", "ws://localhost:*"],
+      "img-src": ["'self'", "data:", "*.supabase.co", "https://*.replit.dev"],
+      "frame-ancestors": ["'self'", "https://*.replit.dev", "https://*.replit.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+// CORS Configuration Refactored for Enterprise Environments
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [
       "https://costloci.com",
       "https://www.costloci.com",
       "http://localhost:3001",
       "http://localhost:5173"
     ];
+
+app.use(cors({
+  origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -31,16 +50,49 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type"]
+  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type", "x-csrf-token"]
 }));
 
+// CSRF Protection Configuration (Phase 32 Hardening)
+const {
+  invalidCsrfTokenError,
+  generateCsrfToken,
+  doubleCsrfProtection,
+} = doubleCsrf({
+  getSecret: () => process.env.CSRF_SECRET || "costloci-sovereign-csrf-secret-2026",
+  cookieName: "costloci_csrf",
+  cookieOptions: {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+  },
+  size: 64,
+  ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+  getSessionIdentifier: (req: any) => req.sessionID || "sovereign-fallback",
+  getCsrfTokenFromRequest: (req: any) => req.headers["x-csrf-token"],
+});
+
+// CSRF Token Endpoint
+app.get("/api/csrf-token", (req: any, res: any) => {
+  res.json({ token: generateCsrfToken(req, res) });
+});
+
+// Apply CSRF Protection to all non-ignored methods on API routes
+app.use("/api", (req: any, res: any, next: any) => {
+  // Bypass CSRF for Bearer Token requests (Stateless APIs)
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    return next();
+  }
+  return doubleCsrfProtection(req, res, next);
+});
+
 // ── PHASE 27: PREFLIGHT OPTIMIZATION ─────────
-// Explicitly capture all OPTIONS requests to ensure the preflight always returns 200 with allowed headers.
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-requested-with, x-p25-status, Authorization, Content-Type');
+    res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-requested-with, x-p25-status, Authorization, Content-Type, x-csrf-token');
     res.header('Access-Control-Allow-Credentials', 'true');
     return res.sendStatus(200);
   }

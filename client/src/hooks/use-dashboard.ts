@@ -5,12 +5,8 @@ import { getApiUrl } from "@/lib/api-config";
 export function useDashboardStats() {
   return useQuery({
     queryKey: [api.dashboard.stats.path],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.dashboard.stats.path), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+    queryFn: async () => {      const res = await fetch(getApiUrl(api.dashboard.stats.path), { 
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch dashboard stats");
       return api.dashboard.stats.responses[200].parse(await res.json());
     },
@@ -21,12 +17,8 @@ export function useDashboardStats() {
 export function useVendorBenchmarks() {
   return useQuery({
     queryKey: [api.vendors.benchmarks.path],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.vendors.benchmarks.path), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+    queryFn: async () => {      const res = await fetch(getApiUrl(api.vendors.benchmarks.path), { 
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch vendor benchmarks");
       return res.json();
     },

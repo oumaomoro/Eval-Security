@@ -1,11 +1,8 @@
 import fs from "node:fs";
-import OpenAI, { toFile } from "openai";
-import { Buffer } from "node:buffer";
+import { toFile } from "openai";
+import { AIGateway } from "../../services/AIGateway.js";
 
-export const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+export const openai = AIGateway.openai;
 
 /**
  * Generate an image and return as Buffer.

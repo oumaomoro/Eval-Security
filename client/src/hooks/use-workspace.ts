@@ -13,12 +13,8 @@ export function useWorkspace() {
 
   const { data: workspaces, isLoading } = useQuery<Workspace[]>({
     queryKey: ["/api/workspaces"],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.workspaces.list.path), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+    queryFn: async () => {      const res = await fetch(getApiUrl(api.workspaces.list.path), { 
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch workspaces");
       return api.workspaces.list.responses[200].parse(await res.json());
     },

@@ -4,9 +4,9 @@
 Write-Host "--- CyberOptimize ENTERPRISE HEALTH CHECK ---" -ForegroundColor Cyan
 
 # 1. Check for Critical Environment Variables
-$RequiredVars = @("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "REPLIT_JWT_SECRET")
+$RequiredVars = @("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET")
 foreach ($var in $RequiredVars) {
-    if (-not $env:$var) {
+    if (-not (Test-Path "env:$var")) {
         Write-Host "[FAIL] Missing environment variable: $var" -ForegroundColor Red
     } else {
         Write-Host "[PASS] found $var" -ForegroundColor Green
@@ -15,15 +15,16 @@ foreach ($var in $RequiredVars) {
 
 # 2. Check Database Schema Integrity (Via local check or external ping)
 Write-Host "--- VALIDATING RLS READINESS ---" -ForegroundColor Cyan
-# This is a mock/simulated check since we can't easily query the DB from PowerShell without a client.
-# In a real CI/CD, this would call /api/health with a specific probe.
-$HealthUrl = "http://localhost:3000/api/health"
+$HealthUrl = "http://localhost:3001/api/health"
 try {
     $response = Invoke-RestMethod -Uri $HealthUrl -Method Get -ErrorAction Stop
     if ($response.status -eq "optimal") {
         Write-Host "[PASS] API Core Healthy (Status: Optimal)" -ForegroundColor Green
+    } elseif ($response.status -eq "degraded") {
+        Write-Host "[WARN] API Reporting Degraded Mode (Schema Mismatch detected)" -ForegroundColor Yellow
+        Write-Host "Missing Columns: $($response.missingTables -join ', ')" -ForegroundColor Gray
     } else {
-        Write-Host "[WARN] API Reporting Degraded Mode" -ForegroundColor Yellow
+        Write-Host "[FAIL] API Core Reporting Critical Failure" -ForegroundColor Red
     }
 } catch {
     Write-Host "[SKIP] Local API server not running. (Expected if validating in static context)" -ForegroundColor Gray

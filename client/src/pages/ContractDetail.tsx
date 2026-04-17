@@ -44,13 +44,11 @@ export default function ContractDetail() {
   } | null>(null);
 
   const handleRemediate = async (risk: any) => {
-    try {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(`/api/contracts/${id}/remediate`), {
+    try {      const res = await fetch(getApiUrl(`/api/contracts/${id}/remediate`), {
         method: "POST",
+        credentials: "include",
         headers: { 
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ 
           riskId: risk.id, 
@@ -76,13 +74,11 @@ export default function ContractDetail() {
 
   const handleRequestSignature = async () => {
     try {
-      setIsInitiatingSignNow(true);
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl("/api/signnow/embedded"), {
+      setIsInitiatingSignNow(true);      const res = await fetch(getApiUrl("/api/signnow/embedded"), {
         method: "POST",
+        credentials: "include",
         headers: { 
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ contractId: id, signerEmail: user?.email })
       });

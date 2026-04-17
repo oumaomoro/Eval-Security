@@ -19,6 +19,7 @@ import integrationsRouter from "./routes/integrations.routes.js";
 import intelligenceRouter from "./routes/intelligence.routes.js";
 import signnowRouter from "./routes/signnow.routes.js";
 import marketplaceRouter from "./routes/marketplace.routes.js";
+import insuranceRouter from "./routes/insurance.routes.js";
 import { telemetryMiddleware } from "./middleware/telemetry";
 
 import multer from "multer";
@@ -28,13 +29,13 @@ import { requireRole } from "./middleware/rbac";
 import { requireWorkspacePermission } from "./middleware/workspace-rbac";
 import { PlaybookService } from "./services/PlaybookService";
 import { storageContext } from "./services/storageContext.js";
-import { AutonomicEngine } from "./services/AutonomicEngine.js";
-import { NotificationService } from "./services/NotificationService.js";
+import { SOC2Logger } from "./services/SOC2Logger";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+import { AIGateway } from "./services/AIGateway.js";
+import { AutonomicEngine } from "./services/AutonomicEngine.js";
+
+// Export the centralized openai router instance
+const openai = AIGateway.openai;
 
 // Use memory storage — files are streamed directly to Supabase Storage.
 // NEVER use disk storage on Vercel: the ephemeral filesystem is wiped on every cold start.
@@ -45,7 +46,7 @@ const upload = multer({
 
 // Cache AI responses 60 min to reduce latency and cost
 const cachedCompletion = memoize(
-  (params: any) => openai.chat.completions.create(params),
+  (params: any) => AIGateway.createCompletion(params),
   { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
 );
 
@@ -78,6 +79,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use(integrationsRouter);
   app.use(signnowRouter);
   app.use(marketplaceRouter);
+  app.use(insuranceRouter);
 
 
   // Rate limiting for mutations
@@ -89,12 +91,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ─── AUTONOMIC PLATFORM HEALTH ──────────────────────────────────────────────
-  const { AutonomicEngine } = await import("./services/AutonomicEngine");
   
-  app.get("/api/health", async (_req, res) => {
-    const health = await AutonomicEngine.getHealthMetrics();
-    res.json(health);
+  app.get("/api/health", async (_req: any, res: any) => {
+    try {
+      const metrics = await AutonomicEngine.getHealthMetrics();
+      res.json({
+        status: "operational",
+        dbStatus: "connected",
+        postgresLatency: Math.floor(Math.random() * 40) + 10,
+        pulseAgeMs: 120,
+        version: metrics?.version || "4.0.0-sovereign",
+        storageMode: (storage as any).healthStatus?.mode || "sovereign",
+      });
+    } catch (err: any) {
+      res.status(200).json({ status: "degraded", error: err.message });
+    }
   });
+
+  app.get("/api/system/health", (_req: any, res: any) => res.json({ status: "ok" }));
 
   /**
    * SOVEREIGN STORAGE CLEANUP CRON
@@ -318,7 +332,7 @@ Analyze the contract text and return JSON with exactly these fields:
           ],
           response_format: { type: "json_object" },
         });
-        analysis = JSON.parse(response.choices[0].message.content || "{}");
+        analysis = JSON.parse(response || "{}");
       } catch (aiError: any) {
         console.warn("[UPLOAD FALLBACK] AI extraction failed, parsing generic metadata:", aiError.message);
         analysis = {
@@ -410,12 +424,10 @@ Analyze the contract text and return JSON with exactly these fields:
               actionTaken: `Automated Warning: Contract for ${contract.vendorName} (Risk: ${analysis.riskScore}) exceeds client threshold of ${client.riskThreshold}.`,
             });
             
-            await storage.createAuditLog({
+            await SOC2Logger.logEvent(req, {
                 action: "GOVERNANCE_VIOLATION",
                 userId: req.user?.id || "SYSTEM",
-                workspaceId,
-                clientId,
-                resourceType: "contract",
+                resourceType: "Contract",
                 resourceId: String(contract.id),
                 details: `Risk Score ${analysis.riskScore} exceeds established corporate guardrail (${client.riskThreshold}).`,
             });
@@ -430,12 +442,10 @@ Analyze the contract text and return JSON with exactly these fields:
             });
           }
 
-          await storage.createAuditLog({
+          await SOC2Logger.logEvent(req, {
             action: "CONTRACT_UPLOADED",
             userId: req.user?.id || "SYSTEM",
-            workspaceId,
-            clientId,
-            resourceType: "contract",
+            resourceType: "Contract",
             resourceId: String(contract.id),
             details: `Ingested: ${req.file.originalname} → ${contract.vendorName}`,
           });
@@ -513,8 +523,8 @@ Analyze the contract text and return JSON with exactly these fields:
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const response = await cachedCompletion({
-        model: "gpt-3.5-turbo",
+      const responseText = await AIGateway.createCompletion({
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "Perform a deep KDPA/POPIA compliance analysis for this vendor contract. Return JSON." },
           { role: "user", content: `Vendor: ${contract.vendorName}, Category: ${contract.category}, Cost: ${contract.annualCost}` },
@@ -522,30 +532,54 @@ Analyze the contract text and return JSON with exactly these fields:
         response_format: { type: "json_object" },
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content || "{}");
+      const analysis = JSON.parse(responseText || "{}");
       const updated = await storage.updateContract(id, { aiAnalysis: analysis });
+      
+      await SOC2Logger.logEvent(req, {
+        action: "CONTRACT_ANALYZE_TRIGGERED",
+        userId: req.user.id,
+        resourceType: "Contract",
+        resourceId: String(id),
+        details: `Deep analysis performed on ${contract.vendorName} contract.`
+      });
+
       res.json(updated);
-    } catch { res.status(500).json({ message: "Analysis failed" }); }
+    } catch (err: any) { 
+        console.error("[CONTRACT-ANALYZE] Error:", err.message);
+        res.status(500).json({ message: "Analysis failed" }); 
+    }
   });
 
   // AI Clause Remediation
-  app.post(api.contracts.remediate.path, isAuthenticated, async (req, res) => {
+  app.post(api.contracts.remediate.path, isAuthenticated, async (req: any, res) => {
     try {
       const { riskId, originalText } = api.contracts.remediate.input.parse(req.body);
-      const response = await cachedCompletion({
-        model: "gpt-3.5-turbo",
+      const responseText = await AIGateway.createCompletion({
+        model: "gpt-4o",
         messages: [
           { role: "system", content: "You are a legal redlining expert. Rewrite the given clause to be compliant with KDPA 2019 and POPIA. Return JSON: { suggestedText, explanation }" },
           { role: "user", content: `Risk ID: ${riskId}\nOriginal Clause:\n${originalText}` },
         ],
         response_format: { type: "json_object" },
       });
-      const result = JSON.parse(response.choices[0].message.content || "{}");
+      const result = JSON.parse(responseText || "{}");
+
+      await SOC2Logger.logEvent(req, {
+        action: "CLAUSE_REMEDIATION_GEN",
+        userId: req.user.id,
+        resourceType: "Risk",
+        resourceId: String(riskId),
+        details: `AI remediation suggestion generated for risk.`
+      });
+
       res.json({
         suggestedText: result.suggestedText || "Clause updated to align with regional data protection standards.",
         explanation: result.explanation || "Remediated for KDPA/POPIA compliance.",
       });
-    } catch { res.status(500).json({ message: "Remediation failed" }); }
+    } catch (err: any) { 
+        console.error("[CLAUSE-REMEDIATE] Error:", err.message);
+        res.status(500).json({ message: "Remediation failed" }); 
+    }
   });
 
   // Contract Comparisons
@@ -579,7 +613,7 @@ Analyze the contract text and return JSON with exactly these fields:
         response_format: { type: "json_object" },
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content || "{}");
+      const analysis = JSON.parse(response || "{}");
       const comparison = await storage.createContractComparison({
         contractId: id,
         comparisonType,
@@ -635,10 +669,19 @@ Analyze the contract text and return JSON with exactly these fields:
     catch { res.status(500).json({ message: "Failed to fetch audit rulesets" }); }
   });
 
-  app.post(api.auditRulesets.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.auditRulesets.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const data = api.auditRulesets.create.input.parse(req.body);
       const ruleset = await storage.createAuditRuleset(data);
+      
+      await SOC2Logger.logEvent(req, {
+        userId: req.user.id,
+        action: "RULESET_CREATED",
+        resourceType: "AuditRuleset",
+        resourceId: String(ruleset.id),
+        details: `Created new audit ruleset: ${ruleset.name}`
+      });
+
       res.status(201).json(ruleset);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -646,11 +689,20 @@ Analyze the contract text and return JSON with exactly these fields:
     }
   });
 
-  app.put(api.auditRulesets.update.path, isAuthenticated, async (req, res) => {
+  app.put(api.auditRulesets.update.path, isAuthenticated, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
       const data = api.auditRulesets.update.input.parse(req.body);
       const ruleset = await storage.updateAuditRuleset(id, data);
+
+      await SOC2Logger.logEvent(req, {
+        userId: req.user.id,
+        action: "RULESET_UPDATED",
+        resourceType: "AuditRuleset",
+        resourceId: String(id),
+        details: `Updated audit ruleset: ${ruleset.name}`
+      });
+
       res.json(ruleset);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -658,9 +710,18 @@ Analyze the contract text and return JSON with exactly these fields:
     }
   });
 
-  app.delete(api.auditRulesets.delete.path, isAuthenticated, async (req, res) => {
+  app.delete(api.auditRulesets.delete.path, isAuthenticated, async (req: any, res) => {
     try {
       await storage.deleteAuditRuleset(Number(req.params.id));
+      
+      await SOC2Logger.logEvent(req, {
+        userId: req.user.id,
+        action: "ROUTINE_DELETION",
+        resourceType: "AuditRuleset",
+        resourceId: String(req.params.id),
+        details: "Deleted corporate audit ruleset component"
+      });
+
       res.status(204).end();
     } catch { res.status(500).json({ message: "Failed to delete audit ruleset" }); }
   });
@@ -703,6 +764,7 @@ Analyze the contract text and return JSON with exactly these fields:
                     ? "Verified via real-time contract telemetry."
                     : "Gap identified — remediation required.",
                   jurisdiction: standard,
+                  category: standard, // ── Bridges the gap for remediation mapping
                 });
               }
             }
@@ -888,7 +950,7 @@ Analyze the contract text and return JSON with exactly these fields:
         ],
         response_format: { type: "json_object" },
       });
-      const result = JSON.parse(response.choices[0].message.content || "{}");
+      const result = JSON.parse(response || "{}");
       res.json({
         clauseText: result.clauseText || `Standard ${category} clause for ${jurisdiction} compliance.`,
         explanation: result.explanation || `Generated per ${jurisdiction} regulatory requirements.`,
@@ -1042,7 +1104,7 @@ Analyze the contract text and return JSON with exactly these fields:
             response_format: { type: "json_object" },
           });
 
-          const analysis = JSON.parse(response.choices[0].message.content || "{}");
+          const analysis = JSON.parse(response || "{}");
           await storage.updateReport(report.id, {
             status: "generated",
             aiAnalysis: analysis,
@@ -1100,7 +1162,7 @@ Analyze the contract text and return JSON with exactly these fields:
 
   app.get(api.vendors.benchmarks.path, isAuthenticated, async (req: any, res) => {
     try {
-      const benchmarks = await storage.getVendorBenchmarks(req.user?.clientId);
+      const benchmarks = await storage.getPeerBenchmarks(req.user?.clientId);
       res.json(benchmarks);
     } catch (err) {
       res.status(500).json({ message: "Failed to generate benchmarks" });
@@ -1187,6 +1249,31 @@ Analyze the contract text and return JSON with exactly these fields:
       res.status(500).json({ message: err.message || "Savings strategy failed" }); 
     }
   });
+
+  // ─── AUTHENTICATION HARDENING (Phase 36) ───────────────────────────────────
+
+  app.post("/api/auth/session", async (req, res) => {
+    try {
+      const { access_token } = req.body;
+      if (!access_token) return res.status(400).json({ message: "Token missing" });
+
+      res.cookie("costloci_session", access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      res.json({ success: true, message: "Session hardened via HttpOnly cookie" });
+    } catch { res.status(500).json({ message: "Session hardening failed" }); }
+  });
+
+  app.post("/api/auth/logout", async (_req, res) => {
+    res.clearCookie("costloci_session");
+    res.json({ success: true, message: "Session terminated" });
+  });
+
+  // ─── DATABASE HEALTH ────────────────────────────────────────────────────────
 
   // ─── DASHBOARD ──────────────────────────────────────────────────────────────
 
@@ -1317,6 +1404,22 @@ Analyze the contract text and return JSON with exactly these fields:
     } catch { res.status(500).json({ message: "Failed to fetch audit logs" }); }
   });
 
+  // ─── OPTIMIZATION & BENCHMARKING ────────────────────────────────────────────
+
+  app.get("/api/savings", isAuthenticated, async (req: any, res) => {
+    try {
+      const contractId = req.query.contractId ? Number(req.query.contractId) : undefined;
+      res.json(await storage.getSavingsOpportunities(contractId));
+    } catch { res.status(500).json({ message: "Failed to fetch savings" }); }
+  });
+
+  app.get("/api/benchmarking", isAuthenticated, async (req: any, res) => {
+    try {
+      const category = req.query.category ? String(req.query.category) : undefined;
+      res.json(await storage.getVendorBenchmarks(category));
+    } catch { res.status(500).json({ message: "Failed to fetch benchmarks" }); }
+  });
+
   // ─── WORD ADD-IN ENDPOINTS ──────────────────────────────────────────────────
 
   // Custom middleware for Word Add-in to accept API keys instead of browser session
@@ -1335,7 +1438,7 @@ Analyze the contract text and return JSON with exactly these fields:
 
       console.log(`[ADDIN] Triggering high-fidelity scan for Word document snippet...`);
 
-      const response = await openai.chat.completions.create({
+      const response = await AIGateway.createCompletion({
         model: "gpt-4o",
         messages: [
           { 
@@ -1347,7 +1450,7 @@ Analyze the contract text and return JSON with exactly these fields:
         response_format: { type: "json_object" },
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content || "{}");
+      const analysis = JSON.parse(response || "{}");
       res.json(analysis);
     } catch (err: any) { 
       console.error("[ADDIN API ERROR]", err.message);
@@ -1369,20 +1472,7 @@ Analyze the contract text and return JSON with exactly these fields:
   });
 
 
-  // ── PHASE 27: INFRASTRUCTURE & SERVICE HEALTH ──
-  const healthResponder = async (_req: any, res: any) => {
-    const metrics = await AutonomicEngine.getHealthMetrics();
-    res.json({
-      status: "operational",
-      dbStatus: "connected",
-      postgresLatency: Math.floor(Math.random() * 40) + 10,
-      pulseAgeMs: 120,
-      version: metrics.version,
-    });
-  };
-
-  app.get("/api/health", healthResponder);
-  app.get("/api/system/health", healthResponder);
+  // Health endpoints defined above at bootstrap level
 
   app.get("/api/governance/posture", async (req: any, res) => {
     try {
@@ -1466,8 +1556,12 @@ export async function seedDatabase() {
     ];
 
     await Promise.allSettled(seedOperations);
+    
+    // Phase 34: Seed Marketplace
+    const { seedMarketplace } = await import("./seed_marketplace.js");
+    await seedMarketplace();
 
-    console.log("✅ [SEED] Sovereign database hydrated (KDPA, POPIA, CBK, GDPR)");
+    console.log("✅ [SEED] Sovereign database hydrated (KDPA, POPIA, CBK, GDPR, Marketplace)");
   } catch (err: any) {
     console.warn("[SEED] Fatal error in seed block:", err.message);
   }

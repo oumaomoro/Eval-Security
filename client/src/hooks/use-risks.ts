@@ -7,16 +7,12 @@ import { getApiUrl } from "@/lib/api-config";
 export function useRisks(filters?: { contractId?: string }) {
   return useQuery({
     queryKey: [api.risks.list.path, filters],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const url = filters?.contractId 
+    queryFn: async () => {      const url = filters?.contractId 
         ? `${api.risks.list.path}?contractId=${filters.contractId}`
         : api.risks.list.path;
       
       const res = await fetch(getApiUrl(url), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch risks");
       return api.risks.list.responses[200].parse(await res.json());
     },
@@ -50,14 +46,11 @@ export function useMitigateRisk() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, status, strategy }: { id: number; status: string; strategy?: string }) => {
-      const token = localStorage.getItem("costloci_token");
-      const url = buildUrl(api.risks.mitigate.path, { id });
+    mutationFn: async ({ id, status, strategy }: { id: number; status: string; strategy?: string }) => {      const url = buildUrl(api.risks.mitigate.path, { id });
       const res = await fetch(getApiUrl(url), {
         method: api.risks.mitigate.method,
         headers: { 
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ status, strategy }),
         credentials: "include",

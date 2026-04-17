@@ -1,0 +1,83 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "dpo_command": "DPO Command Center",
+    "costloci_intel": "Costloci Intelligence",
+    "contracts": "Contracts & DPAs",
+    "redline_studio": "AI Redline Studio",
+    "risk_register": "Risk Register",
+    "clause_library": "Clause Library",
+    "vendor_governance": "Vendor Governance",
+    "compliance_policies": "Compliance Policies",
+    "cost_optimization": "Cost Optimization",
+    "market_benchmarking": "Market Benchmarking",
+    "executive_roi": "Executive ROI",
+    "regulatory_reports": "Regulatory Reports",
+    "billing_usage": "Billing & Usage",
+    "system_health": "System Health",
+    "audit_ledger": "Audit Ledger",
+    "governance_marketplace": "Governance Marketplace",
+    "workspace_team": "Workspace & Team",
+    "settings": "Settings",
+    "groups": {
+      "core": "Core Modules",
+      "intelligence": "AI Intelligence",
+      "platform": "Platform"
+    }
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "initialize_agent": "Initialize Agent",
+    "email": "Email Address",
+    "password": "Password",
+    "first_name": "First Name",
+    "last_name": "Last Name",
+    "welcome": "Welcome to Costloci",
+    "login_title": "Executive Sign In",
+    "register_title": "Agentic Onboarding",
+    "forgot_title": "Identity Recovery",
+    "login_subtitle": "Access your enterprise intelligence dashboard",
+    "register_subtitle": "Initialize your autonomic governance hub",
+    "forgot_subtitle": "Recover access to your secure portal",
+    "sso_google": "Sign in with Google Gateway"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "execute": "Execute",
+    "loading": "Loading..."
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "strategic_pack": "Download Strategic Pack",
+    "annual_spend": "Total Annual Spend",
+    "missing_renewals": "Missing Renewals",
+    "analyzed_contracts": "Analyzed Contracts",
+    "critical_risks": "Critical Risks",
+    "spend_vs_vendors": "Spend vs Vendors",
+    "risk_categories": "Risk Categories",
+    "upcoming_renewals": "Upcoming Renewals",
+    "review_contract": "Review Contract",
+    "no_renewals": "No upcoming renewals found."
+  },
+  "dpo": {
+    "title": "DPO Intelligence Command",
+    "subtitle": "Sovereign oversight of data protection, compliance heatmaps, and breach readiness.",
+    "live_monitoring": "Live Monitoring",
+    "run_audit": "Run Global Audit",
+    "compliance_risk": "Compliance Risk",
+    "avg_compliance": "Avg. Compliance",
+    "dpas_reviewed": "DPAs Reviewed",
+    "readiness_score": "Readiness Score",
+    "heatmap_title": "Global Compliance Heatmap",
+    "heatmap_desc": "Real-time scoring across primary regulatory frameworks.",
+    "breach_title": "Data Breach Readiness",
+    "breach_desc": "Weighted assessment of incident response and security hygiene.",
+    "remediation_tasks": "Recent Remediation Tasks",
+    "remediation_desc": "Critical gaps identified in vendor DPA contracts.",
+    "view_all": "View All",
+    "regulatory_sentinel": "Regulatory Sentinel",
+    "analyze_impact": "Analyze Impact"
+  }
+}

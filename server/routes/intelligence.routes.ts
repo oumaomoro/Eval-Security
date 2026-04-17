@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { isAuthenticated } from "../replit_integrations/auth";
+import { SOC2Logger } from "../services/SOC2Logger";
 
 const router = Router();
 
@@ -20,11 +21,10 @@ router.get("/api/contracts/:id/benchmarking", isAuthenticated, async (req, res) 
     const benchmark = await storage.getMarketIntelligence(id);
     
     // Audit log for enterprise transparency
-    await storage.createAuditLog({
+    await SOC2Logger.logEvent(req as any, {
         action: "MARKET_BENCHMARK_RETRIEVED",
         userId: (req as any).user?.id || "SYSTEM",
-        clientId: (req as any).user?.clientId,
-        resourceType: "contract",
+        resourceType: "Contract",
         resourceId: String(id),
         details: `Calculated market intelligence for ${benchmark.category}. Peer count: ${benchmark.peerCount}.`
     });

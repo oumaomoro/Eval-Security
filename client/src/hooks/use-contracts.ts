@@ -7,16 +7,12 @@ import { getApiUrl } from "@/lib/api-config";
 export function useContracts(filters?: { clientId?: string; status?: string }) {
   return useQuery({
     queryKey: [api.contracts.list.path, filters],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const url = filters 
+    queryFn: async () => {      const url = filters 
         ? `${api.contracts.list.path}?${new URLSearchParams(filters as any).toString()}`
         : api.contracts.list.path;
       
       const res = await fetch(getApiUrl(url), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch contracts");
       return api.contracts.list.responses[200].parse(await res.json());
     },
@@ -26,13 +22,9 @@ export function useContracts(filters?: { clientId?: string; status?: string }) {
 export function useContract(id: number) {
   return useQuery({
     queryKey: [api.contracts.get.path, id],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const url = buildUrl(api.contracts.get.path, { id });
+    queryFn: async () => {      const url = buildUrl(api.contracts.get.path, { id });
       const res = await fetch(getApiUrl(url), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+        credentials: "include",      });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch contract");
       return api.contracts.get.responses[200].parse(await res.json());
@@ -46,13 +38,10 @@ export function useCreateContract() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: InsertContract) => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.contracts.create.path), {
+    mutationFn: async (data: InsertContract) => {      const res = await fetch(getApiUrl(api.contracts.create.path), {
         method: api.contracts.create.method,
         headers: { 
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify(data),
         credentials: "include",
@@ -78,14 +67,10 @@ export function useAnalyzeContract() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: number) => {
-      const token = localStorage.getItem("costloci_token");
-      const url = buildUrl(api.contracts.analyze.path, { id });
+    mutationFn: async (id: number) => {      const url = buildUrl(api.contracts.analyze.path, { id });
       const res = await fetch(getApiUrl(url), {
         method: api.contracts.analyze.method,
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+        credentials: "include",      });
       if (!res.ok) throw new Error("Analysis failed");
       return api.contracts.analyze.responses[200].parse(await res.json());
     },
@@ -98,14 +83,10 @@ export function useAnalyzeContract() {
 
 export function useUploadContractFile() {
   return useMutation({
-    mutationFn: async (formData: FormData) => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.contracts.upload.path), {
+    mutationFn: async (formData: FormData) => {      const res = await fetch(getApiUrl(api.contracts.upload.path), {
         method: api.contracts.upload.method,
         body: formData, // FormData automatically sets correct Content-Type boundary
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+        credentials: "include",      });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Upload failed");

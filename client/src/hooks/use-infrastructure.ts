@@ -15,12 +15,8 @@ export interface InfrastructureLog {
 export function useInfrastructureLogs() {
     return useQuery<InfrastructureLog[]>({
         queryKey: [api.infrastructure.logs.path],
-        queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.infrastructure.logs.path), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+        queryFn: async () => {      const res = await fetch(getApiUrl(api.infrastructure.logs.path), { 
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch infrastructure logs");
       const result = await res.json();
       return result.data || [];
@@ -31,13 +27,10 @@ export function useInfrastructureLogs() {
 
 export function useHealInfrastructure() {
     return useMutation<InfrastructureLog, Error, number>({
-        mutationFn: async (logId) => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.infrastructure.heal.path), {
+        mutationFn: async (logId) => {      const res = await fetch(getApiUrl(api.infrastructure.heal.path), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ logId }),
         credentials: "include",

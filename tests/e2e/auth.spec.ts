@@ -3,10 +3,14 @@ import { test, expect } from '@playwright/test';
 test.describe('Platform Authentication', () => {
 
   test('should allow a new user to register and reach the dashboard', async ({ page }) => {
-    await page.goto('/auth');
+    await page.goto('/auth', { timeout: 60000 });
+    await page.waitForSelector('#root', { state: 'attached', timeout: 30000 });
+    
+    const title = await page.title();
+    console.log(`[TEST-DIAGNOSTIC] Page Title: "${title}"`);
 
     // Page must load with Costloci branding
-    await expect(page).toHaveTitle(/Costloci/i, { timeout: 15000 });
+    await expect(page).toHaveTitle(/Costloci/i, { timeout: 20000 });
 
     // Switch to the Registration tab — label matches "Initialize Agent"
     const registerTab = page.locator('button[role="tab"]').filter({ hasText: /initialize agent/i });

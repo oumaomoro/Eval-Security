@@ -2,14 +2,18 @@ import { Layout } from "@/components/Layout";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
 import { motion } from "framer-motion";
-import { DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Clock } from "lucide-react";
+import { DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Clock, Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { data: stats, isLoading } = useDashboardStats();
 
   if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
@@ -17,7 +21,17 @@ export default function Dashboard() {
   return (
     <Layout header={
       <div className="flex w-full items-center justify-between">
-         <h1 className="text-2xl font-bold tracking-tight text-white">Executive Dashboard</h1>
+         <h1 className="text-2xl font-bold tracking-tight text-white">{t("dashboard.title")}</h1>
+         <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Button 
+              className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl font-black uppercase text-[10px] tracking-widest h-10 px-6 gap-2"
+              onClick={() => window.location.href = "/api/reports/strategic-pack"}
+            >
+              <Package className="w-4 h-4" />
+              {t("dashboard.strategic_pack")}
+            </Button>
+         </div>
       </div>
     }>
       <SEO title="Enterprise Dashboard" description="Monitor your cybersecurity posture and contract ROI." />
@@ -25,10 +39,10 @@ export default function Dashboard() {
       <div className="space-y-8 pb-12 pt-4">
         {/* Top Level KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard label="Total Annual Spend" value={`$${(stats?.totalAnnualCost || 0).toLocaleString()}`} icon={DollarSign} color="text-emerald-400" />
-          <MetricCard label="Missing Renewals" value={stats?.upcomingRenewals?.length || 0} icon={Clock} color="text-amber-400" />
-          <MetricCard label="Analyzed Contracts" value={stats?.totalContracts || 0} icon={FileCheck} color="text-blue-400" />
-          <MetricCard label="Critical Risks" value={stats?.criticalRisks || 0} icon={ShieldCheck} color="text-rose-400" />
+          <MetricCard label={t("dashboard.annual_spend")} value={`$${(stats?.totalAnnualCost || 0).toLocaleString()}`} icon={DollarSign} color="text-emerald-400" />
+          <MetricCard label={t("dashboard.missing_renewals")} value={stats?.upcomingRenewals?.length || 0} icon={Clock} color="text-amber-400" />
+          <MetricCard label={t("dashboard.analyzed_contracts")} value={stats?.totalContracts || 0} icon={FileCheck} color="text-blue-400" />
+          <MetricCard label={t("dashboard.critical_risks")} value={stats?.criticalRisks || 0} icon={ShieldCheck} color="text-rose-400" />
         </div>
 
         {/* Charts Row */}
@@ -88,12 +102,12 @@ export default function Dashboard() {
         {/* Recent Contracts / Upcoming Renewals */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold tracking-tight mb-4 flex items-center gap-2 text-white">
-             <Clock className="w-4 h-4 text-emerald-400" /> Upcoming Renewals
+             <Clock className="w-4 h-4 text-emerald-400" /> {t("dashboard.upcoming_renewals")}
           </h2>
           <Card className="bg-slate-900/50 border-slate-800 shadow-sm rounded-xl overflow-hidden">
             <CardContent className="p-0">
               <div className="divide-y divide-slate-800/60">
-                {stats?.upcomingRenewals?.length === 0 && <p className="text-slate-500 p-6 text-sm">No upcoming renewals found.</p>}
+                {stats?.upcomingRenewals?.length === 0 && <p className="text-slate-500 p-6 text-sm">{t("dashboard.no_renewals")}</p>}
                 {stats?.upcomingRenewals?.map((contract: any) => (
                   <div key={contract.id} className="flex items-center justify-between p-5 hover:bg-slate-800/30 transition-colors">
                     <div>
@@ -105,7 +119,7 @@ export default function Dashboard() {
                           {contract.renewalDate || "Unknown"}
                        </Badge>
                        <Link href={`/contracts/${contract.id}`} className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
-                          Review Contract
+                          {t("dashboard.review_contract")}
                        </Link>
                     </div>
                   </div>

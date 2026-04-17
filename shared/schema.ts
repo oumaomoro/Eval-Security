@@ -88,6 +88,68 @@ export const contracts = pgTable("contracts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const insurancePolicies = pgTable("insurance_policies", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  carrierName: text("carrier_name").notNull(),
+  policyNumber: text("policy_number").notNull(),
+  premiumAmount: doublePrecision("premium_amount"),
+  effectiveDate: date("effective_date"),
+  expirationDate: date("expiration_date"),
+  fileUrl: text("file_url"),
+  status: text("status").default("active"), // active, expired, reviewing
+
+  // Detailed AI extraction mapping
+  coverageLimits: jsonb("coverage_limits").$type<{
+    perOccurrence?: string;
+    annualAggregate?: string;
+    ransomwareSubLimit?: string;
+    socialEngineeringSubLimit?: string;
+    forensicInvestigationSubLimit?: string;
+  }>(),
+  deductibles: jsonb("deductibles").$type<{
+    amount?: string;
+    type?: string; 
+  }>(),
+  waitingPeriods: jsonb("waiting_periods").$type<{
+    businessInterruption?: string;
+    ransomwarePayment?: string;
+  }>(),
+  exclusions: jsonb("exclusions").$type<string[]>(),
+  endorsements: jsonb("endorsements").$type<string[]>(),
+  notificationRequirements: jsonb("notification_requirements").$type<{
+    timeToReport?: string;
+    mandatoryAuthorities?: string[];
+  }>(),
+  claimRiskScore: integer("claim_risk_score").default(0),
+  aiAnalysisSummary: text("ai_analysis_summary"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id).notNull(),
+  userId: text("user_id").references(() => users.id).notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  paypalSubscriptionId: text("paypal_subscription_id"),
+  paystackSubscriptionId: text("paystack_subscription_id"),
+  tier: text("tier").notNull().default("starter"), // starter, pro, enterprise
+  status: text("status").notNull().default("active"), // active, canceled, past_due
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  apiTokenLimit: integer("api_token_limit").notNull().default(5),
+  apiTokenUsage: integer("api_token_usage").notNull().default(0),
+  stripePriceId: text("stripe_price_id"),
+  stripeItemId: text("stripe_item_id"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const auditRulesets = pgTable("audit_rulesets", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
@@ -340,6 +402,73 @@ export const clauses = pgTable("clauses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const remediationTasks = pgTable("remediation_tasks", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  contractId: integer("contract_id").references(() => contracts.id).notNull(),
+  findingId: text("finding_id"), 
+  title: text("title").notNull(),
+  description: text("description"),
+  severity: text("severity").notNull(), 
+  status: text("status").notNull().default("pending"), 
+  ownerId: text("owner_id").references(() => users.id),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const vendorBenchmarks = pgTable("vendor_benchmarks", {
+  id: serial("id").primaryKey(),
+  serviceType: text("service_type").notNull(),
+  serviceCategory: text("service_category").notNull(),
+  marketAverageAnnual: doublePrecision("market_average_annual").notNull(),
+  currency: text("currency").default("USD"),
+  region: text("region").default("East Africa"),
+  sampleSize: integer("sample_size").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+export const continuousMonitoring = pgTable("continuous_monitoring", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  rulesetId: integer("ruleset_id").references(() => auditRulesets.id).notNull(),
+  frequencyDays: integer("frequency_days").default(7),
+  isActive: boolean("is_active").default(true),
+  lastRun: timestamp("last_run"),
+  nextRun: timestamp("next_run"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+
+export const marketplaceListings = pgTable("marketplace_listings", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  sellerId: text("seller_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // data_protection, insurance, liability, etc.
+  content: text("content").notNull(), // The actual clause template
+  price: doublePrecision("price").notNull(),
+  currency: text("currency").default("USD"),
+  rating: doublePrecision("rating").default(0),
+  salesCount: integer("sales_count").default(0),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const marketplacePurchases = pgTable("marketplace_purchases", {
+  id: serial("id").primaryKey(),
+  buyerWorkspaceId: integer("buyer_workspace_id").references(() => workspaces.id).notNull(),
+  buyerId: text("buyer_id").references(() => users.id).notNull(),
+  listingId: integer("listing_id").references(() => marketplaceListings.id).notNull(),
+  amount: doublePrecision("amount").notNull(),
+  platformFee: doublePrecision("platform_fee").notNull(), // 30%
+  sellerPayout: doublePrecision("seller_payout").notNull(), // 70%
+  status: text("status").default("completed"), // completed, refunded
+  transactionId: text("transaction_id"), // Stripe/PayPal TX ID
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+});
 
 // === DATABASE RELATIONS ===
 
@@ -372,6 +501,16 @@ export const contractsRelations = relations(contracts, ({ one, many }) => ({
   comments: many(comments),
   comparisons: many(contractComparisons),
   clauses: many(clauses),
+}));
+
+export const insurancePoliciesRelations = relations(insurancePolicies, ({ one }) => ({
+  client: one(clients, { fields: [insurancePolicies.clientId], references: [clients.id] }),
+  workspace: one(workspaces, { fields: [insurancePolicies.workspaceId], references: [workspaces.id] }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, { fields: [subscriptions.userId], references: [users.id] }),
+  workspace: one(workspaces, { fields: [subscriptions.workspaceId], references: [workspaces.id] }),
 }));
 
 export const auditRulesetsRelations = relations(auditRulesets, ({ many }) => ({
@@ -486,3 +625,31 @@ export const insertWorkspaceMemberSchema = createInsertSchema(workspaceMembers).
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type InsertWorkspaceMember = z.infer<typeof insertWorkspaceMemberSchema>;
 export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
+
+export const insertRemediationTaskSchema = createInsertSchema(remediationTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type RemediationTask = typeof remediationTasks.$inferSelect;
+export type InsertRemediationTask = z.infer<typeof insertRemediationTaskSchema>;
+
+export const insertVendorBenchmarkSchema = createInsertSchema(vendorBenchmarks).omit({ id: true, lastUpdated: true });
+export type VendorBenchmark = typeof vendorBenchmarks.$inferSelect;
+export type InsertVendorBenchmark = z.infer<typeof insertVendorBenchmarkSchema>;
+
+export const insertContinuousMonitoringSchema = createInsertSchema(continuousMonitoring).omit({ id: true, createdAt: true });
+export type ContinuousMonitoring = typeof continuousMonitoring.$inferSelect;
+export type InsertContinuousMonitoring = z.infer<typeof insertContinuousMonitoringSchema>;
+
+export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({ id: true, createdAt: true });
+export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
+export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;
+
+export const insertMarketplacePurchaseSchema = createInsertSchema(marketplacePurchases).omit({ id: true, purchasedAt: true });
+export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
+export type InsertMarketplacePurchase = z.infer<typeof insertMarketplacePurchaseSchema>;
+
+export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
+export type InsertInsurancePolicy = z.infer<typeof insertInsurancePolicySchema>;
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;

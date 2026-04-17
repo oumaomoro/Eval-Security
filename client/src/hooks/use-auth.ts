@@ -3,18 +3,12 @@ import type { User } from "@shared/models/auth";
 import { getApiUrl } from "@/lib/api-config";
 
 async function fetchUser(): Promise<User | null> {
-  const token = localStorage.getItem("costloci_token");
-  if (!token) return null;
-
   try {
     const response = await fetch(getApiUrl("/api/auth/user"), {
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
+      credentials: "include"
     });
 
     if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem("costloci_token");
       return null;
     }
 
@@ -34,7 +28,7 @@ async function fetchUser(): Promise<User | null> {
 }
 
 async function logout(): Promise<void> {
-  localStorage.removeItem("costloci_token");
+  await fetch("/api/auth/logout", { method: "POST" });
   window.location.href = "/auth";
 }
 

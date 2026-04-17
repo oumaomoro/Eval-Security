@@ -6,10 +6,8 @@ export function useAuditLogs() {
   return useQuery({
     queryKey: [api.auditLogs.list.path],
     queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
       const res = await fetch(getApiUrl(api.auditLogs.list.path), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        credentials: "include"
       });
       if (!res.ok) throw new Error("Failed to fetch audit logs");
       return api.auditLogs.list.responses[200].parse(await res.json());

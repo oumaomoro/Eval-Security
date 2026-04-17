@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import { SOC2Logger } from "../services/SOC2Logger";
 
 const router = Router();
 
@@ -67,6 +68,14 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
       clientId
     });
 
+    await SOC2Logger.logEvent(req, {
+      userId: req.user.id,
+      action: "USER_INVITED",
+      resourceType: "User",
+      resourceId: newUser.id,
+      details: `Invited new user with role: ${role}`
+    });
+
     res.status(201).json(newUser);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -102,6 +111,15 @@ router.put("/api/org/member", isAuthenticated, async (req: any, res) => {
     }
 
     const updatedUser = await storage.updateUser(userId, { role });
+
+    await SOC2Logger.logEvent(req, {
+      userId: req.user.id,
+      action: "USER_ROLE_UPDATED",
+      resourceType: "User",
+      resourceId: userId,
+      details: `Updated user organization role to: ${role}`
+    });
+
     res.json(updatedUser);
   } catch (error) {
     if (error instanceof z.ZodError) {

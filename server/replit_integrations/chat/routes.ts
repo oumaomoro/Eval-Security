@@ -1,23 +1,12 @@
-import type { Express, Request, Response } from "express";
-import OpenAI from "openai";
+import { type Express, type Request, type Response } from "express";
+import { AIGateway } from "../../services/AIGateway.js";
 import { chatStorage } from "./storage";
-
-// Lazy initialization — only create the client when actually needed.
-// This prevents the server from crashing at boot if the API key isn't set.
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    });
-  }
-  return _openai;
-}
+import { isAuthenticated } from "../auth";
+import { SOC2Logger } from "../../services/SOC2Logger";
 
 export function registerChatRoutes(app: Express): void {
   // Get all conversations
-  app.get("/api/conversations", async (req: Request, res: Response) => {
+  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const conversations = await chatStorage.getAllConversations();
       res.json(conversations);
@@ -28,7 +17,7 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Get single conversation with messages
-  app.get("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
       const conversation = await chatStorage.getConversation(id);
@@ -44,7 +33,7 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Create new conversation
-  app.post("/api/conversations", async (req: Request, res: Response) => {
+  app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const { title } = req.body;
       const conversation = await chatStorage.createConversation(title || "New Chat");
@@ -56,10 +45,19 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Delete conversation
-  app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
       await chatStorage.deleteConversation(id);
+
+      await SOC2Logger.logEvent(req as any, {
+        userId: (req as any).user.id,
+        action: "CHAT_CONVERSATION_DELETED",
+        resourceType: "Conversation",
+        resourceId: String(id),
+        details: "User deleted a collaborative chat history."
+      });
+
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting conversation:", error);
@@ -68,7 +66,7 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Send message and get AI response (streaming)
-  app.post("/api/conversations/:id/messages", async (req: Request, res: Response) => {
+  app.post("/api/conversations/:id/messages", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const conversationId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
       const { content } = req.body;
@@ -88,8 +86,8 @@ export function registerChatRoutes(app: Express): void {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      // Stream response from OpenAI
-      const stream = await getOpenAI().chat.completions.create({
+      // Stream response from OpenAI (Resilient Path)
+      const stream = await AIGateway.createStreamingCompletion({
         model: "gpt-4o",
         messages: chatMessages,
         stream: true,
@@ -113,7 +111,6 @@ export function registerChatRoutes(app: Express): void {
       res.end();
     } catch (error) {
       console.error("Error sending message:", error);
-      // Check if headers already sent (SSE streaming started)
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Failed to send message" })}\n\n`);
         res.end();

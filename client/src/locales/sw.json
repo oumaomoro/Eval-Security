@@ -1,0 +1,83 @@
+{
+  "nav": {
+    "dashboard": "Dashibodi",
+    "dpo_command": "Kituo cha Amri cha DPO",
+    "costloci_intel": "Akili za Costloci",
+    "contracts": "Mikataba na DPA",
+    "redline_studio": "Studio ya Kuhariri ya AI",
+    "risk_register": "Sajili ya Hatari",
+    "clause_library": "Maktaba ya Vifungu",
+    "vendor_governance": "Uongozi wa Wauzaji",
+    "compliance_policies": "Sera za Utekelezaji",
+    "cost_optimization": "Uboreshaji wa Gharama",
+    "market_benchmarking": "Vipimo vya Soko",
+    "executive_roi": "ROI ya Watendaji",
+    "regulatory_reports": "Ripoti za Udhibiti",
+    "billing_usage": "Malipo na Matumizi",
+    "system_health": "Afya ya Mfumo",
+    "audit_ledger": "Daftari la Ukaguzi",
+    "governance_marketplace": "Soko la Uongozi",
+    "workspace_team": "Eneo la Kazi na Timu",
+    "settings": "Mipangilio",
+    "groups": {
+      "core": "Moduli Kuu",
+      "intelligence": "Akili za AI",
+      "platform": "Jukwaa"
+    }
+  },
+  "auth": {
+    "login": "Ingia",
+    "register": "Jisajili",
+    "initialize_agent": "Anzisha Wakala",
+    "email": "Anwani ya Barua Pepe",
+    "password": "Nenosiri",
+    "first_name": "Jina la Kwanza",
+    "last_name": "Jina la Mwisho",
+    "welcome": "Karibu Costloci",
+    "login_title": "Ingia kwa Mtendaji",
+    "register_title": "Usajili wa Wakala",
+    "forgot_title": "Urejeshaji wa Kitambulisho",
+    "login_subtitle": "Fikia dashibodi yako ya akili ya biashara",
+    "register_subtitle": "Anzisha kitovu chako cha uongozi wa kiotomatiki",
+    "forgot_subtitle": "Rejesha ufikiaji wa tovuti yako salama",
+    "sso_google": "Ingia kwa kutumia Google Gateway"
+  },
+  "common": {
+    "save": "Hifadhi",
+    "cancel": "Ghairi",
+    "execute": "Tekeleza",
+    "loading": "Inapakia..."
+  },
+  "dashboard": {
+    "title": "Dashibodi ya Mtendaji",
+    "strategic_pack": "Pakua Kifurushi cha Mkakati",
+    "annual_spend": "Jumla ya Matumizi ya Mwaka",
+    "missing_renewals": "Usasishaji Unaokosekana",
+    "analyzed_contracts": "Mikataba Iliyochambuliwa",
+    "critical_risks": "Hatari Muhimu",
+    "spend_vs_vendors": "Matumizi dhidi ya Wauzaji",
+    "risk_categories": "Vitengo vya Hatari",
+    "upcoming_renewals": "Usasishaji Unaokuja",
+    "review_contract": "Pitia Mkataba",
+    "no_renewals": "Hakuna usasishaji unaokuja uliopatikana."
+  },
+  "dpo": {
+    "title": "Kituo cha Amri cha DPO",
+    "subtitle": "Usimamizi kamili wa ulinzi wa data, ramani za utiifu, na utayari wa ukiukaji.",
+    "live_monitoring": "Ufuatiliaji wa Moja kwa Moja",
+    "run_audit": "Fanya Ukaguzi we Kimataifa",
+    "compliance_risk": "Hatari ya Utiifu",
+    "avg_compliance": "Wastani wa Utiifu",
+    "dpas_reviewed": "DPA Zilizopitiwa",
+    "readiness_score": "Alama ya Utayari",
+    "heatmap_title": "Ramani ya Utiifu wa Kimataifa",
+    "heatmap_desc": "Ufungaji wa moja kwa moja kupitia mifumo mikuu ya udhibiti.",
+    "breach_title": "Utayari wa Ukiukaji wa Data",
+    "breach_desc": "Tathmini iliyopimwa ya mwitikio wa tukio na usafi wa usalama.",
+    "remediation_tasks": "Kazi za Hivi Karibuni za Urekebishaji",
+    "remediation_desc": "Mapengo muhimu yaliyotambuliwa katika mikataba ya DPA ya wauzaji.",
+    "view_all": "Tazama Zote",
+    "regulatory_sentinel": "Mlinzi wa Udhibiti",
+    "analyze_impact": "Changanua Athari"
+  }
+}

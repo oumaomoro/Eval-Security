@@ -7,7 +7,7 @@ export function AuthCallback() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const handleAuth = () => {
+    const handleAuth = async () => {
       const hash = window.location.hash;
       const search = window.location.search;
 
@@ -17,9 +17,29 @@ export function AuthCallback() {
         const accessToken = params.get("access_token");
         
         if (accessToken) {
-          localStorage.setItem("costloci_token", accessToken);
-          window.location.href = "/";
-          return;
+          try {
+            // Exchange token for secure HttpOnly session cookie
+            const res = await fetch("/api/auth/session", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ access_token: accessToken }),
+            });
+            
+            if (res.ok) {
+              window.location.href = "/";
+              return;
+            } else {
+              console.error("Session exchange failed", await res.text());
+              setLocation("/auth?error=session_failed");
+              return;
+            }
+          } catch (error) {
+            console.error("Session exchange error", error);
+            setLocation("/auth?error=network");
+            return;
+          }
         }
       }
 
@@ -32,11 +52,9 @@ export function AuthCallback() {
          return;
       }
 
-      // If nothing is found but it's processing
+      // Fallback
       setTimeout(() => {
-        if (!localStorage.getItem("costloci_token")) {
-           setLocation("/auth");
-        }
+         setLocation("/auth");
       }, 3000);
     };
 

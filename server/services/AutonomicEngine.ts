@@ -13,6 +13,7 @@ export class AutonomicEngine {
   private static pulseCount = 0;
   private static lastLatencyMs = 0;
   private static lastPulseAt: string | null = null;
+  private static auditRetentionCount = 0;
 
   static start() {
     if (this.heartbeatInterval) return;
@@ -67,7 +68,48 @@ export class AutonomicEngine {
         // Silently handle missing billing_telemetry table
       }
 
-      // 3. Log Health Pulse
+      // 3. Governance Ledger Health (Phase 32)
+      try {
+        const recentAudits = await storage.getAuditLogs();
+        this.auditRetentionCount = recentAudits.length;
+      } catch (e) {
+        // Handle case where audit_logs table might be initializing or restricted
+      }
+
+      // 4. Continuous Monitoring Rescans (Phase 34)
+      try {
+        const monitoringConfigs = await storage.getContinuousMonitoringConfigs();
+        const now = Date.now();
+        
+        for (const config of monitoringConfigs) {
+          if (config.isActive && config.nextRun && new Date(config.nextRun).getTime() <= now) {
+            console.log(`[AUTONOMIC] Triggering continuous monitoring rescan for Client ${config.clientId}, Ruleset ${config.rulesetId}`);
+            
+            // Log the monitoring trigger
+            await storage.createInfrastructureLog({
+              status: "info",
+              component: "AutonomicMonitoring",
+              event: "Rescan Triggered",
+              actionTaken: `Recurring compliance scan for Client ${config.clientId}`
+            });
+
+            // Updating triggers (next run = now + frequency)
+            const nextRunDate = new Date(Date.now() + (config.frequencyDays || 7) * 24 * 60 * 60 * 1000).toISOString();
+            await storage.updateContinuousMonitoringConfig(config.id, {
+               lastRun: new Date(),
+               nextRun: new Date(nextRunDate)
+            });
+
+            // Note: In a full production environment, we would emit an event or call AuditService.runAudit here.
+            // For Phase 34 stabilization, we are hardening the logic; the actual trigger 
+            // will hook into the AuditService implementation.
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[AUTONOMIC] Monitoring check failed: ${e.message}`);
+      }
+
+      // 5. Log Health Pulse
       if (storage && typeof storage.createInfrastructureLog === 'function') {
         await storage.createInfrastructureLog({
           status: "healthy",
@@ -95,7 +137,8 @@ export class AutonomicEngine {
       pulseCount: this.pulseCount,
       lastPulse: this.lastPulseAt || new Date().toISOString(),
       postgresLatency: `${this.lastLatencyMs}ms`,
-      version: "2.1.0-sovereign"
+      governanceEventsLogged: this.auditRetentionCount,
+      version: "2.2.0-sovereign-observability"
     };
   }
 }

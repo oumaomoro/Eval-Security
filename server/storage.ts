@@ -4,6 +4,15 @@ import { AuditService } from "./services/AuditService";
 import { adminClient } from "./services/supabase";
 import { storageContext } from "./services/storageContext";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  RemediationTask, InsertRemediationTask,
+  VendorBenchmark, InsertVendorBenchmark,
+  ContinuousMonitoring, InsertContinuousMonitoring,
+  InsurancePolicy, InsertInsurancePolicy,
+  Subscription, InsertSubscription,
+  MarketplaceListing, InsertMarketplaceListing,
+  MarketplacePurchase, InsertMarketplacePurchase
+} from "@shared/schema";
 
 // RLS HARDENING: Dynamically resolve the Supabase Client from the current AsyncLocalStorage context.
 // This seamlessly enforces enterprise RLS by using the authenticated user's client instead of the sovereign bypass.
@@ -35,7 +44,8 @@ import {
   type InsertRisk, type InsertSavings, type InsertReport, type InsertVendorScorecard, type InsertWorkspace, type InsertComment, type InsertContractComparison,
   type InsertInfrastructureLog, type InsertBillingTelemetry, type InsertAuditLog,
   type InsertRemediationSuggestion, type InsertRegulatoryAlert,
-  type InsertClause, type InsertContractClause, type InsertWorkspaceMember
+  type InsertClause, type InsertContractClause, type InsertWorkspaceMember,
+  type InsurancePolicy as InsuranceItem, type Subscription as UserSubscription
 } from "@shared/schema";
 
 /**
@@ -135,8 +145,12 @@ export interface IStorage {
   createUser(user: Partial<User>): Promise<User>;
   deleteUser(id: string): Promise<void>;
 
-  // Playbooks (Marketplace / E2E test fix)
+  // Playbooks & Marketplace
   getPlaybooks(): Promise<Playbook[]>;
+  getMarketplaceListings(): Promise<MarketplaceListing[]>;
+  getMarketplaceListing(id: number): Promise<MarketplaceListing | undefined>;
+  createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing>;
+  createMarketplacePurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase>;
 
   // Notification Channels (Feature Option C)
   getNotificationChannels(workspaceId?: number): Promise<any[]>;
@@ -147,6 +161,31 @@ export interface IStorage {
   // Regulatory
   getRegulatoryAlerts(status?: string): Promise<RegulatoryAlert[]>;
   createRegulatoryAlert(alert: InsertRegulatoryAlert): Promise<RegulatoryAlert>;
+
+  // Remediation Tasks
+  getRemediationTasks(contractId?: number): Promise<RemediationTask[]>;
+  createRemediationTask(task: InsertRemediationTask): Promise<RemediationTask>;
+  updateRemediationTask(id: number, updates: Partial<RemediationTask>): Promise<RemediationTask>;
+
+  // Benchmarking
+  getVendorBenchmarks(category?: string): Promise<VendorBenchmark[]>;
+  getPeerBenchmarks(clientId?: number): Promise<any[]>;
+  createVendorBenchmark(benchmark: InsertVendorBenchmark): Promise<VendorBenchmark>;
+
+  // Continuous Monitoring
+  getContinuousMonitoringConfigs(clientId?: number): Promise<ContinuousMonitoring[]>;
+  createContinuousMonitoringConfig(config: InsertContinuousMonitoring): Promise<ContinuousMonitoring>;
+  updateContinuousMonitoringConfig(id: number, updates: Partial<ContinuousMonitoring>): Promise<ContinuousMonitoring>;
+
+  // Insurance Policies
+  getInsurancePolicies(clientId?: number): Promise<InsurancePolicy[]>;
+  createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy>;
+  updateInsurancePolicy(id: number, updates: Partial<InsurancePolicy>): Promise<InsurancePolicy>;
+
+  // Subscriptions
+  getSubscription(userId: string): Promise<Subscription | undefined>;
+  upsertSubscription(sub: InsertSubscription): Promise<Subscription>;
+
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] };
 }
 
@@ -169,6 +208,13 @@ export class SupabaseRESTStorage implements IStorage {
       }
       throw new Error(error.message);
     }
+    
+    // Recovery: If we hit a successful response, ensure we clear any stale degraded markers
+    // unless there are still confirmed missing tables known.
+    if (this.healthStatus.mode === 'degraded' && this.healthStatus.missingTables.length === 0) {
+       this.healthStatus.mode = 'sovereign';
+    }
+    
     return data as T;
   }
 
@@ -436,12 +482,13 @@ export class SupabaseRESTStorage implements IStorage {
   async getAuditRulesets(): Promise<AuditRuleset[]> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("audit_rulesets").select("*");
-    // Only return global rulesets (isCustom=false) OR those belonging to current workspace
+    
     if (workspaceId) {
       query = query.or(`is_custom.eq.false,workspace_id.eq.${workspaceId}`);
     } else {
       query = query.eq("is_custom", false);
     }
+    
     return this.handleResponse<AuditRuleset[]>(query);
   }
 
@@ -455,8 +502,12 @@ export class SupabaseRESTStorage implements IStorage {
     return this.handleResponse<AuditRuleset>(
       supabase.from("audit_rulesets")
         .insert({
-          ...ruleset,
-          workspaceId: workspaceId || ruleset.workspaceId
+          workspace_id: workspaceId || ruleset.workspaceId,
+          name: ruleset.name,
+          description: ruleset.description,
+          standard: ruleset.standard,
+          rules: ruleset.rules,
+          is_custom: ruleset.isCustom || false
         })
         .select()
         .single()
@@ -464,7 +515,14 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async updateAuditRuleset(id: number, updates: Partial<AuditRuleset>): Promise<AuditRuleset> {
-    return this.handleResponse(supabase.from("audit_rulesets").update(updates).eq("id", id).select().single());
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.standard !== undefined) payload.standard = updates.standard;
+    if (updates.rules !== undefined) payload.rules = updates.rules;
+    if (updates.isCustom !== undefined) payload.is_custom = updates.isCustom;
+
+    return this.handleResponse(supabase.from("audit_rulesets").update(payload).eq("id", id).select().single());
   }
 
   async deleteAuditRuleset(id: number): Promise<void> {
@@ -472,7 +530,7 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await this.handleResponse(supabase.from("users").delete().eq("id", id));
+    await this.handleResponse(supabase.from("profiles").delete().eq("id", id));
   }
 
   // --- PLAYBOOKS (Marketplace E2E tests dependency) --- //
@@ -520,24 +578,66 @@ export class SupabaseRESTStorage implements IStorage {
     if (contractId) query = query.eq("contract_id", contractId);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
-    return this.handleResponse<ComplianceAudit[]>(query.order("created_at", { ascending: false }));
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      rulesetId: d.ruleset_id,
+      auditName: d.audit_name,
+      auditType: d.audit_type,
+      scope: d.scope,
+      status: d.status,
+      overallComplianceScore: Number(d.overall_compliance_score),
+      findings: d.findings,
+      complianceByStandard: d.compliance_by_standard,
+      systemicIssues: d.systemic_issues,
+      executiveSummary: d.executive_summary,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
   }
 
   async createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit> {
     const workspaceId = storageContext.getStore()?.workspaceId;
+    const payload: any = {
+      workspace_id: workspaceId || audit.workspaceId,
+      contract_id: audit.contractId,
+      ruleset_id: audit.rulesetId,
+      audit_name: audit.auditName,
+      audit_type: audit.auditType,
+      status: audit.status || "in_progress",
+      scope: audit.scope,
+      findings: audit.findings,
+      overall_compliance_score: audit.overallComplianceScore,
+      compliance_by_standard: audit.complianceByStandard,
+      systemic_issues: audit.systemicIssues,
+      executive_summary: audit.executiveSummary
+    };
+
     return this.handleResponse<ComplianceAudit>(
       supabase.from("compliance_audits")
-        .insert({
-          ...audit,
-          workspaceId: workspaceId || audit.workspaceId
-        })
+        .insert(payload)
         .select()
         .single()
     );
   }
 
   async updateComplianceAudit(id: number, updates: Partial<ComplianceAudit>): Promise<ComplianceAudit> {
-    return this.handleResponse<ComplianceAudit>(supabase.from("compliance_audits").update(updates).eq("id", id).select().single());
+    const payload: any = {};
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.findings !== undefined) payload.findings = updates.findings;
+    if (updates.overallComplianceScore !== undefined) payload.overall_compliance_score = updates.overallComplianceScore;
+    if (updates.complianceByStandard !== undefined) payload.compliance_by_standard = updates.complianceByStandard;
+    if (updates.systemicIssues !== undefined) payload.systemic_issues = updates.systemicIssues;
+    if (updates.executiveSummary !== undefined) payload.executive_summary = updates.executiveSummary;
+
+    return this.handleResponse<ComplianceAudit>(
+      supabase.from("compliance_audits")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
   }
 
   // --- RISKS ---
@@ -546,7 +646,29 @@ export class SupabaseRESTStorage implements IStorage {
     let query = supabase.from("risks").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
-    return this.handleResponse<Risk[]>(query.order("created_at", { ascending: false }));
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => this.mapRisk(d));
+  }
+
+  private mapRisk(d: any): Risk {
+    return {
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      riskTitle: d.risk_title,
+      riskCategory: d.risk_category,
+      riskDescription: d.risk_description,
+      severity: d.severity,
+      likelihood: d.likelihood,
+      impact: d.impact,
+      riskScore: d.risk_score,
+      mitigationStatus: d.mitigation_status,
+      mitigationStrategies: d.mitigation_strategies,
+      financialExposureMin: d.financial_exposure_min,
+      financialExposureMax: d.financial_exposure_max,
+      aiConfidence: d.ai_confidence,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    };
   }
 
   /**
@@ -566,13 +688,13 @@ export class SupabaseRESTStorage implements IStorage {
     const contractIds = contractData.map((c: any) => c.id);
 
     // Step 2: Fetch risks that belong to those contracts only
-    const data = await this.handleResponse<Risk[]>(
+    const data = await this.handleResponse<any[]>(
       supabase.from("risks")
         .select("*")
         .in("contract_id", contractIds)
         .order("risk_score", { ascending: false })
     );
-    return data || [];
+    return (data || []).map(d => this.mapRisk(d));
   }
 
   async createRisk(risk: InsertRisk): Promise<Risk> {
@@ -602,7 +724,21 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async updateRisk(id: number, updates: Partial<Risk>): Promise<Risk> {
-    return this.handleResponse(supabase.from("risks").update(updates).eq("id", id).select().single());
+    const payload: any = {};
+    if (updates.riskTitle !== undefined) payload.risk_title = updates.riskTitle;
+    if (updates.riskCategory !== undefined) payload.risk_category = updates.riskCategory;
+    if (updates.riskDescription !== undefined) payload.risk_description = updates.riskDescription;
+    if (updates.severity !== undefined) payload.severity = updates.severity;
+    if (updates.likelihood !== undefined) payload.likelihood = updates.likelihood;
+    if (updates.impact !== undefined) payload.impact = updates.impact;
+    if (updates.riskScore !== undefined) payload.risk_score = updates.riskScore;
+    if (updates.mitigationStatus !== undefined) payload.mitigation_status = updates.mitigationStatus;
+    if (updates.mitigationStrategies !== undefined) payload.mitigation_strategies = updates.mitigationStrategies;
+    if (updates.financialExposureMin !== undefined) payload.financial_exposure_min = updates.financialExposureMin;
+    if (updates.financialExposureMax !== undefined) payload.financial_exposure_max = updates.financialExposureMax;
+    if (updates.aiConfidence !== undefined) payload.ai_confidence = updates.aiConfidence;
+
+    return this.handleResponse(supabase.from("risks").update(payload).eq("id", id).select().single());
   }
 
   // --- SAVINGS ---
@@ -653,7 +789,24 @@ export class SupabaseRESTStorage implements IStorage {
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("reports").select("*");
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
-    return this.handleResponse<Report[]>(query.order("created_at", { ascending: false }));
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      userId: d.user_id,
+      organizationId: d.organization_id,
+      title: d.title,
+      type: d.type,
+      regulatoryBody: d.regulatory_body,
+      status: d.status,
+      aiAnalysis: d.ai_analysis,
+      content: d.content,
+      format: d.format,
+      fileUrl: d.file_url,
+      generatedBy: d.generated_by,
+      completedAt: d.completed_at ? new Date(d.completed_at) : null,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
   }
 
   async createReport(report: InsertReport): Promise<Report> {
@@ -661,8 +814,19 @@ export class SupabaseRESTStorage implements IStorage {
     return this.handleResponse<Report>(
       supabase.from("reports")
         .insert({
-          ...report,
-          workspaceId: workspaceId || report.workspaceId
+          workspace_id: workspaceId || report.workspaceId,
+          user_id: report.userId,
+          organization_id: report.organizationId,
+          title: report.title,
+          type: report.type,
+          regulatory_body: report.regulatoryBody,
+          status: report.status || "pending",
+          ai_analysis: report.aiAnalysis,
+          content: report.content,
+          format: report.format || "pdf",
+          file_url: report.fileUrl,
+          generated_by: report.generatedBy,
+          completed_at: report.completedAt
         })
         .select()
         .single()
@@ -670,7 +834,20 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async updateReport(id: number, updates: Partial<Report>): Promise<Report> {
-    return this.handleResponse<Report>(supabase.from("reports").update(updates).eq("id", id).select().single());
+    const payload: any = {};
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.aiAnalysis !== undefined) payload.ai_analysis = updates.aiAnalysis;
+    if (updates.content !== undefined) payload.content = updates.content;
+    if (updates.fileUrl !== undefined) payload.file_url = updates.fileUrl;
+    if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt;
+
+    return this.handleResponse<Report>(
+      supabase.from("reports")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
   }
 
   // --- SCORECARDS ---
@@ -680,7 +857,21 @@ export class SupabaseRESTStorage implements IStorage {
     if (vendorName) query = query.eq("vendor_name", vendorName);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     query = query.order("last_assessment_date", { ascending: false });
-    return this.handleResponse<VendorScorecard[]>(query);
+
+    const data = await this.handleResponse<any[]>(query);
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      vendorName: d.vendor_name,
+      complianceScore: d.compliance_score,
+      riskScore: d.risk_score,
+      securityScore: d.security_score,
+      slaPerformance: d.sla_performance,
+      overallGrade: d.overall_grade,
+      lastAssessmentDate: d.last_assessment_date ? new Date(d.last_assessment_date) : null,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
   }
 
   async createVendorScorecard(scorecard: InsertVendorScorecard): Promise<VendorScorecard> {
@@ -688,8 +879,15 @@ export class SupabaseRESTStorage implements IStorage {
     return this.handleResponse<VendorScorecard>(
       supabase.from("vendor_scorecards")
         .insert({
-          ...scorecard,
-          workspaceId: workspaceId || scorecard.workspaceId
+          workspace_id: workspaceId || scorecard.workspaceId,
+          contract_id: scorecard.contractId,
+          vendor_name: scorecard.vendorName,
+          compliance_score: scorecard.complianceScore,
+          risk_score: scorecard.riskScore,
+          security_score: scorecard.securityScore,
+          sla_performance: scorecard.slaPerformance,
+          overall_grade: scorecard.overallGrade,
+          last_assessment_date: scorecard.lastAssessmentDate
         })
         .select()
         .single()
@@ -702,7 +900,7 @@ export class SupabaseRESTStorage implements IStorage {
       this.getContracts({ clientId }),
       this.getRisks(),
       this.getSavingsOpportunities(),
-      supabase.from("profiles").select("*").then(r => r.data || []),
+      supabase.from("profiles").select("*").then(r => (r.data || []).map(p => this.mapProfileToUser(p))),
       this.getAuditLogs(clientId),
       this.getInfrastructureLogs(),
       clientId ? this.getWorkspace(clientId) : Promise.resolve(null)
@@ -716,9 +914,9 @@ export class SupabaseRESTStorage implements IStorage {
     const totalPotentialSavings = savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0);
     
     const liveMrr = users.reduce((sum, u) => {
-       if (u.subscription_tier === 'enterprise') return sum + 999;
-       if (u.subscription_tier === 'pro') return sum + 299;
-       if (u.subscription_tier === 'starter') return sum + 99;
+       if (u.subscriptionTier === 'enterprise') return sum + 999;
+       if (u.subscriptionTier === 'pro') return sum + 299;
+       if (u.subscriptionTier === 'starter') return sum + 99;
        return sum;
     }, 0);
 
@@ -743,8 +941,8 @@ export class SupabaseRESTStorage implements IStorage {
     const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, 'enterprise');
 
     const currentUser = userId ? users.find(u => u.id === userId) : (users[0] || {});
-    const subscriptionTier = currentUser?.subscription_tier || 'starter';
-    const contractsCount = currentUser?.contracts_count || contracts.length;
+    const subscriptionTier = currentUser?.subscriptionTier || 'starter';
+    const contractsCount = currentUser?.contractsCount || contracts.length;
 
     return {
       subscriptionTier,
@@ -797,7 +995,7 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
-  async getVendorBenchmarks(clientId?: number): Promise<any[]> {
+  async getPeerBenchmarks(clientId?: number): Promise<any[]> {
     const [contracts, risks] = await Promise.all([
       this.getContracts({ clientId }),
       this.getRisks()
@@ -981,6 +1179,7 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
+
   // --- CLAUSES & LEGAL ---
   async getClauseLibrary(): Promise<Clause[]> {
     const data = await this.handleResponse<any[]>(supabase.from("clause_library").select("*"));
@@ -1057,9 +1256,11 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async createClauseLibraryItem(clause: InsertClause): Promise<Clause> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     const data = await this.handleResponse<any>(
       supabase.from("clause_library")
         .insert({
+          workspace_id: workspaceId || clause.workspaceId,
           clause_name: clause.clauseName,
           clause_category: clause.clauseCategory,
           standard_language: clause.standardLanguage,
@@ -1131,7 +1332,17 @@ export class SupabaseRESTStorage implements IStorage {
     let query = supabase.from("regulatory_alerts").select("*");
     if (status) query = query.eq("status", status);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
-    return this.handleResponse<RegulatoryAlert[]>(query.order("published_date", { ascending: false }));
+    
+    const data = await this.handleResponse<any[]>(query.order("published_date", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      standard: d.standard,
+      alertTitle: d.alert_title,
+      alertDescription: d.alert_description,
+      publishedDate: d.published_date ? new Date(d.published_date) : null,
+      status: d.status
+    }));
   }
 
   async createRegulatoryAlert(alert: InsertRegulatoryAlert): Promise<RegulatoryAlert> {
@@ -1139,8 +1350,11 @@ export class SupabaseRESTStorage implements IStorage {
     return this.handleResponse<RegulatoryAlert>(
       supabase.from("regulatory_alerts")
         .insert({
-          ...alert,
-          workspaceId: workspaceId || alert.workspaceId
+          workspace_id: workspaceId || alert.workspaceId,
+          standard: alert.standard,
+          alert_title: alert.alertTitle,
+          alert_description: alert.alertDescription,
+          status: alert.status || "pending_rescan"
         })
         .select()
         .single()
@@ -1342,9 +1556,483 @@ export class SupabaseRESTStorage implements IStorage {
     return owned || workspaces[0];
   }
 
+  // --- REMEDIATION TASKS ---
+  async getRemediationTasks(contractId?: number): Promise<RemediationTask[]> {
+    let query = supabase.from("remediation_tasks").select("*");
+    if (contractId) query = query.eq("contract_id", contractId);
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      findingId: d.finding_id,
+      title: d.title,
+      description: d.description,
+      severity: d.severity,
+      status: d.status,
+      ownerId: d.owner_id,
+      dueDate: d.due_date ? new Date(d.due_date) : null,
+      createdAt: d.created_at ? new Date(d.created_at) : null,
+      updatedAt: d.updated_at ? new Date(d.updated_at) : null
+    }));
+  }
+
+  async createRemediationTask(task: InsertRemediationTask): Promise<RemediationTask> {
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_tasks")
+        .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || task.workspaceId,
+          contract_id: task.contractId,
+          finding_id: task.findingId,
+          title: task.title,
+          description: task.description,
+          severity: task.severity,
+          status: task.status || "pending",
+          owner_id: task.ownerId,
+          due_date: task.dueDate
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      contractId: data.contract_id,
+      findingId: data.finding_id,
+      title: data.title,
+      description: data.description,
+      severity: data.severity,
+      status: data.status,
+      ownerId: data.owner_id,
+      dueDate: data.due_date ? new Date(data.due_date) : null,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null
+    };
+  }
+
+  async updateRemediationTask(id: number, updates: Partial<RemediationTask>): Promise<RemediationTask> {
+    const payload: any = { updated_at: new Date().toISOString() };
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.ownerId !== undefined) payload.owner_id = updates.ownerId;
+    if (updates.dueDate !== undefined) payload.due_date = updates.dueDate;
+    if (updates.title !== undefined) payload.title = updates.title;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_tasks")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      contractId: data.contract_id,
+      findingId: data.finding_id,
+      title: data.title,
+      description: data.description,
+      severity: data.severity,
+      status: data.status,
+      ownerId: data.owner_id,
+      dueDate: data.due_date ? new Date(data.due_date) : null,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null
+    };
+  }
+
+  // --- BENCHMARKING ---
+  async getVendorBenchmarks(category?: string): Promise<VendorBenchmark[]> {
+    let query = supabase.from("vendor_benchmarks").select("*");
+    if (category) query = query.eq("service_category", category);
+    const data = await this.handleResponse<any[]>(query.order("service_type", { ascending: true }));
+    return (data || []).map(d => ({
+      id: d.id,
+      serviceType: d.service_type,
+      serviceCategory: d.service_category,
+      marketAverageAnnual: Number(d.market_average_annual),
+      currency: d.currency,
+      region: d.region,
+      sampleSize: d.sample_size,
+      lastUpdated: d.last_updated ? new Date(d.last_updated) : null
+    }));
+  }
+
+  async createVendorBenchmark(benchmark: InsertVendorBenchmark): Promise<VendorBenchmark> {
+    const data = await this.handleResponse<any>(
+      supabase.from("vendor_benchmarks")
+        .insert({
+          service_type: benchmark.serviceType,
+          service_category: benchmark.serviceCategory,
+          market_average_annual: benchmark.marketAverageAnnual,
+          currency: benchmark.currency || "USD",
+          region: benchmark.region || "East Africa",
+          sample_size: benchmark.sampleSize || 0
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      serviceType: data.service_type,
+      serviceCategory: data.service_category,
+      marketAverageAnnual: Number(data.market_average_annual),
+      currency: data.currency,
+      region: data.region,
+      sampleSize: data.sample_size,
+      lastUpdated: data.last_updated ? new Date(data.last_updated) : null
+    };
+  }
+
+  // --- CONTINUOUS MONITORING ---
+  async getContinuousMonitoringConfigs(clientId?: number): Promise<ContinuousMonitoring[]> {
+    let query = supabase.from("continuous_monitoring").select("*");
+    if (clientId) query = query.eq("client_id", clientId);
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      clientId: d.client_id,
+      rulesetId: d.ruleset_id,
+      frequencyDays: d.frequency_days,
+      isActive: d.is_active,
+      lastRun: d.last_run ? new Date(d.last_run) : null,
+      nextRun: d.next_run ? new Date(d.next_run) : null,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
+  }
+
+  async createContinuousMonitoringConfig(config: InsertContinuousMonitoring): Promise<ContinuousMonitoring> {
+    const data = await this.handleResponse<any>(
+      supabase.from("continuous_monitoring")
+        .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || config.workspaceId,
+          client_id: config.clientId,
+          ruleset_id: config.rulesetId,
+          frequency_days: config.frequencyDays || 7,
+          is_active: config.isActive ?? true,
+          next_run: new Date(Date.now() + (config.frequencyDays || 7) * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      clientId: data.client_id,
+      rulesetId: data.ruleset_id,
+      frequencyDays: data.frequency_days,
+      isActive: data.is_active,
+      lastRun: data.last_run ? new Date(data.last_run) : null,
+      nextRun: data.next_run ? new Date(data.next_run) : null,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async updateContinuousMonitoringConfig(id: number, updates: Partial<ContinuousMonitoring>): Promise<ContinuousMonitoring> {
+    const payload: any = {};
+    if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+    if (updates.frequencyDays !== undefined) payload.frequency_days = updates.frequencyDays;
+    if (updates.lastRun !== undefined) payload.last_run = updates.lastRun;
+    if (updates.nextRun !== undefined) payload.next_run = updates.nextRun;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("continuous_monitoring")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      clientId: data.client_id,
+      rulesetId: data.ruleset_id,
+      frequencyDays: data.frequency_days,
+      isActive: data.is_active,
+      lastRun: data.last_run ? new Date(data.last_run) : null,
+      nextRun: data.next_run ? new Date(data.next_run) : null,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+  // --- INSURANCE POLICIES ---
+  async createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy> {
+    const data = await this.handleResponse<any>(
+      supabase.from("insurance_policies")
+        .insert({
+          workspace_id: storageContext.getStore()?.workspaceId || policy.workspaceId,
+          client_id: policy.clientId,
+          carrier_name: policy.carrierName,
+          policy_number: policy.policyNumber,
+          premium_amount: policy.premiumAmount,
+          effective_date: policy.effectiveDate,
+          expiration_date: policy.expirationDate,
+          file_url: policy.fileUrl,
+          status: policy.status || "active",
+          coverage_limits: policy.coverageLimits,
+          deductibles: policy.deductibles,
+          waiting_periods: policy.waitingPeriods,
+          exclusions: policy.exclusions,
+          endorsements: policy.endorsements,
+          notification_requirements: policy.notificationRequirements,
+          claim_risk_score: policy.claimRiskScore,
+          ai_analysis_summary: policy.aiAnalysisSummary
+        })
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      carrierName: data.carrier_name,
+      policyNumber: data.policy_number,
+      coverageLimits: data.coverage_limits,
+      claimRiskScore: data.claim_risk_score,
+      aiAnalysisSummary: data.ai_analysis_summary,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async updateInsurancePolicy(id: number, updates: Partial<InsurancePolicy>): Promise<InsurancePolicy> {
+    const payload: any = { updated_at: new Date().toISOString() };
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.claimRiskScore !== undefined) payload.claim_risk_score = updates.claimRiskScore;
+    if (updates.aiAnalysisSummary !== undefined) payload.ai_analysis_summary = updates.aiAnalysisSummary;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("insurance_policies")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      carrierName: data.carrier_name,
+      policyNumber: data.policy_number,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  // --- MARKETPLACE ---
+  async getMarketplaceListings(): Promise<MarketplaceListing[]> {
+    const data = await this.handleResponse<any[]>(
+      supabase.from("marketplace_listings")
+        .select("*")
+        .order("created_at", { ascending: false })
+    );
+    return (data || []).map(d => ({
+      ...d,
+      workspaceId: d.workspace_id,
+      sellerId: d.seller_id,
+      salesCount: d.sales_count,
+      isVerified: d.is_verified,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
+  }
+
+  async getMarketplaceListing(id: number): Promise<MarketplaceListing | undefined> {
+    const data = await this.handleResponse<any>(
+      supabase.from("marketplace_listings")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()
+    );
+    if (!data) return undefined;
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      sellerId: data.seller_id,
+      salesCount: data.sales_count,
+      isVerified: data.is_verified,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing> {
+    const data = await this.handleResponse<any>(
+      supabase.from("marketplace_listings")
+        .insert({
+          workspace_id: listing.workspaceId,
+          seller_id: listing.sellerId,
+          title: listing.title,
+          description: listing.description,
+          category: listing.category,
+          content: listing.content,
+          price: listing.price,
+          currency: listing.currency || "USD",
+          is_verified: listing.isVerified || false
+        })
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      sellerId: data.seller_id,
+      salesCount: data.sales_count,
+      isVerified: data.is_verified,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async createMarketplacePurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase> {
+    const data = await this.handleResponse<any>(
+      supabase.from("marketplace_purchases")
+        .insert({
+          buyer_workspace_id: purchase.buyerWorkspaceId,
+          buyer_id: purchase.buyerId,
+          listing_id: purchase.listingId,
+          amount: purchase.amount,
+          platform_fee: purchase.platformFee,
+          seller_payout: purchase.sellerPayout,
+          status: purchase.status || "completed",
+          transaction_id: purchase.transactionId
+        })
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      buyerWorkspaceId: data.buyer_workspace_id,
+      buyerId: data.buyer_id,
+      listingId: data.listing_id,
+      platformFee: data.platform_fee,
+      sellerPayout: data.seller_payout,
+      purchasedAt: data.purchased_at ? new Date(data.purchased_at) : null
+    };
+  }
+
+  // --- SUBSCRIPTIONS ---
+  async getSubscription(userId: string): Promise<Subscription | undefined> {
+    const data = await this.handleResponse<any>(
+      supabase.from("subscriptions")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle()
+    );
+    if (!data) return undefined;
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      userId: data.user_id,
+      stripeCustomerId: data.stripe_customer_id,
+      stripeSubscriptionId: data.stripe_subscription_id,
+      paypalSubscriptionId: data.paypal_subscription_id,
+      paystackSubscriptionId: data.paystack_subscription_id,
+      currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end) : null,
+      cancelAtPeriodEnd: data.cancel_at_period_end,
+      apiTokenLimit: data.api_token_limit,
+      apiTokenUsage: data.api_token_usage,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null
+    };
+  }
+
+  async upsertSubscription(sub: InsertSubscription): Promise<Subscription> {
+    const existing = await this.getSubscription(sub.userId);
+    const payload = {
+      workspace_id: storageContext.getStore()?.workspaceId || sub.workspaceId,
+      user_id: sub.userId,
+      stripe_customer_id: sub.stripeCustomerId,
+      stripe_subscription_id: sub.stripeSubscriptionId,
+      paypal_subscription_id: sub.paypalSubscriptionId,
+      paystack_subscription_id: sub.paystackSubscriptionId,
+      tier: sub.tier,
+      status: sub.status,
+      current_period_end: sub.currentPeriodEnd,
+      cancel_at_period_end: sub.cancelAtPeriodEnd,
+      api_token_limit: sub.apiTokenLimit,
+      api_token_usage: sub.apiTokenUsage,
+      updated_at: new Date().toISOString()
+    };
+    
+    let data;
+    if (existing) {
+      data = await this.handleResponse<any>(
+        supabase.from("subscriptions")
+          .update(payload)
+          .eq("user_id", sub.userId)
+          .select()
+          .single()
+      );
+    } else {
+      data = await this.handleResponse<any>(
+        supabase.from("subscriptions")
+          .insert(payload)
+          .select()
+          .single()
+      );
+    }
+    
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      userId: data.user_id,
+      stripeCustomerId: data.stripe_customer_id,
+      stripeSubscriptionId: data.stripe_subscription_id,
+      apiTokenLimit: data.api_token_limit,
+      apiTokenUsage: data.api_token_usage,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null
+    };
+  }
+
   // --- SYSTEM HEALTH ---
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] } {
     return this.healthStatus;
+  }
+
+  async getSubscriptions(): Promise<Subscription[]> {
+    const data = await this.handleResponse<any[]>(
+      supabase.from("subscriptions").select("*")
+    );
+    return (data || []).map(sub => ({
+      ...sub,
+      workspaceId: sub.workspace_id,
+      userId: sub.user_id,
+      stripeCustomerId: sub.stripe_customer_id,
+      stripeSubscriptionId: sub.stripe_subscription_id,
+      apiTokenLimit: sub.api_token_limit,
+      apiTokenUsage: sub.api_token_usage
+    }));
+  }
+
+  async incrementApiUsage(workspaceId: number): Promise<void> {
+    await supabase.rpc('increment_api_usage', { wid: workspaceId });
+  }
+
+  async getInsurancePolicies(workspaceId?: number): Promise<InsurancePolicy[]> {
+    let query = supabase.from("insurance_policies").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(p => ({
+      ...p,
+      workspaceId: p.workspace_id,
+      carrierName: p.carrier_name,
+      policyNumber: p.policy_number,
+      coverageLimits: p.coverage_limits,
+      claimRiskScore: p.claim_risk_score,
+      aiAnalysisSummary: p.ai_analysis_summary,
+      createdAt: p.created_at ? new Date(p.created_at) : null
+    }));
+  }
+
+  async getInsurancePolicy(id: number): Promise<InsurancePolicy | undefined> {
+    const data = await this.handleResponse<any>(
+      supabase.from("insurance_policies").select("*").eq("id", id).maybeSingle()
+    );
+    if (!data) return undefined;
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      carrierName: data.carrier_name,
+      policyNumber: data.policy_number,
+      coverageLimits: data.coverage_limits,
+      claimRiskScore: data.claim_risk_score,
+      aiAnalysisSummary: data.ai_analysis_summary
+    };
   }
 }
 

@@ -1,12 +1,7 @@
-import OpenAI from "openai";
+import { AIGateway } from "./AIGateway.js";
 import { storage } from "../storage";
 import { ROIService } from "./ROIService";
 import { type Contract, type Risk, type Clause } from "@shared/schema";
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
 
 export class PlaybookService {
   /**
@@ -62,13 +57,11 @@ export class PlaybookService {
         }
       `;
 
-      const response = await openai.chat.completions.create({
+      const content = await AIGateway.createCompletion({
         model: "gpt-4o", // Premium model for executive logic
         messages: [{ role: "system", content: "You generate executive-level vendor negotiation strategies in JSON format." }, { role: "user", content: prompt }],
         response_format: { type: "json_object" },
       });
-
-      const content = response.choices[0].message.content;
       if (!content) throw new Error("AI failed to generate playbook");
 
       const result = JSON.parse(content);

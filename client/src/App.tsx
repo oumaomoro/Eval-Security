@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 import Dashboard from "@/pages/Dashboard";
+import DPODashboard from "@/pages/DPODashboard";
 import Contracts from "@/pages/Contracts";
 import Compliance from "@/pages/Compliance";
 import Clauses from "@/pages/Clauses";
@@ -21,6 +22,11 @@ import Marketplace from "@/pages/Marketplace";
 import ExecutiveROI from "@/pages/ExecutiveROI";
 import History from "@/pages/History";
 import NotificationSettings from "@/pages/NotificationSettings";
+import Savings from "@/pages/Savings";
+import Benchmarking from "@/pages/Benchmarking";
+import CyberInsurance from "@/pages/CyberInsurance";
+import RedliningStudio from "@/pages/RedliningStudio";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 import React, { Suspense } from "react";
 const ContractDetail = React.lazy(() => import("@/pages/ContractDetail"));
@@ -38,6 +44,7 @@ function PrivateRouter() {
     <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-950"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>}>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/dpo-command" component={DPODashboard} />
         <Route path="/contracts" component={Contracts} />
         <Route path="/contracts/:id" component={ContractDetail} />
         <Route path="/compliance" component={Compliance} />
@@ -53,8 +60,13 @@ function PrivateRouter() {
         <Route path="/settings" component={Settings} />
         <Route path="/marketplace" component={Marketplace} />
         <Route path="/roi" component={ExecutiveROI} />
+        <Route path="/savings" component={Savings} />
+        <Route path="/benchmarking" component={Benchmarking} />
+        <Route path="/cyber-insurance" component={CyberInsurance} />
+        <Route path="/redline-studio" component={RedliningStudio} />
         <Route path="/history" component={History} />
         <Route path="/notifications" component={NotificationSettings} />
+        <Route path="/admin" component={AdminDashboard} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

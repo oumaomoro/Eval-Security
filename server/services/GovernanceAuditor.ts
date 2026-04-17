@@ -1,14 +1,9 @@
-import OpenAI from "openai";
+import { AIGateway } from "./AIGateway.js";
 import { storage } from "../storage";
 import memoize from "memoizee";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
-
 const cachedAuditAnalysis = memoize(
-  (params: any) => openai.chat.completions.create(params),
+  (params: any) => AIGateway.createCompletion(params),
   { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
 );
 
@@ -47,7 +42,7 @@ export class GovernanceAuditor {
           "predictiveAnalysis": "Short forecast of potential risks in the next 30 days."
         }`;
 
-      const response = await cachedAuditAnalysis({
+      const responseText = await cachedAuditAnalysis({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
@@ -55,8 +50,8 @@ export class GovernanceAuditor {
         ],
         response_format: { type: "json_object" },
       });
-
-      const report = JSON.parse(response.choices[0].message.content || "{}");
+      
+      const report = JSON.parse(responseText || "{}");
       console.log("[GOVERNANCE AUDITOR] AI Posture Review Completed.");
       return report;
     } catch (err) {

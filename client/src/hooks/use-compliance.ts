@@ -6,12 +6,8 @@ import { getApiUrl } from "@/lib/api-config";
 export function useComplianceAudits() {
   return useQuery({
     queryKey: [api.compliance.list.path],
-    queryFn: async () => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.compliance.list.path), { 
-        credentials: "include",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+    queryFn: async () => {      const res = await fetch(getApiUrl(api.compliance.list.path), { 
+        credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch audits");
       return api.compliance.list.responses[200].parse(await res.json());
     },
@@ -23,13 +19,10 @@ export function useRunAudit() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: { scope: { contractIds: number[]; standards: string[] } }) => {
-      const token = localStorage.getItem("costloci_token");
-      const res = await fetch(getApiUrl(api.compliance.run.path), {
+    mutationFn: async (data: { scope: { contractIds: number[]; standards: string[] } }) => {      const res = await fetch(getApiUrl(api.compliance.run.path), {
         method: api.compliance.run.method,
         headers: { 
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify(data),
         credentials: "include",

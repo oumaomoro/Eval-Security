@@ -42,12 +42,11 @@ export default function Rulesets() {
 
     const updateRuleset = useMutation({
         mutationFn: async ({ id, data }: { id: number, data: any }) => {
-            const token = localStorage.getItem("costloci_token");
             const res = await fetch(getApiUrl(`/api/audit-rulesets/${id}`), {
                 method: "PUT",
+                credentials: "include",
                 headers: { 
                     "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify(data),
             });
@@ -63,10 +62,9 @@ export default function Rulesets() {
 
     const deleteRuleset = useMutation({
         mutationFn: async (id: number) => {
-            const token = localStorage.getItem("costloci_token");
             const res = await fetch(getApiUrl(`/api/audit-rulesets/${id}`), { 
                 method: "DELETE",
-                headers: token ? { "Authorization": `Bearer ${token}` } : {}
+                credentials: "include"
             });
             if (!res.ok) throw new Error("Failed to delete ruleset");
         },
@@ -78,12 +76,11 @@ export default function Rulesets() {
 
     const generateEvidencePack = useMutation({
         mutationFn: async () => {
-            const token = localStorage.getItem("costloci_token");
             const res = await fetch(getApiUrl("/api/reports/evidence-pack"), {
                 method: "POST",
+                credentials: "include",
                 headers: { 
                     "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify({ standard: "SOC 2 / ISO 27001", type: "Enterprise Verification" })
             });
@@ -109,12 +106,11 @@ export default function Rulesets() {
 
     const triggerRescan = useMutation({
         mutationFn: async () => {
-            const token = localStorage.getItem("costloci_token");
             const res = await fetch(getApiUrl("/api/regulatory-alerts/trigger-rescan"), {
                 method: "POST",
+                credentials: "include",
                 headers: { 
                     "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify({ standard: "Global", alertTitle: "Autonomic Compliance Rescan" })
             });

@@ -1,30 +1,60 @@
 import { type Express, type Request, type Response, type NextFunction } from "express";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 import { adminClient as supabase, createUserClient } from "../../services/supabase";
 import { authStorage } from "./storage";
 import { storageContext } from "../../services/storageContext";
 import { storage } from "../../storage.js";
+import { pool } from "../../db";
+
+const PostgresStore = connectPg(session);
 
 /**
- * UNIFIED STATELESS AUTHENTICATION MIDDLEWARE V3
+ * UNIFIED HYBRID AUTHENTICATION MIDDLEWARE V4
  * 
- * 100% Stateless: Resolves identity via Bearer JWT (Supabase Access Token).
- * Removes express-session dependency to eliminate DB-connection points-of-failure.
+ * Resolves identity via Bearer JWT (Stateless) but maintains 
+ * Stateful sessions for high-security MFA/WebAuthn flows.
  */
 export async function setupAuth(app: Express) {
-  // We no longer initialize express-session here. 
-  // Identity is resolved on every request via the Authorization header.
+  // 1. Initialize Persistent Session Store (Phase 32 Auth Repair)
+  // Required for WebAuthn/Passkey challenges which cannot be stateless.
+  const sessionStore = new PostgresStore({
+    pool: pool!,
+    tableName: "session",
+    createTableIfMissing: true
+  });
+
+  app.use(session({
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || "costloci-sovereign-secret-2026",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: "lax"
+    }
+  }));
 
   app.use(async (req: Request, res: Response, next: NextFunction) => {
-    // 1. Resolve Identity (Session or Header)
+    // 1. Resolve Identity (Cookie, Session, or Header)
     let token: string | undefined;
 
-    // Check for Authorization Header
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
+    // Check for Secure Cookie (Phase 27 Hardening)
+    if (req.cookies && req.cookies.costloci_session) {
+      token = req.cookies.costloci_session;
     }
 
-    // Check for Session Token (Replit/Standard)
+    // Fallback: Check for Authorization Header (for mobile/API clients)
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.substring(7);
+      }
+    }
+
+    // Fallback: Check for Session Token (Legacy/Replit/WebAuthn flow)
     if (!token && (req as any).session?.supabase_token) {
       token = (req as any).session.supabase_token;
     }
@@ -45,8 +75,6 @@ export async function setupAuth(app: Express) {
       });
 
       // 4. Attach Identity Context
-      // Always provide a base user object even if profile is missing, 
-      // but if profile exists, it will have the clientId.
       (req as any).user = {
         id: user.id,
         email: user.email,
@@ -62,20 +90,15 @@ export async function setupAuth(app: Express) {
         userAgent: req.headers["user-agent"] || "unknown"
       };
 
-      // Add Harmonization Header for Debugging (Phase 25)
-      res.setHeader("X-P25-Status", "Harmonized-V2");
+      res.setHeader("X-P25-Status", "Harmonized-V3-Stateless-Hybrid");
 
       // 5. Resolve Active Workspace Context (Sovereign Mode)
-      // This ensures that the RLS Proxy can enforce workspace boundaries.
       const defaultWorkspace = await storage.getDefaultWorkspace(user.id).catch(() => null);
       const workspaceId = defaultWorkspace?.id;
 
       const userClient = createUserClient(token);
       
-      // If we have a workspace ID, we try to set it in the DB context 
-      // This is for the 'current_setting' RLS policies to work properly.
       if (workspaceId) {
-          // Fire and forget, but handle error
           try {
             userClient.rpc('set_workspace_context', { wid: String(workspaceId) })
               .then(({ error }) => { if (error) console.error("[AUTH] DB Context Error:", error.message); });

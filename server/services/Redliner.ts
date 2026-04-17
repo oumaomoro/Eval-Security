@@ -1,11 +1,6 @@
-import OpenAI from "openai";
+import { AIGateway } from "./AIGateway.js";
 import { storage } from "../storage";
 import { type Clause } from "@shared/schema";
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
 
 export class Redliner {
   static async generateRedline(contractId: number, originalText: string, riskDescription: string): Promise<string> {
@@ -30,15 +25,13 @@ export class Redliner {
       Suggest a corrected version of this clause that aligns with the organization's standards and mitigates the risk.
       Return ONLY the corrected text, no preamble.`;
 
-    const response = await openai.chat.completions.create({
+    const suggestedText = await AIGateway.createCompletion({
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
     });
-
-    const suggestedText = response.choices[0].message.content || "Remediation unavailable at this time.";
 
     // 3. Store the suggestion in the audit log (or the new table via route)
     return suggestedText.trim();

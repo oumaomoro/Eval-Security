@@ -15,21 +15,16 @@
 
 import { Router } from "express";
 import { storage } from "../storage.js";
-import OpenAI from "openai";
+import { AIGateway } from "../services/AIGateway.js";
+import { SOC2Logger } from "../services/SOC2Logger.js";
 import memoize from "memoizee";
 import { z } from "zod";
 
 const router = Router();
 
-// ─── Shared AI client (matches the pattern in routes.ts) ─────────────────────
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
-
 // Cache identical analysis prompts for 30 minutes to avoid redundant API calls
 const cachedWordAnalysis = memoize(
-  (params: any) => openai.chat.completions.create(params),
+  (params: any) => AIGateway.createCompletion(params),
   {
     promise: true,
     maxAge: 1800000,
@@ -106,7 +101,7 @@ router.post("/api/integrations/word/analyze", authenticateAddinRequest, async (r
   try {
     const { textBlock } = analyzeInputSchema.parse(req.body);
 
-    const response = await cachedWordAnalysis({
+    const responseText = await cachedWordAnalysis({
       model: "gpt-4o",
       messages: [
         {
@@ -136,7 +131,7 @@ Be precise, cite KDPA sections when applicable, and prioritize actionable intell
       response_format: { type: "json_object" },
     });
 
-    const analysis = JSON.parse(response.choices[0].message.content || "{}");
+    const analysis = JSON.parse(responseText || "{}");
 
     // Normalise to guarantee shape even if the model truncates
     const result = {
@@ -148,16 +143,15 @@ Be precise, cite KDPA sections when applicable, and prioritize actionable intell
 
     // Audit log for enterprise traceability
     try {
-      await storage.createAuditLog({
-        action: "WORD_ADDIN_ANALYSIS",
+      await SOC2Logger.logEvent(req, {
         userId: req.user?.id || "ADDIN_USER",
-        clientId: req.user?.clientId,
-        resourceType: "word_document",
+        action: "WORD_ADDIN_ANALYSIS",
+        resourceType: "WordDocument",
         resourceId: "external",
-        details: `MS Word Add-in analysis: Risk ${result.riskScore}%, Status: ${result.complianceStatus}, Findings: ${result.findings.length}`,
+        details: `MS Word Add-in analysis: Risk ${result.riskScore}%, Status: ${result.complianceStatus}, Findings: ${result.findings.length}`
       });
-    } catch {
-      // Audit log failure is non-blocking
+    } catch (auditErr: any) {
+      console.warn("[WORD-ANALYSIS-AUDIT] Logging failed:", auditErr.message);
     }
 
     res.json(result);
@@ -190,13 +184,12 @@ router.post("/api/integrations/word/publish", authenticateAddinRequest, async (r
       isMandatory: false,
     });
 
-    await storage.createAuditLog({
-      action: "WORD_ADDIN_CLAUSE_PUBLISHED",
+    await SOC2Logger.logEvent(req, {
       userId: req.user?.id || "ADDIN_USER",
-      clientId: req.user?.clientId,
-      resourceType: "clause",
+      action: "WORD_ADDIN_CLAUSE_PUBLISHED",
+      resourceType: "Clause",
       resourceId: String(clause.id),
-      details: `Clause synced from MS Word Add-in: "${input.clauseName}" (${input.clauseCategory})`,
+      details: `Clause synced from MS Word Add-in: "${input.clauseName}" (${input.clauseCategory})`
     });
 
     res.status(201).json({

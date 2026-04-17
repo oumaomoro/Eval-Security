@@ -2,6 +2,9 @@ import { Router } from "express";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { storage } from "../storage";
 import crypto from "crypto";
+import { SOC2Logger } from "../services/SOC2Logger";
+import { stripe } from "../services/stripe";
+import type Stripe from "stripe";
 
 const billingRouter = Router();
 
@@ -24,9 +27,18 @@ if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
 if (!PAYSTACK_SECRET_KEY) {
   console.warn("[BILLING] WARNING: PAYSTACK_SECRET_KEY not set — Paystack checkout will fail.");
 }
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.warn("[BILLING] WARNING: STRIPE_SECRET_KEY not set — Stripe checkout will fail.");
+}
 if (!PLANS.starter || !PLANS.pro || !PLANS.enterprise) {
   console.warn("[BILLING] WARNING: One or more PAYPAL_*_PLAN_ID env vars not set — PayPal subscription creation will fail.");
 }
+
+const STRIPE_PLANS = {
+  starter: process.env.STRIPE_STARTER_PRICE_ID,
+  pro: process.env.STRIPE_PRO_PRICE_ID,
+  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID,
+};
 
 /**
  * Generate a PayPal access token
@@ -52,9 +64,20 @@ async function getPayPalAccessToken() {
  */
 billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, res) => {
   try {
-    const { planType } = req.body;
+    const { planType, billingInterval = "monthly" } = req.body;
+    const isAnnual = billingInterval === "annual";
     
-    // Check if we should use Paystack (Priority if key exists)
+    // Base prices (Monthly)
+    const basePrices = {
+       starter: 99,
+       pro: 299,
+       enterprise: 999
+    };
+
+    const monthlyPrice = basePrices[planType as keyof typeof basePrices] || 99;
+    const finalAmount = isAnnual ? (monthlyPrice * 12 * 0.8) : monthlyPrice; // 20% discount
+
+    // 1. PAYSTACK ENTERPRISE PATH
     if (PAYSTACK_SECRET_KEY) {
       const response = await fetch(`${PAYSTACK_API_BASE}/transaction/initialize`, {
         method: "POST",
@@ -64,14 +87,13 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
         },
         body: JSON.stringify({
           email: req.user.email,
-          amount: planType === 'enterprise' ? 99900 : planType === 'pro' ? 29900 : 9900, // Amount in Kobo/Cents
+          amount: Math.round(finalAmount * 100), 
           callback_url: `${req.protocol}://${req.get("host")}/billing?success=true`,
           metadata: {
             userId: req.user.id,
-            planType: planType,
-            custom_fields: [
-              { display_name: "Plan", variable_name: "plan", value: planType }
-            ]
+            planType,
+            billingInterval,
+            finalAmount
           }
         })
       });
@@ -81,18 +103,34 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
       
       return res.json({ 
         approvalUrl: data.data.authorization_url, 
-        accessCode: data.data.access_code,
         reference: data.data.reference
       });
     }
 
-    // Fallback to PayPal
-    const planId = PLANS[planType as keyof typeof PLANS];
-    if (!planId) return res.status(400).json({ message: "Invalid plan selected" });
-    if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
-      return res.status(503).json({ message: "Billing is not yet configured on this server. Please contact support." });
+    // 2. STRIPE ENTERPRISE PATH
+    if (process.env.STRIPE_SECRET_KEY) {
+      const priceId = STRIPE_PLANS[planType as keyof typeof STRIPE_PLANS];
+      if (!priceId) return res.status(400).json({ message: "Invalid plan selected for Stripe" });
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        line_items: [{ price: priceId, quantity: 1 }],
+        // In a real scenario, we'd use Stripe Coupons for the 20% annual discount if not pre-configured in Price IDs
+        discounts: isAnnual ? [{ coupon: process.env.STRIPE_ANNUAL_COUPON_ID }] : [],
+        success_url: `${req.protocol}://${req.get("host")}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get("host")}/settings?canceled=true`,
+        client_reference_id: req.user.id,
+        metadata: { userId: req.user.id, planType, billingInterval }
+      });
+
+      return res.json({ approvalUrl: session.url, sessionId: session.id });
     }
 
+    // 3. PAYPAL FALLBACK
+    const planId = PLANS[planType as keyof typeof PLANS];
+    if (!planId) return res.status(400).json({ message: "Invalid plan selected" });
+    
     const accessToken = await getPayPalAccessToken();
 
     const response = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions`, {
@@ -105,7 +143,7 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
       },
       body: JSON.stringify({
         plan_id: planId,
-        custom_id: req.user.id, // We embed our user ID to recognize them in webhooks
+        custom_id: req.user.id,
         application_context: {
           brand_name: "Costloci",
           locale: "en-US",
@@ -120,8 +158,14 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || "Failed to create subscription");
 
-    // Return the approval URL to redirect the user
     const approvalLink = data.links.find((link: any) => link.rel === "approve")?.href;
+    
+    await SOC2Logger.logEvent(req, {
+        action: "SUBSCRIPTION_INITIATED",
+        userId: req.user.id,
+        details: `Checkout session created for ${planType} (${billingInterval}) via PayPal.`
+    });
+
     res.json({ approvalUrl: approvalLink, subscriptionId: data.id });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -172,11 +216,13 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
         await storage.updateUser(customId, { subscriptionTier: tier });
         console.log(`[Costloci Billing] Upgraded user ${customId} to ${tier} tier.`);
 
-        // Audit Trail for Regulatory Compliance
-        await storage.createAuditLog({
+        // Audit Trail for Regulatory Compliance (SOC-2 Hardened)
+        await SOC2Logger.logEvent(req as any, {
           userId: customId,
           action: "SUBSCRIPTION_UPGRADE",
-          details: JSON.stringify({ plan_id: planId, tier: tier, status: "activated" }),
+          resourceType: "BillingProfile",
+          resourceId: String(customId),
+          details: `Tier upgraded to ${tier} (PayPal Event: ${event_type})`
         });
 
         // Telemetry for MRR & ROI Tracking
@@ -218,10 +264,12 @@ billingRouter.post("/api/billing/paystack-webhook", async (req, res) => {
         await storage.updateUser(userId, { subscriptionTier: planType });
         console.log(`[Costloci Billing] Paystack: Upgraded user ${userId} to ${planType} tier.`);
 
-        await storage.createAuditLog({
+        await SOC2Logger.logEvent(req as any, {
           userId: userId,
           action: "SUBSCRIPTION_UPGRADE_PAYSTACK",
-          details: JSON.stringify({ reference: event.data.reference, tier: planType }),
+          resourceType: "BillingProfile",
+          resourceId: String(userId),
+          details: `Tier upgraded to ${planType} (Reference: ${event.data.reference})`
         });
 
         await storage.createBillingTelemetry({
@@ -236,6 +284,60 @@ billingRouter.post("/api/billing/paystack-webhook", async (req, res) => {
     res.sendStatus(200);
   } catch (err: any) {
     console.error("[Costloci Billing] Paystack Webhook Error:", err.message);
+    res.status(500).send("Webhook Error");
+  }
+});
+
+/**
+ * Handle Stripe Webhooks
+ */
+billingRouter.post("/api/billing/stripe-webhook", async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    // If you use body parser with raw body, pass the raw buffer here
+    // For now we assume req.body is already parsed, or handled via middleware
+    event = stripe.webhooks.constructEvent(
+      req.body, 
+      sig as string, 
+      process.env.STRIPE_WEBHOOK_SECRET || ""
+    );
+  } catch (err: any) {
+    console.error("[Costloci Billing] Stripe Webhook Error:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const userId = session.client_reference_id || session.metadata?.userId;
+      const planType = session.metadata?.planType;
+
+      if (userId && planType) {
+        await storage.updateUser(userId, { subscriptionTier: planType });
+        console.log(`[Costloci Billing] Stripe: Upgraded user ${userId} to ${planType} tier.`);
+
+        await SOC2Logger.logEvent(req as any, {
+          userId: userId,
+          action: "SUBSCRIPTION_UPGRADE_STRIPE",
+          resourceType: "BillingProfile",
+          resourceId: String(userId),
+          details: `Tier upgraded to ${planType} (Session: ${session.id})`
+        });
+
+        await storage.createBillingTelemetry({
+          clientId: 0,
+          metricType: "mrr_capture_stripe",
+          value: planType === 'pro' ? 299 : planType === 'enterprise' ? 999 : 99,
+          cost: 0,
+        });
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err: any) {
+    console.error("[Costloci Billing] Stripe Webhook Processing Error:", err.message);
     res.status(500).send("Webhook Error");
   }
 });

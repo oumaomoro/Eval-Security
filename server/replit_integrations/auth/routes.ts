@@ -6,11 +6,14 @@ import { WebAuthnService } from "../../services/WebAuthn";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
+import { cookieHandler } from "../../middleware/cookie-handler";
+import { SOC2Logger } from "../../services/SOC2Logger";
+import { EmailService } from "../../services/EmailService";
 
 const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per `window` (standard for security-critical auth)
-  message: { message: "Too many authentication attempts. Please try again after 15 minutes." },
+  windowMs: 15 * 60 * 1000, 
+  max: process.env.NODE_ENV === "production" ? 10 : 100, // Permissive for dev/tests
+  message: { message: "Too many authentication attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -31,40 +34,7 @@ export function registerAuthRoutes(app: Express): void {
       let user = await authStorage.getUser(req.user.id).catch(() => null);
 
       if (!user || !user.clientId) {
-        console.log(`[AUTH-DIAG] Implicit OAuth Self-Healing Identity for user ${req.user.id}`);
-        try {
-          const firstName = req.user.firstName || "Enterprise";
-          const lastName = req.user.lastName || "User";
-          let clientId = user?.clientId;
-
-          if (!clientId) {
-             const client = await storage.createClient({
-               companyName: `${firstName}'s Enterprise Hub`,
-               industry: "Professional Services",
-               contactName: `${firstName} ${lastName}`,
-               contactEmail: req.user.email!,
-               status: "active"
-             });
-             clientId = client.id;
-             await storage.createWorkspace({
-               name: "Main Workspace",
-               ownerId: req.user.id,
-               plan: "starter"
-             });
-          }
-
-          user = await authStorage.upsertUser({
-             id: req.user.id,
-             email: req.user.email!,
-             firstName,
-             lastName,
-             clientId,
-             role: user?.role || "admin",
-             subscriptionTier: "starter"
-          });
-        } catch (healErr: any) {
-          console.error(`[AUTH-DIAG] Identity Healing Failed in GET /user:`, healErr.message);
-        }
+        user = await healUserIdentity(req.user, user);
       }
 
       res.json(user);
@@ -77,11 +47,11 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/register", async (req: any, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
-      // 1. Supabase Auth Secure Admin Provisioning (Auto-Confirms Email)
+      // 1. Supabase Auth Secure Admin Provisioning (Verification Required)
       const { data, error } = await adminClient.auth.admin.createUser({
         email,
         password,
-        email_confirm: true,
+        email_confirm: false, // Force verification
         user_metadata: { first_name: firstName, last_name: lastName }
       });
 
@@ -155,7 +125,16 @@ export function registerAuthRoutes(app: Express): void {
         // We don't throw here — the user is created in Auth, and login will self-heal.
       }
 
-      res.status(201).json({ message: "Registration successful. Welcome to the Enterprise Intelligence Hub." });
+      try {
+        await EmailService.sendVerificationEmail(email, data.user.id);
+      } catch (e) {
+        console.warn("[AUTH-DIAG] Verification email failed to send, but identity is provisioned.");
+      }
+
+      res.status(201).json({ 
+        message: "Costloci Hub provisioned. Please check your email to verify and activate your dashboard.",
+        userId: data.user.id 
+      });
     } catch (err: any) {
       console.error(`[AUTH-DIAG] Registration Critical Error:`, err.message);
       res.status(400).json({ message: err.message });
@@ -183,69 +162,26 @@ export function registerAuthRoutes(app: Express): void {
       // 84. Sync with local DB (Harmonized Onboarding)
       let localUser = await authStorage.getUser(data.user.id).catch(() => null);
 
-      if (!localUser || !localUser.clientId) {
-        console.log(`[AUTH-DIAG] Self-Healing Identity for user ${data.user.id}`);
-        // Missing critical Enterprise linkage — provision missing assets
-        try {
-          const userMeta = data.user.user_metadata || {};
-          const firstName = userMeta.first_name || "Enterprise";
-          const lastName = userMeta.last_name || "User";
-          
-          let clientId = localUser?.clientId;
-
-          // Note: Organization hierarchy has been unified into Workspaces/Clients (Phase 25)
-          // No need to create a legacy 'organization' record.
-
-          if (!clientId) {
-            const client = await storage.createClient({
-              companyName: `${firstName}'s Enterprise Hub`,
-              industry: "Professional Services",
-              contactName: `${firstName} ${lastName}`,
-              contactEmail: data.user.email!,
-              status: "active"
-            });
-            clientId = client.id;
-
-            await storage.createWorkspace({
-              name: "Main Workspace",
-              ownerId: data.user.id,
-              plan: "starter"
-            });
-          }
-
-          localUser = await authStorage.upsertUser({
-            id: data.user.id,
-            email: data.user.email!,
-            firstName,
-            lastName,
-            clientId,
-            role: localUser?.role || "admin",
-            subscriptionTier: "starter"
-          });
-
-          await storage.createInfrastructureLog({
-            component: "IdentityHealing",
-            event: "IDENTITY_REPAIRED",
-            status: "resolved",
-            actionTaken: `Healed missing organization/client for user ${email}`
-          });
-          
-          console.log(`[AUTH-DIAG] Identity Successfully Healed for ${email}`);
-        } catch (healErr: any) {
-          console.error(`[AUTH-DIAG] Identity Healing Failed:`, healErr.message);
-          // Don't block login, but log the critical failure
-          await storage.createInfrastructureLog({
-            component: "IdentityHealing",
-            event: "HEALING_FAILURE",
-            status: "critical",
-            actionTaken: `Critical: Could not heal identity for ${email}: ${healErr.message}`
-          });
-        }
+      if (!data.user.email_confirmed_at && process.env.REQUIRE_EMAIL_VERIFICATION === "true") {
+        return res.status(403).json({ message: "Costloci Identity not yet verified. Please check your primary enterprise email." });
       }
+
+      if (!localUser || !localUser.clientId) {
+        localUser = await healUserIdentity(data.user, localUser);
+      }
+
+      // Secure Identity Hardening: Set HttpOnly cookie
+      cookieHandler.setSessionCookie(res, data.session.access_token);
+
+      await SOC2Logger.logEvent(req, {
+        userId: data.user.id,
+        action: "AUTHENTICATION_SUCCESS",
+        details: "Standard credential authentication"
+      });
 
       res.json({
         user: localUser,
-        token: data.session.access_token
+        token: data.session.access_token // Keep for backwards compatibility for non-browser clients
       });
     } catch (err: any) {
       res.status(401).json({ message: err.message });
@@ -263,6 +199,26 @@ export function registerAuthRoutes(app: Express): void {
       res.json({ message: "Password reset link sent successfully." });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
+    }
+  });
+
+  // Verify Email Endpoint
+  app.get("/api/auth/verify", async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token) return res.status(400).json({ message: "Verification token missing" });
+
+      const { data, error } = await adminClient.auth.admin.updateUserById(
+        token as string,
+        { email_confirm: true }
+      );
+
+      if (error) throw error;
+
+      res.redirect(`${process.env.FRONTEND_URL || ''}/login?verified=true`);
+    } catch (err: any) {
+      console.error("[AUTH-DIAG] Verification Error:", err.message);
+      res.redirect(`${process.env.FRONTEND_URL || ''}/login?error=verification_failed`);
     }
   });
 
@@ -326,10 +282,92 @@ export function registerAuthRoutes(app: Express): void {
 
   // Logout
   app.post("/api/auth/logout", (req: any, res) => {
-    req.session.destroy((err: any) => {
-      if (err) return res.status(500).json({ message: "Logout failed" });
-      res.json({ message: "Logout successful" });
+    cookieHandler.clearSessionCookie(res);
+    req.session?.destroy((err: any) => {
+      if (err) console.error("Logout session destroy failed:", err);
     });
+    res.json({ message: "Logout successful" });
+  });
+
+  // Auth Callback (SSO)
+  app.get("/api/auth/callback", async (req: any, res) => {
+    try {
+      const { code } = req.query;
+      if (!code) return res.redirect(`${process.env.FRONTEND_URL || ''}/login?error=no_code`);
+
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code as string);
+      if (error) throw error;
+
+      if (data.session) {
+        // Sync identity and provision if first time
+        let user = await authStorage.getUser(data.user.id).catch(() => null);
+        if (!user || !user.clientId) {
+          user = await healUserIdentity(data.user, user);
+        }
+
+        // Set secure cookie
+        cookieHandler.setSessionCookie(res, data.session.access_token);
+        
+        if (req.session) {
+          req.session.supabase_token = data.session.access_token;
+        }
+
+        await SOC2Logger.logEvent(req, {
+          userId: data.user.id,
+          action: "SSO_LOGIN_SUCCESS",
+          details: `Google SSO login successful for ${data.user.email}`
+        });
+      }
+
+      res.redirect(`${process.env.FRONTEND_URL || ''}/dashboard`);
+    } catch (err: any) {
+      console.error("[AUTH-DIAG] SSO Callback Error:", err.message);
+      res.redirect(`${process.env.FRONTEND_URL || ''}/login?error=sso_failed`);
+    }
+  });
+
+  // Secure Session Initialization (Called from AuthCallback frontend if needed)
+  app.post("/api/auth/session", async (req: any, res) => {
+    try {
+      const { access_token } = req.body;
+      if (!access_token) {
+        console.warn("[AUTH-DIAG] Session exchange attempt missing token.");
+        return res.status(400).json({ message: "Access token required" });
+      }
+      
+      // Set the secure HttpOnly cookie
+      cookieHandler.setSessionCookie(res, access_token);
+
+      // ── BRIDGE STATELESS TO STATEFUL (Phase 32 Auth Repair) ───────
+      // We explicitly synchronize the JWT into the persistent session store.
+      // This is the bridge required for WebAuthn/Biometric MFA challenges.
+      if (req.session) {
+        req.session.supabase_token = access_token;
+      }
+
+      // Identity validation to ensure the token is actually valid for logging
+      const { data: { user }, error } = await supabase.auth.getUser(access_token);
+      
+      if (user && !error) {
+          if (req.session) {
+            req.session.expires_at = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 day parity
+          }
+
+          await SOC2Logger.logEvent(req, {
+            userId: user.id,
+            action: "SSO_SESSION_ESTABLISHED",
+            resourceType: "Infrastructure",
+            resourceId: "AUTH_GATEWAY",
+            details: `Secure HttpOnly session cookie and server-side state established via OAuth token exchange.`
+          });
+          console.log(`[AUTH-DIAG] SSO Session established for ${user.email} (Bridged to Stateful)`);
+      }
+
+      res.json({ message: "Secure session established" });
+    } catch (err: any) {
+      console.error("[AUTH-DIAG] Session exchange failure:", err.message);
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // API Key Rotation
@@ -418,6 +456,9 @@ export function registerAuthRoutes(app: Express): void {
           delete req.session.pendingAuthUser;
         }
 
+        // Secure Identity Hardening
+        cookieHandler.setSessionCookie(res, token);
+
         res.json({ verified: true, token, message: "Biometric verification successful" });
       } else {
         res.status(401).json({ verified: false, message: "Verification failed" });
@@ -426,4 +467,67 @@ export function registerAuthRoutes(app: Express): void {
       res.status(500).json({ message: err.message });
     }
   });
+}
+
+/**
+ * SOVEREIGN IDENTITY HEALING: Autocorrects provisioning failures
+ */
+async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
+    const userId = authUser.id;
+    const email = authUser.email;
+    console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
+    
+    try {
+      // 1. Recover metadata
+      const userMeta = authUser.user_metadata || {};
+      const firstName = authUser.firstName || userMeta.first_name || "Enterprise";
+      const lastName = authUser.lastName || userMeta.last_name || "User";
+      
+      let clientId = localUser?.clientId;
+
+      // 2. Provision missing Client/Workspace
+      if (!clientId) {
+        const client = await storage.createClient({
+          companyName: `${firstName}'s Enterprise Hub`,
+          industry: "Professional Services",
+          contactName: `${firstName} ${lastName}`,
+          contactEmail: email,
+          status: "active"
+        });
+        clientId = client.id;
+
+        // Check if workspace already exists before creating
+        const workspaces = await storage.getUserWorkspaces(userId);
+        if (workspaces.length === 0) {
+            await storage.createWorkspace({
+              name: "Main Workspace",
+              ownerId: userId,
+              plan: "starter"
+            });
+        }
+      }
+
+      // 3. Sync local profile
+      const healedUser = await authStorage.upsertUser({
+        id: userId,
+        email: email,
+        firstName,
+        lastName,
+        clientId,
+        role: localUser?.role || "admin",
+        subscriptionTier: "starter"
+      });
+
+      await storage.createInfrastructureLog({
+        component: "IdentityHealing",
+        event: "IDENTITY_REPAIRED",
+        status: "resolved",
+        actionTaken: `Atomic Identity Repair for ${email}`
+      });
+
+      return healedUser;
+    } catch (err: any) {
+      console.error(`[IDENTITY-RESILLIENCE] Healing CRITICAL FAILURE:`, err.message);
+      return localUser; // Fallback to raw user to avoid blocking access
+    }
 }
