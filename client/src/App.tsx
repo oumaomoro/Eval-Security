@@ -122,14 +122,18 @@ function AuthWrapper() {
   return <PrivateRouter />;
 }
 
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <AnalyticsWrapper />
-          <Toaster />
-          <AuthWrapper />
+          <WorkspaceProvider>
+            <AnalyticsWrapper />
+            <Toaster />
+            <AuthWrapper />
+          </WorkspaceProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>

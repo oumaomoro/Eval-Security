@@ -43,110 +43,72 @@
   --risk-low: 156 72% 50%;
 }
 
+/* --- Design System — Professional Minimalist --- */
 @layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Outfit', 'Inter', sans-serif;
+    font-family: 'Inter', 'Outfit', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3 {
+  h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
-    @apply font-bold tracking-tight;
+    @apply font-bold tracking-tight text-slate-900;
   }
-  h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    @apply text-slate-100;
   }
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
 }
 
-/* --- Costloci Scrollbar --- */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { scrollbar-width: none; }
 
-/* --- Premium Grid Pattern --- */
+/* --- Grid Pattern --- */
 .bg-grid-pattern {
-  background-size: 48px 48px;
+  background-size: 40px 40px;
   background-image:
-    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+    linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
 }
 
-/* --- Glassmorphism Card --- */
+/* --- Refined Glass Card --- */
 .glass-card {
-  background: rgba(15, 11, 50, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  @apply bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50;
 }
 
-/* --- Costloci Button Base --- */
-.btn-costloci {
-  @apply font-black uppercase tracking-widest text-xs px-6 py-2.5 rounded-xl transition-all duration-200;
-  letter-spacing: 0.12em;
-}
-
-/* --- Premium Stat Card Hover glow --- */
+/* --- Minimal Stat Card --- */
 .stat-card-glow:hover {
-  box-shadow: 0 0 40px -10px hsl(var(--primary) / 0.25);
+  @apply shadow-lg shadow-primary/5 border-primary/20 transition-all duration-300;
 }
 
-/* --- Subscription Tier Badges --- */
+/* --- Tier Badges --- */
 .badge-tier-starter {
-  background: linear-gradient(135deg, hsl(215 20% 65% / 0.2), transparent);
-  border-color: hsl(215 20% 65% / 0.5);
-  color: hsl(215 20% 65%);
+  @apply bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700;
 }
 .badge-tier-pro {
-  background: linear-gradient(135deg, hsl(210 100% 60% / 0.3), transparent);
-  border-color: hsl(210 100% 60% / 0.6);
-  color: hsl(210 100% 60%);
-  text-shadow: 0 0 10px hsl(210 100% 60% / 0.5);
+  @apply bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800;
 }
 .badge-tier-enterprise {
-  background: linear-gradient(135deg, hsl(45 93% 47% / 0.2), transparent);
-  border-color: hsl(45 93% 47% / 0.5);
-  color: hsl(45 93% 47%);
-  text-shadow: 0 0 15px hsl(45 93% 47% / 0.6);
+  @apply bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800;
 }
 
-/* --- Floating animations --- */
+/* --- Subtle Animations --- */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-4px); }
 }
-.animate-float { animation: float 4s ease-in-out infinite; }
-
-/* --- Pulsing ring --- */
-@keyframes ring-pulse {
-  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5); }
-  70% { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
-  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
-}
-.animate-ring-pulse { animation: ring-pulse 2s infinite; }
-
-/* --- Gradient text utility --- */
-.gradient-text-emerald {
-  background: linear-gradient(135deg, hsl(156,72%,60%) 0%, hsl(180,72%,50%) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.gradient-text-indigo {
-  background: linear-gradient(135deg, hsl(240,60%,70%) 0%, hsl(210,70%,85%) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+.animate-float { animation: float 6s ease-in-out infinite; }
 
 /* -- Shimmer loading -- */
 @keyframes shimmer {
@@ -156,36 +118,14 @@
 .animate-shimmer {
   background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--border)) 50%, hsl(var(--muted)) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.8s infinite;
+  animation: shimmer 2s infinite linear;
 }
 
-/* --- Cyber Signature Scanline --- */
-@keyframes scanline {
-  0% { transform: translateY(-100%); opacity: 0; }
-  50% { opacity: 0.5; }
-  100% { transform: translateY(100%); opacity: 0; }
+/* --- Gradient Utility --- */
+.gradient-text-emerald {
+  @apply bg-clip-text text-transparent bg-gradient-to-br from-emerald-500 to-teal-600;
 }
-.animate-cyber-scan {
-  position: relative;
-  overflow: hidden;
+.gradient-indigo {
+  @apply bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900;
 }
-.animate-cyber-scan::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
-  animation: scanline 3s linear infinite;
-  pointer-events: none;
-}
-
-/* --- Biometric Pulse --- */
-@keyframes biometric-pulse {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.7; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.animate-biometric { animation: biometric-pulse 2s ease-in-out infinite; }
 

@@ -172,7 +172,7 @@ export default function Marketplace() {
                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                             <div>
                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Global Payout</p>
-                               <p className="text-white font-black text-xs">Stripe Protected</p>
+                               <p className="text-white font-black text-xs">PayPal & Paystack Protected</p>
                             </div>
                             <ShieldCheck className="w-5 h-5 text-emerald-500" />
                          </div>

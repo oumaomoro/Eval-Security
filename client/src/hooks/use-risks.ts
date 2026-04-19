@@ -4,15 +4,21 @@ import { type InsertRisk } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
 
+import { useWorkspace } from "@/hooks/use-workspace";
+
 export function useRisks(filters?: { contractId?: string }) {
+  const { activeWorkspaceId } = useWorkspace();
+  
   return useQuery({
-    queryKey: [api.risks.list.path, filters],
-    queryFn: async () => {      const url = filters?.contractId 
+    queryKey: [api.risks.list.path, filters, activeWorkspaceId],
+    queryFn: async () => {
+      const url = filters?.contractId 
         ? `${api.risks.list.path}?contractId=${filters.contractId}`
         : api.risks.list.path;
       
       const res = await fetch(getApiUrl(url), { 
-        credentials: "include",      });
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch risks");
       return api.risks.list.responses[200].parse(await res.json());
     },

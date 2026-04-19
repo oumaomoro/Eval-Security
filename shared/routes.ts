@@ -8,6 +8,7 @@ import {
   insertClauseSchema,
   insertSavingsSchema,
   insertReportSchema,
+  insertReportScheduleSchema,
   insertVendorScorecardSchema,
   clients,
   contracts,
@@ -383,6 +384,32 @@ export const api = {
       responses: {
         200: z.any(),
         404: errorSchemas.notFound,
+      },
+    },
+    schedules: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/reports/schedules' as const,
+        responses: {
+          200: z.array(z.custom<typeof reportSchedules.$inferSelect>()),
+        },
+      },
+      create: {
+        method: 'POST' as const,
+        path: '/api/reports/schedules' as const,
+        input: insertReportScheduleSchema,
+        responses: {
+          201: z.custom<typeof reportSchedules.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      delete: {
+        method: 'DELETE' as const,
+        path: '/api/reports/schedules/:id' as const,
+        responses: {
+          204: z.null(),
+          404: errorSchemas.notFound,
+        },
       },
     },
   },

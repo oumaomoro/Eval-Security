@@ -3,11 +3,17 @@ import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
 
+import { useWorkspace } from "@/hooks/use-workspace";
+
 export function useComplianceAudits() {
+  const { activeWorkspaceId } = useWorkspace();
+  
   return useQuery({
-    queryKey: [api.compliance.list.path],
-    queryFn: async () => {      const res = await fetch(getApiUrl(api.compliance.list.path), { 
-        credentials: "include",      });
+    queryKey: [api.compliance.list.path, activeWorkspaceId],
+    queryFn: async () => {
+      const res = await fetch(getApiUrl(api.compliance.list.path), { 
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch audits");
       return api.compliance.list.responses[200].parse(await res.json());
     },

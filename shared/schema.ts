@@ -271,6 +271,19 @@ export const reports = pgTable("reports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const reportSchedules = pgTable("report_schedules", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // compliance, risk_assessment, etc.
+  frequency: text("frequency").notNull(), // daily, weekly, monthly, quarterly
+  regulatoryBodies: jsonb("regulatory_bodies").$type<string[]>(),
+  nextRun: timestamp("next_run"),
+  lastRun: timestamp("last_run"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const vendorScorecards = pgTable("vendor_scorecards", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
@@ -555,6 +568,7 @@ export type InsertRisk = z.infer<typeof insertRiskSchema>;
 export const insertClauseSchema = createInsertSchema(clauseLibrary).omit({ id: true });
 export const insertSavingsSchema = createInsertSchema(savingsOpportunities).omit({ id: true, createdAt: true });
 export const insertReportSchema = createInsertSchema(reports).omit({ id: true, createdAt: true });
+export const insertReportScheduleSchema = createInsertSchema(reportSchedules).omit({ id: true, createdAt: true });
 export const insertVendorScorecardSchema = createInsertSchema(vendorScorecards).omit({ id: true, createdAt: true });
 export const insertWorkspaceSchema = createInsertSchema(workspaces).omit({ id: true, createdAt: true });
 export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true });
@@ -567,6 +581,9 @@ export type InsertSavings = z.infer<typeof insertSavingsSchema>;
 
 export type Report = typeof reports.$inferSelect;
 export type InsertReport = z.infer<typeof insertReportSchema>;
+
+export type ReportSchedule = typeof reportSchedules.$inferSelect;
+export type InsertReportSchedule = z.infer<typeof insertReportScheduleSchema>;
 
 export type VendorScorecard = typeof vendorScorecards.$inferSelect;
 export type InsertVendorScorecard = z.infer<typeof insertVendorScorecardSchema>;

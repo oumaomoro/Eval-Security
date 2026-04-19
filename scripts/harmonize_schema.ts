@@ -21,11 +21,7 @@ try {
 const { Client } = pg;
 // Use Pooler host with separated credentials to avoid escaping issues
 const client = new Client({
-  user: 'postgres.ulercnwyckrcjcnrenzz',
-  host: 'aws-0-eu-central-1.pooler.supabase.com',
-  database: 'postgres',
-  password: 'CyberOptimizeDb2026!',
-  port: 5432,
+  connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   }
@@ -92,6 +88,19 @@ async function harmonize() {
           purchased_at TIMESTAMPTZ DEFAULT NOW()
       );`,
 
+      `CREATE TABLE IF NOT EXISTS report_schedules (
+          id SERIAL PRIMARY KEY,
+          workspace_id INTEGER,
+          title TEXT NOT NULL,
+          type TEXT NOT NULL,
+          frequency TEXT NOT NULL,
+          regulatory_bodies JSONB,
+          next_run TIMESTAMPTZ,
+          last_run TIMESTAMPTZ,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );`,
+      
       // 3. Additive Column Migrations (IF NOT EXISTS pattern)
       `ALTER TABLE clients ADD COLUMN IF NOT EXISTS workspace_id INTEGER;`,
       `ALTER TABLE contracts ADD COLUMN IF NOT EXISTS workspace_id INTEGER;`,

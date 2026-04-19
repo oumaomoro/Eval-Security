@@ -240,7 +240,7 @@ export function registerAuthRoutes(app: Express): void {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/callback`,
+          emailRedirectTo: `${process.env.FRONTEND_URL}/auth/callback`,
         }
       });
       
@@ -252,13 +252,15 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  // Google SSO
-  app.get("/api/auth/google", async (req, res) => {
+  app.get("/api/auth/google", async (req: any, res) => {
     try {
+      const redirectBase = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+      console.log(`[AUTH-DIAG] Google SSO Init: email=${req.query.email}, redirectBase=${redirectBase}`);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/callback`,
+          redirectTo: `${redirectBase}/auth/callback`,
         }
       });
 

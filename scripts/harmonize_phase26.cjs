@@ -21,7 +21,7 @@ const { Client } = require('pg');
 async function runViaPG() {
   // Build connection from SUPABASE_DB_URL or reconstruct from parts
   const dbUrl = process.env.DATABASE_URL
-    || `postgresql://postgres.ulercnwyckrcjcnrenzz:CyberOptimizeDb2026!@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`;
+    || `postgresql://postgres.ulercnwyckrcjcnrenzz:CostlociDb2026!@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`;
 
   console.log('🔌 Connecting via direct PostgreSQL pooler...');
   

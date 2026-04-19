@@ -4,15 +4,21 @@ import { type InsertContract } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
 
+import { useWorkspace } from "@/hooks/use-workspace";
+
 export function useContracts(filters?: { clientId?: string; status?: string }) {
+  const { activeWorkspaceId } = useWorkspace();
+  
   return useQuery({
-    queryKey: [api.contracts.list.path, filters],
-    queryFn: async () => {      const url = filters 
+    queryKey: [api.contracts.list.path, activeWorkspaceId, filters],
+    queryFn: async () => {
+      const url = filters 
         ? `${api.contracts.list.path}?${new URLSearchParams(filters as any).toString()}`
         : api.contracts.list.path;
       
       const res = await fetch(getApiUrl(url), { 
-        credentials: "include",      });
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch contracts");
       return api.contracts.list.responses[200].parse(await res.json());
     },

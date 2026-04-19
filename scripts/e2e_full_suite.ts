@@ -4,7 +4,7 @@
  * Run: npx tsx scripts/e2e_full_suite.ts
  */
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
 // Load .env
@@ -150,15 +150,30 @@ async function run() {
     }
   }
 
-  // ── Stage 2: Core Data APIs ───────────────────────────────────────────────
+  // ── Stage 2: Core Data Endpoints ───────────────────────────────────────────────
   console.log("\n▶ STAGE 2: Core Data Endpoints");
+
+  // Verify Board-Ready Fixtures (Real Documents)
+  const fixtures = [
+    "Axmed insurane policy.pdf",
+    "Seacom - MSA Nyali.pdf"
+  ];
+
+  for (const fixture of fixtures) {
+    const filePath = resolve(process.cwd(), "tests", "fixtures", fixture);
+    if (!existsSync(filePath)) {
+      fail(`Fixture missing: ${fixture}`);
+    } else {
+      pass(`Board-ready fixture verified: ${fixture}`);
+    }
+  }
 
   const endpoints = [
     ["GET", "/api/contracts"],
     ["GET", "/api/clients"],
     ["GET", "/api/risks"],
     ["GET", "/api/workspaces"],
-    ["GET", "/api/compliance/audits"],
+    ["GET", "/api/compliance-audits"],
     ["GET", "/api/savings"],
     ["GET", "/api/vendors/scorecards"],
     ["GET", "/api/reports"],
@@ -188,7 +203,7 @@ async function run() {
 
   // ── Stage 4: Infrastructure Telemetry ────────────────────────────────────
   console.log("\n▶ STAGE 4: Telemetry & Governance");
-  const telemetryRes = await api("GET", "/api/infrastructure-logs", accessToken);
+  const telemetryRes = await api("GET", "/api/infrastructure/logs", accessToken);
   if (telemetryRes.ok) {
     pass(`Infrastructure logs accessible (${Array.isArray(telemetryRes.data) ? telemetryRes.data.length : "N/A"} entries)`);
   } else {

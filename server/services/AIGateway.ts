@@ -10,28 +10,41 @@ import { storage } from "../storage";
  */
 export class AIGateway {
   private static openaiClient: OpenAI | null = null;
+  private static deepseekClient: OpenAI | null = null;
   private static anthropicClient: Anthropic | null = null;
 
-  private static readonly PRIMARY_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing";
-  private static readonly SECONDARY_KEY = process.env.ANTHROPIC_API_KEY || "missing";
+  private static readonly OPENAI_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing";
+  private static readonly DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "missing";
+  private static readonly ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "missing";
   
-  private static readonly PRIMARY_BASE = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  private static readonly OPENAI_BASE = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  private static readonly DEEPSEEK_BASE = "https://api.deepseek.com";
   private static readonly LOCAL_BASE = process.env.LOCAL_AI_BASE_URL || "http://localhost:11434/v1";
 
   private static getOpenAI(): OpenAI {
     if (!this.openaiClient) {
       this.openaiClient = new OpenAI({
-        apiKey: this.PRIMARY_KEY,
-        baseURL: this.PRIMARY_BASE,
+        apiKey: this.OPENAI_KEY,
+        baseURL: this.OPENAI_BASE,
       });
     }
     return this.openaiClient;
   }
 
+  private static getDeepSeek(): OpenAI {
+    if (!this.deepseekClient) {
+      this.deepseekClient = new OpenAI({
+        apiKey: this.DEEPSEEK_KEY,
+        baseURL: this.DEEPSEEK_BASE,
+      });
+    }
+    return this.deepseekClient;
+  }
+
   private static getAnthropic(): Anthropic {
     if (!this.anthropicClient) {
       this.anthropicClient = new Anthropic({
-        apiKey: this.SECONDARY_KEY,
+        apiKey: this.ANTHROPIC_KEY,
       });
     }
     return this.anthropicClient;
@@ -41,20 +54,31 @@ export class AIGateway {
    * Resilient completion endpoint with Multi-Provider Fallback
    */
   static async createCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): Promise<string> {
-    // 1. Attempt Primary (OpenAI)
+    // 1. Attempt Primary (DeepSeek - cost effective & high context)
     try {
-      if (this.PRIMARY_KEY !== "missing") {
+      if (this.DEEPSEEK_KEY !== "missing") {
+        const deepseekParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
+        const response = await this.getDeepSeek().chat.completions.create(deepseekParams as any);
+        return response.choices[0]?.message?.content || "";
+      }
+    } catch (error: any) {
+      console.warn(`[AI-GATEWAY] DeepSeek Engine Unavailable: ${error.message}`);
+    }
+
+    // 2. Attempt Secondary (OpenAI)
+    try {
+      if (this.OPENAI_KEY !== "missing") {
         const response = await this.getOpenAI().chat.completions.create(params);
         return response.choices[0]?.message?.content || "";
       }
     } catch (error: any) {
-      console.warn(`[AI-GATEWAY] Primary Engine (OpenAI) Unavailable: ${error.message}`);
+      console.warn(`[AI-GATEWAY] OpenAI Engine Unavailable: ${error.message}`);
     }
 
-    // 2. Attempt Secondary (Anthropic)
+    // 3. Attempt Tertiary (Anthropic)
     try {
-      if (this.SECONDARY_KEY !== "missing") {
-        console.log("[AI-GATEWAY] Attempting Secondary Resilience Path (Anthropic)...");
+      if (this.ANTHROPIC_KEY !== "missing") {
+        console.log("[AI-GATEWAY] Attempting Anthropic Resilience Path...");
         const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
         const response = await this.getAnthropic().messages.create({
           model: "claude-3-5-sonnet-20241022",
@@ -68,44 +92,45 @@ export class AIGateway {
         }
       }
     } catch (error: any) {
-      console.warn(`[AI-GATEWAY] Secondary Engine (Anthropic) Unavailable: ${error.message}`);
+      console.warn(`[AI-GATEWAY] Anthropic Engine Unavailable: ${error.message}`);
     }
 
-    // 3. Attempt Tertiary (Sovereign Local AI - Ollama/vLLM)
+    // 4. Attempt Quaternary (Sovereign Local AI)
     try {
-      console.log("[AI-GATEWAY] Attempting Tertiary Resilience Path (Local sovereign AI)...");
+      console.log("[AI-GATEWAY] Attempting Local sovereign AI...");
       const localParams = { ...params, model: params.model.includes('gpt') ? 'llama3' : params.model };
       
       const localOpenAI = new OpenAI({
-         apiKey: "ollama", // Local models usually don't require keys
+         apiKey: "ollama",
          baseURL: this.LOCAL_BASE
       });
 
       const response = await localOpenAI.chat.completions.create(localParams as any);
       return response.choices[0]?.message?.content || "";
     } catch (error: any) {
-      console.warn(`[AI-GATEWAY] Tertiary Engine (Local AI) Unavailable: ${error.message}`);
+      console.warn(`[AI-GATEWAY] Local AI Engine Unavailable: ${error.message}`);
     }
 
-    // 4. Sovereign Fallback (Regional/Mock)
+    // 5. Sovereign Fallback (Regional/Mock)
     console.warn(`[AI-GATEWAY] All AI Providers Exhausted. Activating Sovereign Fallback.`);
     return this.executeSovereignFallback(params);
   }
 
   /**
    * Resilient Streaming Endpoint
-   * (Phase 30 Expansion)
    */
   static async createStreamingCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsStreaming) {
-     // For now, streaming only uses the primary client with a fallback to the non-streaming error
-     // In a future sprint, we can implement cross-provider stream abstraction.
      try {
-        if (this.PRIMARY_KEY !== "missing") {
+        if (this.DEEPSEEK_KEY !== "missing") {
+           const deepseekParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
+           return await this.getDeepSeek().chat.completions.create(deepseekParams as any);
+        }
+        if (this.OPENAI_KEY !== "missing") {
            return await this.getOpenAI().chat.completions.create(params);
         }
-        throw new Error("Primary Provider Offline");
+        throw new Error("No Primary Providers Offline");
      } catch (error: any) {
-        console.error(`[AI-GATEWAY] Streaming Failure: ${error.message}. Redirecting to non-streaming sovereign mode.`);
+        console.error(`[AI-GATEWAY] Streaming Failure: ${error.message}.`);
         throw error;
      }
   }

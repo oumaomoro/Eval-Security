@@ -1,255 +1,406 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@shared/routes";
-import { queryClient } from "@/lib/queryClient";
+import { 
+  FileText, 
+  Download, 
+  Plus, 
+  Calendar, 
+  Trash2, 
+  Clock, 
+  ShieldCheck, 
+  Filter,
+  ChevronRight,
+  RefreshCw
+} from "lucide-react";
+import { 
+  useReports, 
+  useGenerateReport, 
+  useReportSchedules, 
+  useCreateReportSchedule, 
+  useDeleteReportSchedule 
+} from "@/hooks/use-reports";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, FileText, Download, Plus, ShieldAlert, Cpu } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
 
 export default function Reports() {
-    const { toast } = useToast();
-    const [open, setOpen] = useState(false);
-    const [title, setTitle] = useState("");
-    const [type, setType] = useState("compliance");
-    const [regulatoryBody, setRegulatoryBody] = useState("ODPC");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  
+  // Manual Report State
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState("compliance");
+  const [regulatoryBody, setRegulatoryBody] = useState("KDPA");
+  
+  // Schedule State
+  const [schedTitle, setSchedTitle] = useState("");
+  const [schedFrequency, setSchedFrequency] = useState("monthly");
 
-    const { data: reports, isLoading } = useQuery({
-        queryKey: [api.reports.list.path],
-        queryFn: async () => {
-            const res = await fetch(api.reports.list.path);
-            if (!res.ok) throw new Error("Failed to fetch reports");
-            return res.json();
-        }
+  const { data: reports, isLoading: isLoadingReports } = useReports();
+  const { data: schedules, isLoading: isLoadingSchedules } = useReportSchedules();
+  const generateReport = useGenerateReport();
+  const createSchedule = useCreateReportSchedule();
+  const deleteSchedule = useDeleteReportSchedule();
+
+  const handleGenerate = async () => {
+    await generateReport.mutateAsync({ title, type, regulatoryBody });
+    setReportDialogOpen(false);
+    setTitle("");
+  };
+
+  const handleCreateSchedule = async () => {
+    await createSchedule.mutateAsync({ 
+      title: schedTitle, 
+      type: "compliance", 
+      frequency: schedFrequency,
+      regulatoryBodies: [regulatoryBody],
+      isActive: true
     });
+    setScheduleDialogOpen(false);
+    setSchedTitle("");
+  };
 
-    const generateReport = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await fetch(api.reports.generate.path, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-            if (!res.ok) throw new Error("Failed to generate report");
-            return res.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [api.reports.list.path] });
-            toast({ title: "Report generated successfully" });
-            setOpen(false);
-        },
-        onError: () => {
-            toast({ title: "Failed to generate report", variant: "destructive" });
-        }
-    });
-
-    if (isLoading) {
-        return (
-            <div className="flex justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    return (
-        <Layout header={<h1 className="text-2xl font-black uppercase tracking-tighter italic drop-shadow-sm flex items-center gap-2"><FileText className="w-6 h-6 text-primary" /> Regulatory Reports</h1>}>
-            <SEO title="Regulatory Reports" description="Manage and export specialized compliance reports for ODPC, CBK, and POPIA." />
-            <div className="space-y-8 pb-12">
-                <div className="flex justify-between items-center bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-800/50 shadow-3xl">
-                    <div>
-                        <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic">Report Generation Hub</h1>
-                        <p className="text-slate-500 font-bold uppercase tracking-tight text-sm mt-2">
-                            Engineered for high-fidelity compliance transparency and jurisdictional verification.
-                        </p>
-                    </div>
-                <Dialog open={open} onOpenChange={setOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase italic tracking-tighter">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Initialize Report
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px] bg-slate-950 border-slate-800">
-                        <DialogHeader>
-                            <DialogTitle className="text-white uppercase tracking-tighter italic">Generate Regulatory Intelligence</DialogTitle>
-                            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px]">
-                                Configure jurisdictional parameters for autonomic report generation.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-6 py-4">
-                            <div className="grid gap-2">
-                                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Report Title</Label>
-                                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Q3 Jurisdictional Audit" className="bg-slate-900 border-slate-800" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Analytical Framework</Label>
-                                <Select value={type} onValueChange={setType}>
-                                    <SelectTrigger className="bg-slate-900 border-slate-800"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">
-                                        <SelectItem value="compliance">Jurisdictional Compliance</SelectItem>
-                                        <SelectItem value="risk_assessment">Forrensic Risk Assessment</SelectItem>
-                                        <SelectItem value="evidence_pack">Strategic Evidence Pack</SelectItem>
-                                        <SelectItem value="audit">Full Autonomic Audit</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Regulatory Standard</Label>
-                                <Select value={regulatoryBody} onValueChange={setRegulatoryBody}>
-                                    <SelectTrigger className="bg-slate-900 border-slate-800"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">
-                                        <SelectItem value="KDPA">KDPA (Kenya Act 2019)</SelectItem>
-                                        <SelectItem value="CBK">CBK (Cybersecurity Guidance)</SelectItem>
-                                        <SelectItem value="POPIA">POPIA (South Africa)</SelectItem>
-                                        <SelectItem value="GDPR">GDPR (EU Standard)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-3 mt-4">
-                            <Button variant="ghost" onClick={() => setOpen(false)} className="text-[10px] font-black uppercase text-slate-500 hover:text-white tracking-widest">Abort</Button>
-                            <Button
-                                onClick={() => generateReport.mutate({ title, type, regulatoryBody: regulatoryBody })}
-                                disabled={!title || generateReport.isPending}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase italic tracking-tighter"
-                            >
-                                {generateReport.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Cpu className="w-4 h-4 mr-2" />}
-                                Begin Generation
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
-            {/* Evidence Pack Strategic Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <Card className="bg-slate-950 border-slate-800 shadow-2xl overflow-hidden relative group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <ShieldAlert className="w-32 h-32 text-emerald-500" />
-                    </div>
-                    <CardHeader>
-                        <CardTitle className="text-lg font-black uppercase tracking-tighter italic flex items-center gap-2">
-                             <Cpu className="w-5 h-5 text-emerald-500" /> Strategic Evidence Pack
-                        </CardTitle>
-                        <CardDescription className="text-slate-500 font-bold uppercase text-[10px]">
-                            Generate a board-ready executive brief for jurisdictional verification.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                            Compiles all recent autonomic rescans, risk mitigations, and legal speed metrics into a cryptographically signed PDF dashboard.
-                        </p>
-                        <div className="flex items-center gap-4">
-                            <Select value={regulatoryBody} onValueChange={setRegulatoryBody}>
-                                <SelectTrigger className="w-48 bg-slate-900 border-slate-800 text-[10px] font-bold uppercase h-9"><SelectValue /></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800">
-                                    <SelectItem value="KDPA">Standard: KDPA</SelectItem>
-                                    <SelectItem value="POPIA">Standard: POPIA</SelectItem>
-                                    <SelectItem value="CBK">Standard: CBK</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button 
-                                variant="outline" 
-                                className="h-9 border-slate-800 hover:bg-slate-900 text-slate-300 font-black uppercase text-[10px] tracking-widest italic"
-                                onClick={() => generateReport.mutate({ 
-                                    title: `Board Evidence Pack - ${regulatoryBody}`, 
-                                    type: "evidence_pack", 
-                                    standard: regulatoryBody 
-                                })}
-                                disabled={generateReport.isPending}
-                            >
-                                {generateReport.isPending ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : "Deploy Pack"}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-emerald-500/5 border-emerald-500/20 backdrop-blur-xl">
-                    <CardHeader>
-                        <CardTitle className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                            <ShieldAlert className="w-4 h-4" /> Integrity Verification
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                            Every generated report is indexed against the Sovereign Integrity Ledger. Reports can be verified using the unique Forensic Hash found in the document footer.
-                        </p>
-                        <div className="mt-4 flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase italic">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Ledger Sync Active: Node-Cluster-01
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card className="bg-card/50 backdrop-blur border-primary/10">
-                <CardContent className="pt-6">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="border-border/50">
-                                <TableHead>Title</TableHead>
-                                <TableHead>Regulatory Body</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Date Generated</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {reports?.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                        No reports generated yet.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                            {reports?.map((r: any) => (
-                                <TableRow key={r.id} className="border-border/50">
-                                    <TableCell className="font-medium">
-                                        <div className="flex items-center">
-                                            <FileText className="w-4 h-4 mr-2 text-primary/70" />
-                                            {r.title}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{r.regulatoryBody}</Badge>
-                                    </TableCell>
-                                    <TableCell className="capitalize">{r.type.replace('_', ' ')}</TableCell>
-                                    <TableCell>{new Date(r.createdAt).toLocaleDateString()}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={
-                                            r.status === 'generated' ? 'default' :
-                                                r.status === 'failed' ? 'destructive' : 'secondary'
-                                        }>
-                                            {r.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={r.status !== 'generated'}
-                                            onClick={() => window.open(`/api/reports/${r.id}/export`, "_blank")}
-                                        >
-                                            <Download className="w-4 h-4 mr-2" />
-                                            Export PDF
-                                        </Button>
-
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+  return (
+    <Layout header={
+      <div className="flex w-full items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Reporting Bureau</h1>
+          <p className="text-xs text-muted-foreground mt-1">Enterprise regulatory intelligence and automated compliance exports.</p>
         </div>
-        </Layout>
-    );
+        <div className="flex items-center gap-3">
+          <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-primary hover:bg-primary/90">
+                <Plus className="w-4 h-4 mr-2" /> New Report
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Generate Intelligence Report</DialogTitle>
+                <DialogDescription>Configure jurisdictional parameters for on-demand report generation.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Report Title</Label>
+                  <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Q3 Compliance Audit" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="type" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Framework</Label>
+                  <Select value={type} onValueChange={setType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="compliance">Jurisdictional Compliance</SelectItem>
+                      <SelectItem value="risk_assessment">Operational Risk Assessment</SelectItem>
+                      <SelectItem value="evidence_pack">Strategic Evidence Pack</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="body" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Regulatory Standard</Label>
+                  <Select value={regulatoryBody} onValueChange={setRegulatoryBody}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="KDPA">KDPA (Kenya Act 2019)</SelectItem>
+                      <SelectItem value="CBK">CBK (Cyber Guidelines)</SelectItem>
+                      <SelectItem value="POPIA">POPIA (South Africa)</SelectItem>
+                      <SelectItem value="GDPR">GDPR (EU Standard)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setReportDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleGenerate} disabled={!title || generateReport.isPending}>
+                  {generateReport.isPending ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                  Generate
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    }>
+      <SEO title="Reporting Bureau" description="Automated regulatory intelligence and evidence generation." />
+      
+      <div className="space-y-6">
+        {/* Intelligence Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-card/50 shadow-sm border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-500" /> Active Schedules
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{schedules?.filter(s => s.isActive).length || 0}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Automated reporting pipelines engaged.</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50 shadow-sm border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-emerald-500" /> Total Exports
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{reports?.length || 0}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Documents in sovereign repository.</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50 shadow-sm border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-amber-500" /> Last Audit
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{reports?.[0] ? format(new Date(reports[0].createdAt), "MMM d, yyyy") : "N/A"}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Latest jurisdictional verification run.</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="reports" className="w-full">
+          <div className="flex items-center justify-between mb-4 border-b border-border/50 pb-px">
+            <TabsList className="bg-transparent h-auto p-0 gap-6">
+              <TabsTrigger value="reports" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 text-sm font-medium transition-none">
+                Generated Reports
+              </TabsTrigger>
+              <TabsTrigger value="schedules" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 text-sm font-medium transition-none">
+                Automated Schedules
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground pb-3 font-medium">
+              <Filter className="w-3.5 h-3.5" /> Filter Repository
+            </div>
+          </div>
+
+          <TabsContent value="reports" className="mt-0 outline-none">
+            <Card className="bg-card/50 border-border/50 shadow-sm overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent border-border/50">
+                    <TableHead className="w-[300px] text-[11px] font-bold uppercase tracking-wider text-muted-foreground py-3 px-6">Report Detail</TableHead>
+                    <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground py-3">Jurisdiction</TableHead>
+                    <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground py-3">Format</TableHead>
+                    <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground py-3">Status</TableHead>
+                    <TableHead className="text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground py-3 px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingReports ? (
+                    Array(5).fill(0).map((_, i) => (
+                      <TableRow key={i} className="border-border/40">
+                        <TableCell className="px-6 py-4"><Skeleton className="h-4 w-[200px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[60px]" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-[70px] rounded-full" /></TableCell>
+                        <TableCell className="text-right px-6"><Skeleton className="h-8 w-[100px] ml-auto rounded-md" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : reports?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-24 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center">
+                            <FileText className="w-6 h-6 text-muted-foreground/50" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold">No reports generated</p>
+                            <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">Generate your first jurisdictional report to see it here.</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    reports?.map((report) => (
+                      <TableRow key={report.id} className="group border-border/40 hover:bg-muted/20 transition-colors">
+                        <TableCell className="px-6 py-4">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{report.title}</span>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 uppercase font-medium">
+                              {report.type.replace('_', ' ')} • {format(new Date(report.createdAt), "MMM d, yyyy")}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-tight bg-muted/20 border-border/50 text-muted-foreground">
+                            {report.regulatoryBody || 'General'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-muted-foreground uppercase">{report.format}</TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={`text-[9px] font-bold uppercase tracking-tight rounded-md px-1.5 py-0.5 ${
+                              report.status === 'generated' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                              report.status === 'failed' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                              'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse'
+                            }`}
+                            variant="secondary"
+                          >
+                            {report.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right px-6 py-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                            disabled={report.status !== 'generated'}
+                            onClick={() => window.open(`/api/reports/${report.id}/export`, "_blank")}
+                          >
+                            <Download className="w-3.5 h-3.5 mr-2" />
+                            Export PDF
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="schedules" className="mt-0 outline-none">
+             <Card className="bg-card/50 border-border/50 shadow-sm">
+                <div className="p-6 flex items-center justify-between border-b border-border/50">
+                  <div>
+                    <h3 className="text-sm font-semibold">Report Automation</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Configure automated reporting windows for your organization.</p>
+                  </div>
+                  <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="h-8 border-border/50 hover:bg-muted/50">
+                        <Calendar className="w-4 h-4 mr-2" /> Schedule Automation
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Configure Automation</DialogTitle>
+                        <DialogDescription>Engage recurrent AI report generation for active monitoring.</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="sched-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Schedule Title</Label>
+                          <Input id="sched-title" value={schedTitle} onChange={(e) => setSchedTitle(e.target.value)} placeholder="e.g., Monthly Executive Evidence" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="freq" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Frequency</Label>
+                          <Select value={schedFrequency} onValueChange={setSchedFrequency}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Daily Snapshot</SelectItem>
+                              <SelectItem value="weekly">Weekly Operational</SelectItem>
+                              <SelectItem value="monthly">Monthly Executive</SelectItem>
+                              <SelectItem value="quarterly">Quarterly Jurisdictional</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-3">
+                        <Button variant="ghost" onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateSchedule} disabled={!schedTitle || createSchedule.isPending}>
+                          {createSchedule.isPending ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Calendar className="w-4 h-4 mr-2" />}
+                          Activate Schedule
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="p-0">
+                   <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow className="hover:bg-transparent border-border/50 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          <TableHead className="px-6 py-3">Schedule Configuration</TableHead>
+                          <TableHead>Frequency</TableHead>
+                          <TableHead>Next Deployment</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right px-6">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {isLoadingSchedules ? (
+                           Array(3).fill(0).map((_, i) => (
+                             <TableRow key={i} className="border-border/40">
+                               <TableCell className="px-6 py-4"><Skeleton className="h-4 w-[150px]" /></TableCell>
+                               <TableCell><Skeleton className="h-4 w-[60px]" /></TableCell>
+                               <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                               <TableCell><Skeleton className="h-5 w-[50px] rounded-full" /></TableCell>
+                               <TableCell className="text-right px-6"><Skeleton className="h-8 w-[30px] ml-auto rounded-md" /></TableCell>
+                             </TableRow>
+                           ))
+                        ) : schedules?.length === 0 ? (
+                           <TableRow>
+                             <TableCell colSpan={5} className="py-24 text-center">
+                               <div className="flex flex-col items-center gap-3">
+                                 <Clock className="w-10 h-10 text-muted-foreground/30" />
+                                 <p className="text-sm font-semibold">No active schedules found</p>
+                                 <Button variant="link" onClick={() => setScheduleDialogOpen(true)} className="text-primary text-xs font-semibold">Initiate first schedule <ChevronRight className="w-3 h-3 ml-1" /></Button>
+                               </div>
+                             </TableCell>
+                           </TableRow>
+                        ) : (
+                          schedules?.map((schedule) => (
+                            <TableRow key={schedule.id} className="border-border/40 hover:bg-muted/10 transition-colors">
+                              <TableCell className="px-6 py-4">
+                                <span className="text-sm font-semibold">{schedule.title}</span>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="bg-muted/30 text-muted-foreground border-border/50 text-[10px] font-bold uppercase">
+                                  {schedule.frequency}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs font-medium text-muted-foreground">
+                                {schedule.nextRun ? format(new Date(schedule.nextRun), "MMM d, HH:mm") : "Pending"}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${schedule.isActive ? 'bg-emerald-500 shadow-emerald-500/50 shadow-sm' : 'bg-muted-foreground'}`} />
+                                  <span className="text-xs font-semibold">{schedule.isActive ? 'Engaged' : 'Paused'}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right px-6 py-4">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
+                                  onClick={() => deleteSchedule.mutate(schedule.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                   </Table>
+                </div>
+             </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </Layout>
+  );
 }

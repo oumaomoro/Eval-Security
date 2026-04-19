@@ -16,16 +16,20 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const { data: stats, isLoading } = useDashboardStats();
 
-  if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
+  if (isLoading) return <Layout><div className="text-center py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary/50" /></div></Layout>;
 
   return (
     <Layout header={
       <div className="flex w-full items-center justify-between">
-         <h1 className="text-2xl font-bold tracking-tight text-white">{t("dashboard.title")}</h1>
+         <div>
+           <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("dashboard.title")}</h1>
+           <p className="text-xs text-muted-foreground mt-1">Platform overview and strategic insights.</p>
+         </div>
          <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <Button 
-              className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl font-black uppercase text-[10px] tracking-widest h-10 px-6 gap-2"
+              variant="outline"
+              className="rounded-lg h-9 px-4 gap-2 text-xs font-semibold border-slate-200 dark:border-slate-800"
               onClick={() => window.location.href = "/api/reports/strategic-pack"}
             >
               <Package className="w-4 h-4" />
@@ -34,92 +38,107 @@ export default function Dashboard() {
          </div>
       </div>
     }>
-      <SEO title="Enterprise Dashboard" description="Monitor your cybersecurity posture and contract ROI." />
+      <SEO title="Dashboard" description="Monitor your enterprise posture and contract ROI." />
 
       <div className="space-y-8 pb-12 pt-4">
         {/* Top Level KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard label={t("dashboard.annual_spend")} value={`$${(stats?.totalAnnualCost || 0).toLocaleString()}`} icon={DollarSign} color="text-emerald-400" />
-          <MetricCard label={t("dashboard.missing_renewals")} value={stats?.upcomingRenewals?.length || 0} icon={Clock} color="text-amber-400" />
-          <MetricCard label={t("dashboard.analyzed_contracts")} value={stats?.totalContracts || 0} icon={FileCheck} color="text-blue-400" />
-          <MetricCard label={t("dashboard.critical_risks")} value={stats?.criticalRisks || 0} icon={ShieldCheck} color="text-rose-400" />
+          <MetricCard label={t("dashboard.annual_spend")} value={`$${(stats?.totalAnnualCost || 0).toLocaleString()}`} icon={DollarSign} color="text-emerald-500" />
+          <MetricCard label={t("dashboard.missing_renewals")} value={stats?.upcomingRenewals?.length || 0} icon={Clock} color="text-amber-500" />
+          <MetricCard label={t("dashboard.analyzed_contracts")} value={stats?.totalContracts || 0} icon={FileCheck} color="text-blue-500" />
+          <MetricCard label={t("dashboard.critical_risks")} value={stats?.criticalRisks || 0} icon={ShieldCheck} color="text-rose-500" />
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto min-h-[350px]">
-          <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
-            <h3 className="text-sm font-semibold tracking-wider uppercase text-slate-400 mb-6">Spend vs Vendors</h3>
-            <div className="flex-1 w-full min-h-[250px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Spend by Vendor</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 w-full min-h-[300px] pt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats?.costByVendor || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="vendor" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} className="dark:stroke-slate-800" />
+                  <XAxis dataKey="vendor" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
-                    itemStyle={{ color: "#f8fafc" }}
-                    cursor={{ fill: "#1e293b" }}
+                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }}
+                    className="dark:!bg-slate-900 dark:!border-slate-800"
+                    itemStyle={{ fontSize: "12px" }}
+                    cursor={{ fill: "#f8fafc" }}
                   />
-                  <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32}>
                     {stats?.costByVendor?.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#10b981" : "#059669"} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col">
-            <h3 className="text-sm font-semibold tracking-wider uppercase text-slate-400 mb-6">Risk Categories</h3>
-            <div className="flex-1 w-full min-h-[250px]">
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Risk Distribution</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 w-full min-h-[300px] pt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={stats?.riskHeatmap?.length ? stats.riskHeatmap : [{ category: "No Data", count: 1 }]}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={90}
-                    paddingAngle={5}
+                    cy="45%"
+                    innerRadius={65}
+                    outerRadius={85}
+                    paddingAngle={6}
                     dataKey="count"
                     nameKey="category"
                   >
                     {stats?.riskHeatmap?.map((entry: any, i: number) => (
-                      <Cell key={i} fill={["#10b981", "#3b82f6", "#64748b", "#f43f5e"][i % 4]} />
+                      <Cell key={i} fill={["#10b981", "#3b82f6", "#f43f5e", "#f59e0b"][i % 4]} />
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
-                    itemStyle={{ color: "#f8fafc" }}
+                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px" }}
+                    className="dark:!bg-slate-900 dark:!border-slate-800"
                   />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Recent Contracts / Upcoming Renewals */}
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold tracking-tight mb-4 flex items-center gap-2 text-white">
-             <Clock className="w-4 h-4 text-emerald-400" /> {t("dashboard.upcoming_renewals")}
-          </h2>
-          <Card className="bg-slate-900/50 border-slate-800 shadow-sm rounded-xl overflow-hidden">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <Clock className="w-4 h-4 text-primary" />
+            <h2 className="text-lg font-bold tracking-tight text-foreground truncate">
+              {t("dashboard.upcoming_renewals")}
+            </h2>
+          </div>
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden">
             <CardContent className="p-0">
-              <div className="divide-y divide-slate-800/60">
-                {stats?.upcomingRenewals?.length === 0 && <p className="text-slate-500 p-6 text-sm">{t("dashboard.no_renewals")}</p>}
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {(!stats?.upcomingRenewals || stats.upcomingRenewals.length === 0) && (
+                  <div className="p-12 text-center">
+                    <p className="text-slate-400 text-sm">{t("dashboard.no_renewals")}</p>
+                  </div>
+                )}
                 {stats?.upcomingRenewals?.map((contract: any) => (
-                  <div key={contract.id} className="flex items-center justify-between p-5 hover:bg-slate-800/30 transition-colors">
+                  <div key={contract.id} className="flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
                     <div>
-                      <p className="font-semibold text-slate-200 text-sm">{contract.vendorName}</p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{contract.vendorName}</p>
                       <p className="text-xs text-slate-500 mt-1">{contract.category}</p>
                     </div>
-                    <div className="text-right flex flex-col items-end">
-                       <Badge variant="outline" className="mb-2 text-slate-300 border-slate-700 font-normal">
-                          {contract.renewalDate || "Unknown"}
-                       </Badge>
-                       <Link href={`/contracts/${contract.id}`} className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
-                          {t("dashboard.review_contract")}
+                    <div className="text-right flex items-center gap-6">
+                       <div className="hidden sm:block">
+                         <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Renew Date</p>
+                         <p className="text-xs font-mono text-slate-600 dark:text-slate-400">{contract.renewalDate || "—"}</p>
+                       </div>
+                       <Link href={`/contracts/${contract.id}`}>
+                          <Button variant="ghost" size="sm" className="h-8 text-primary hover:text-primary hover:bg-primary/5">
+                            {t("dashboard.review_contract")}
+                          </Button>
                        </Link>
                     </div>
                   </div>
@@ -137,19 +156,18 @@ export default function Dashboard() {
 function MetricCard({ label, value, icon: Icon, color }: any) {
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative bg-slate-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl shadow-xl hover:border-emerald-500/20 transition-all group overflow-hidden"
+      className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-6 rounded-xl shadow-sm hover:shadow-md transition-all group overflow-hidden"
     >
-      <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-colors" />
       <div className="flex justify-between items-start relative z-10">
-        <div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">{label}</p>
-          <h3 className="text-3xl font-black tracking-tighter text-white italic">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{label}</p>
+          <h3 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
             {value}
           </h3>
         </div>
-        <div className={`p-3 rounded-xl bg-slate-950 border border-white/10 shadow-inner group-hover:scale-110 transition-transform ${color}`}>
+        <div className={`p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 group-hover:scale-110 transition-transform ${color}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>

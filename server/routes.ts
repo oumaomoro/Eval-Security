@@ -4,6 +4,7 @@ import type { Server } from "http";
 
 import { storage } from "./storage.js";
 import { api } from "@shared/routes";
+import { insertReportScheduleSchema } from "@shared/schema";
 import { z } from "zod";
 import { jsPDF } from "jspdf";
 import OpenAI from "openai";
@@ -50,21 +51,20 @@ const cachedCompletion = memoize(
   { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
 );
 
+import { workspaceContextMiddleware } from "./middleware/workspace-context-middleware";
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   console.log("[ROUTES] Starting registration...");
   console.log(`[ROUTES] API Key Rotate Path: ${api.auth.apiKey.rotate.path}`);
 
-  
-  // Custom middleware to ensure req.user is always populated accurately for logs/telemetry
-  app.use((req, res, next) => {
-    next();
-  });
-
-  await setupAuth(app);
-  console.log("[ROUTES] Auth setup complete.");
-  
   // Real-time Telemetry Monitor - Hardened entry-point
   app.use(telemetryMiddleware);
+  
+  // Multi-tenant Workspace Context
+  app.use(workspaceContextMiddleware);
+  
+  await setupAuth(app);
+  console.log("[ROUTES] Auth setup complete.");
   
   registerAuthRoutes(app);
   console.log("[ROUTES] Chat routes...");
@@ -745,26 +745,43 @@ Analyze the contract text and return JSON with exactly these fields:
       // Full async background analysis — real DB writes
       (async () => {
         try {
-          const rulesets = await storage.getAuditRulesets();
+          const contracts = await storage.getContracts({ ids: scope.contractIds });
+          const contractText = contracts.map(c => `[ID: ${c.id}, Vendor: ${c.vendorName}] ${c.aiAnalysis?.summary || ""}`).join("\n");
           const findings: any[] = [];
-
+          const allRulesets = await storage.getAuditRulesets();
           for (const standard of scope.standards) {
-            const ruleset = rulesets.find((r) => r.standard === standard);
+            const ruleset = allRulesets.find((r: any) => r.standard === standard);
             if (ruleset) {
+              const rulePrompt = ruleset.rules.map(r => `Rule ${r.id}: ${r.requirement}`).join("\n");
+              
+              // Real Jurisdictional Assessment via DeepSeek (No simulations)
+              const response = await AIGateway.createCompletion({
+                model: "deepseek-chat",
+                messages: [
+                  { 
+                    role: "system", 
+                    content: `You are a Lead Regulatory Auditor. Analyze the provided contracts against the compliance rules for ${standard}. 
+                    Return a JSON object: { "results": [ { "id": number, "status": "compliant" | "non_compliant", "evidence": string } ] }` 
+                  },
+                  { role: "user", content: `Contracts Architecture:\n${contractText}\n\nCompliance Rules:\n${rulePrompt}` }
+                ],
+                response_format: { type: "json_object" }
+              });
+
+              const analysis = JSON.parse(response || '{"results":[]}');
+              const resultsMap = new Map<number, any>(analysis.results.map((r: any) => [r.id, r]));
+
               for (const rule of ruleset.rules) {
-                // AI-assessed compliance finding
-                const status = Math.random() > 0.15 ? "compliant" : "non_compliant";
+                const aiResult = resultsMap.get(Number(rule.id));
                 findings.push({
                   id: rule.id,
                   requirement: rule.requirement,
                   description: rule.description,
                   severity: rule.severity,
-                  status,
-                  evidence: status === "compliant"
-                    ? "Verified via real-time contract telemetry."
-                    : "Gap identified — remediation required.",
+                  status: aiResult?.status || "non_compliant",
+                  evidence: aiResult?.evidence || "AI could not definitively verify compliance during sovereign scan.",
                   jurisdiction: standard,
-                  category: standard, // ── Bridges the gap for remediation mapping
+                  category: standard,
                 });
               }
             }
@@ -1121,6 +1138,38 @@ Analyze the contract text and return JSON with exactly these fields:
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       res.status(500).json({ message: "Report generation failed" });
     }
+  });
+
+  app.get("/api/reports/schedules", isAuthenticated, async (_req, res) => {
+    try { res.json(await storage.getReportSchedules()); }
+    catch { res.status(500).json({ message: "Failed to fetch schedules" }); }
+  });
+
+  app.post("/api/reports/schedules", isAuthenticated, async (req, res) => {
+    try {
+      const data = insertReportScheduleSchema.parse(req.body);
+      const schedule = await storage.createReportSchedule(data);
+      res.status(201).json(schedule);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: "Schedule creation failed" });
+    }
+  });
+
+  app.patch("/api/reports/schedules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const schedule = await storage.updateReportSchedule(id, req.body);
+      res.json(schedule);
+    } catch { res.status(500).json({ message: "Schedule update failed" }); }
+  });
+
+  app.delete("/api/reports/schedules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteReportSchedule(id);
+      res.status(204).end();
+    } catch { res.status(500).json({ message: "Schedule deletion failed" }); }
   });
 
   app.get(api.reports.export.path, isAuthenticated, async (req, res) => {

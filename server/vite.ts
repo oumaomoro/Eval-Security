@@ -41,7 +41,10 @@ export async function setupVite(server: Server, app: Express) {
 
   app.use(vite.middlewares);
 
-  app.use("/{*path}", async (req, res, next) => {
+  app.use(async (req, res, next) => {
+    if (req.method !== 'GET' || req.originalUrl.startsWith('/api')) {
+      return next();
+    }
     const url = req.originalUrl;
 
     try {
@@ -56,7 +59,7 @@ export async function setupVite(server: Server, app: Express) {
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/src/main.tsx?v=${Math.random().toString(36).slice(2)}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);

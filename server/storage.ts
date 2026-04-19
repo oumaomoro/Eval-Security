@@ -71,7 +71,7 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
 
   // Contracts
-  getContracts(filters?: { clientId?: number, status?: string }): Promise<(Contract & { client?: Client })[]>;
+  getContracts(filters?: { clientId?: number, status?: string, ids?: number[] }): Promise<(Contract & { client?: Client })[]>;
   getContract(id: number): Promise<(Contract & { client?: Client }) | undefined>;
   createContract(contract: InsertContract, userId?: string): Promise<Contract>;
   updateContract(id: number, updates: Partial<InsertContract> & { aiAnalysis?: any }): Promise<Contract>;
@@ -395,11 +395,12 @@ export class SupabaseRESTStorage implements IStorage {
 
 
   // --- CONTRACTS ---
-  async getContracts(filters?: { clientId?: number, status?: string }): Promise<(Contract & { client?: Client })[]> {
+  async getContracts(filters?: { clientId?: number, status?: string, ids?: number[] }): Promise<(Contract & { client?: Client })[]> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("contracts").select("*");
     if (filters?.clientId) query = query.eq("client_id", filters.clientId);
     if (filters?.status) query = query.eq("status", filters.status);
+    if (filters?.ids && filters.ids.length > 0) query = query.in("id", filters.ids);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
@@ -923,6 +924,90 @@ export class SupabaseRESTStorage implements IStorage {
         .select()
         .single()
     );
+  }
+
+  // --- REPORT SCHEDULES ---
+  async getReportSchedules(): Promise<ReportSchedule[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("report_schedules").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      ...d,
+      workspaceId: d.workspace_id,
+      regulatoryBodies: d.regulatory_bodies,
+      nextRun: d.next_run ? new Date(d.next_run) : null,
+      lastRun: d.last_run ? new Date(d.last_run) : null,
+      isActive: d.is_active,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
+  }
+
+  async createReportSchedule(schedule: InsertReportSchedule): Promise<ReportSchedule> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    
+    // Calculate initial nextRun based on frequency
+    const nextRun = new Date();
+    if (schedule.frequency === 'daily') nextRun.setDate(nextRun.getDate() + 1);
+    else if (schedule.frequency === 'weekly') nextRun.setDate(nextRun.getDate() + 7);
+    else if (schedule.frequency === 'monthly') nextRun.setMonth(nextRun.getMonth() + 1);
+    else if (schedule.frequency === 'quarterly') nextRun.setMonth(nextRun.getMonth() + 3);
+
+    const data = await this.handleResponse<any>(
+      supabase.from("report_schedules")
+        .insert({
+          workspace_id: workspaceId || schedule.workspaceId,
+          title: schedule.title,
+          type: schedule.type,
+          frequency: schedule.frequency,
+          regulatory_bodies: schedule.regulatoryBodies,
+          next_run: nextRun.toISOString(),
+          is_active: schedule.isActive ?? true
+        })
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      regulatoryBodies: data.regulatory_bodies,
+      nextRun: data.next_run ? new Date(data.next_run) : null,
+      lastRun: data.last_run ? new Date(data.last_run) : null,
+      isActive: data.is_active,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async updateReportSchedule(id: number, updates: Partial<ReportSchedule>): Promise<ReportSchedule> {
+    const payload: any = {};
+    if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.type !== undefined) payload.type = updates.type;
+    if (updates.frequency !== undefined) payload.frequency = updates.frequency;
+    if (updates.regulatoryBodies !== undefined) payload.regulatory_bodies = updates.regulatoryBodies;
+    if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+    if (updates.nextRun !== undefined) payload.next_run = updates.nextRun?.toISOString();
+    if (updates.lastRun !== undefined) payload.last_run = updates.lastRun?.toISOString();
+
+    const data = await this.handleResponse<any>(
+      supabase.from("report_schedules")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      regulatoryBodies: data.regulatory_bodies,
+      nextRun: data.next_run ? new Date(data.next_run) : null,
+      lastRun: data.last_run ? new Date(data.last_run) : null,
+      isActive: data.is_active,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async deleteReportSchedule(id: number): Promise<void> {
+    await this.handleResponse(supabase.from("report_schedules").delete().eq("id", id));
   }
 
   // --- SCORECARDS ---

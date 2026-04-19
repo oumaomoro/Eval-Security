@@ -1,5 +1,5 @@
 /**
- * CyberOptimize Phase 26 — Full Platform Verification
+ * Costloci Phase 26 — Full Platform Verification
  * Checks: DB tables, workspace_id columns, TypeScript, server health
  */
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -27,7 +27,7 @@ const WORKSPACE_ID_TABLES = [
 ];
 
 async function verify() {
-  console.log('🔍 CyberOptimize Phase 26 — Full Platform Verification\n');
+  console.log('🔍 Costloci Phase 26 — Full Platform Verification\n');
   let pass = 0; let fail = 0;
 
   // 1. Core tables
@@ -70,7 +70,7 @@ async function verify() {
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   
   if (fail === 0) {
-    console.log('\n🏆 CyberOptimize Phase 26 — ALL SYSTEMS GO');
+    console.log('\n🏆 Costloci Phase 26 — ALL SYSTEMS GO');
   } else {
     console.log('\n⚠️  Some checks need attention. See above for details.');
     console.log('   If Phase 26 tables are missing, run: scripts/phase26_harmonize.sql');

@@ -16,7 +16,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// ── PHASE 27 INFRASTRUCTURE HARDENING: UNIFIED API GATEWAY ─────────
+/*
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -29,6 +29,7 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
+*/
 
 // CORS Configuration Refactored for Enterprise Environments
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
@@ -42,15 +43,20 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Phase 27 Development Bypass
+    if (process.env.NODE_ENV === "development" || !origin) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("CORS-REJECTION: Origin not allowed for Enterprise Infrastructure"));
+      callback(new Error(`CORS-REJECTION: Origin ${origin} not allowed for Enterprise Infrastructure`));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type", "x-csrf-token"]
+  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type", "x-csrf-token", "x-workspace-id"]
 }));
 
 // CSRF Protection Configuration (Phase 32 Hardening)

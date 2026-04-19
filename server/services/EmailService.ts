@@ -8,7 +8,7 @@ export class EmailService {
    */
   static async sendVerificationEmail(email: string, token: string): Promise<boolean> {
     try {
-      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/auth/verify?token=${token}`;
+      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3200'}/auth/verify?token=${token}`;
       
       const { data, error } = await resend.emails.send({
         from: "Costloci Governance <onboarding@costloci.com>",
