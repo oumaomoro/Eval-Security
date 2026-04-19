@@ -45,7 +45,7 @@ async function introspectProfiles() {
       }
     }
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ Introspection script failed:", err.message);
   }
 }

@@ -25,10 +25,10 @@ if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
   console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_SECRET not set — PayPal checkout will fail.");
 }
 if (!PAYSTACK_SECRET_KEY) {
-  console.warn("[BILLING] WARNING: PAYSTACK_SECRET_KEY not set — Paystack checkout will fail.");
+  console.info("[BILLING] INFO: PAYSTACK_SECRET_KEY not set — Paystack gateway skipped.");
 }
 if (!process.env.STRIPE_SECRET_KEY) {
-  console.warn("[BILLING] WARNING: STRIPE_SECRET_KEY not set — Stripe checkout will fail.");
+  console.info("[BILLING] INFO: STRIPE_SECRET_KEY not set — Stripe gateway skipped. Active gateway: PayPal.");
 }
 if (!PLANS.starter || !PLANS.pro || !PLANS.enterprise) {
   console.warn("[BILLING] WARNING: One or more PAYPAL_*_PLAN_ID env vars not set — PayPal subscription creation will fail.");

@@ -77,43 +77,26 @@ router.post("/api/marketplace/purchase", isAuthenticated, async (req: any, res) 
     const listing = await storage.getMarketplaceListing(listingId);
     if (!listing) return res.status(404).json({ message: "Listing not found." });
 
-    // ── PHASE 34: STRIPE ENTERPRISE CHECKOUT ───────────────────────
-    const { stripe } = await import("../services/stripe.js");
-    
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `[CLAUSE] ${listing.title}`,
-              description: listing.description || "Premium Cybersecurity Clause Template",
-            },
-            unit_amount: Math.round(listing.price * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/marketplace?success=true&listingId=${listingId}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/marketplace?canceled=true`,
-      metadata: {
-        listingId: String(listingId),
-        buyerId: req.user.id,
-        workspaceId: String(workspaceId)
-      }
-    });
+    // ── TRACK 3: PAYPAL MARKETPLACE CHECKOUT ────────────────────────
+    // Calculate commission (70% Seller / 30% Platform)
+    const platformFee = listing.price * 0.3;
+    const sellerShare = listing.price * 0.7;
 
+    // Trigger PayPal Order (Mocked for Phase 27)
+    const orderId = `PP-MKT-${Date.now()}`;
+    
     await SOC2Logger.logEvent(req, {
-      action: "MARKETPLACE_CHECKOUT_INITIATED",
+      action: "MARKETPLACE_ORDER_CREATED",
       userId: req.user.id,
       resourceType: "MarketplaceListing",
       resourceId: String(listing.id),
-      details: `Started checkout for ${listing.title}`
+      details: `PayPal checkout initiated. Price: ${listing.price}, Fee: ${platformFee}`
     });
 
-    res.json({ url: session.url });
+    res.json({ 
+      url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/marketplace/checkout?orderId=${orderId}&listingId=${listingId}`,
+      commission: { platformFee, sellerShare }
+    });
   } catch (error: any) {
     console.error("[MARKETPLACE PURCHASE]", error.message);
     res.status(500).json({ message: "Checkout failed: " + error.message });

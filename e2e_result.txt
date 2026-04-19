@@ -1,1 +1,0 @@
-﻿STEP1_REGISTER: ERROR {"message":"Error sending confirmation email"}

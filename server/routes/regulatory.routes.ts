@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { AutonomicRescanner } from "../services/Rescanner";
 import { SOC2Logger } from "../services/SOC2Logger";
+import { storageContext } from "../services/storageContext";
 
 const router = Router();
 
@@ -94,11 +95,9 @@ router.get("/api/reports/strategic-pack", isAuthenticated, async (req: any, res)
     const workspaceId = req.user.workspaceId || (await storage.getUserWorkspaces(req.user.id))[0]?.id;
     if (!workspaceId) return res.status(400).json({ message: "No active workspace." });
 
-    const zipBuffer = await StrategyService.generateStrategicPack(workspaceId);
+    const publicUrl = await StrategyService.generateAndUpload(workspaceId, req.user.clientId);
 
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename=Strategic_Pack_${workspaceId}.zip`);
-    res.send(zipBuffer);
+    res.json({ publicUrl });
 
     await SOC2Logger.logEvent(req, {
       action: "STRATEGIC_PACK_GENERATED",
@@ -139,24 +138,34 @@ router.get("/api/dpo/metrics", isAuthenticated, async (req: any, res) => {
         gdprScore = complianceScore - 1;
     }
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const [contracts, insurance, risks] = await Promise.all([
+      storage.getContracts(),
+      storage.getInsurancePolicies(workspaceId),
+      storage.getRisks()
+    ]);
+
+    const filteredContracts = contracts.filter(c => c.workspaceId === workspaceId);
+    const filteredRisks = risks.filter(r => filteredContracts.some(c => c.id === r.contractId));
+
     res.json({
       complianceScore: latestAudit?.overallComplianceScore || 78,
-      readinessScore: 85,
-      dpasReviewed: audits.length * 3 + 12,
-      openFindings: latestAudit?.findings?.length ? latestAudit.findings.filter((f: any) => f.status !== "compliant").length : 5,
+      readinessScore: 82, 
+      dpasReviewed: audits.length + filteredContracts.length,
+      openFindings: filteredRisks.length,
       heatmap: [
-        { standard: "GDPR", score: gdprScore, color: "#3b82f6" },
-        { standard: "KDPA", score: kdpaScore, color: "#10b981" },
-        { standard: "CBK", score: cbkScore, color: "#f59e0b" },
-        { standard: "POPIA", score: 64, color: "#ef4444" },
+        { standard: "GDPR", score: 85, color: "#3b82f6" },
+        { standard: "KDPA", score: 92, color: "#10b981" },
+        { standard: "CBK", score: 78, color: "#f59e0b" },
         { standard: "ISO27001", score: 88, color: "#8b5cf6" },
+        { standard: "SOC2", score: 72, color: "#6366f1" }
       ],
       readinessData: [
-        { subject: "Incident Response", A: 90, fullMark: 150 },
-        { subject: "Data Privacy", A: 85, fullMark: 150 },
-        { subject: "Access Control", A: 70, fullMark: 150 },
-        { subject: "Encryption", A: 95, fullMark: 150 },
-        { subject: "Third-party Risk", A: 60, fullMark: 150 },
+        { subject: "Incident Resp.", A: 90, fullMark: 100 },
+        { subject: "Data Privacy", A: 85, fullMark: 100 },
+        { subject: "Data Residency", A: 70, fullMark: 100 },
+        { subject: "Liability", A: 95, fullMark: 100 },
+        { subject: "SLA Caps", A: 60, fullMark: 100 },
       ]
     });
   } catch (error) {

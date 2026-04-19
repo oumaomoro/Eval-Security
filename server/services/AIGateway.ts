@@ -146,7 +146,11 @@ Required JSON Structure:
     "systemFailure": "string"
   },
   "exclusions": ["string list of critical exclusions"],
-  "claimRiskScore": "number (1-100, where 100 is most restrictive/risky)",
+  "notificationRequirements": {
+    "timeToReport": "string",
+    "mandatoryAuthorities": ["string"]
+  },
+  "claimRiskScore": "number (1-100)",
   "professionalOpinion": "string (Professional legal/underwriting summary)"
 }
 
@@ -161,27 +165,44 @@ ${documentText.slice(0, 30000)}`;
 
       const analysis = JSON.parse(response.replace(/```json|```/g, ""));
 
-      // ─── LEGAL & PROFESSIONAL SCORE CONTEXTUALISATION ───────────────
-      // If AI fails to provide a nuanced score, apply deterministic legal weights
-      if (!analysis.claimRiskScore || analysis.claimRiskScore === 50) {
-        let score = 20; // Baseline
-        
-        // 1. Coverage Dilution Risk
-        const agg = analysis.coverageLimits?.annualAggregate || 1000000;
-        const ransom = analysis.coverageLimits?.ransomwareSubLimit || 0;
-        if (ransom < (agg * 0.25)) score += 30; // Ransomware sub-limit is less than 25% of agg
-        
-        // 2. Operational Wait Risk
-        const waitHours = parseInt(analysis.waitingPeriods?.businessInterruption || "24");
-        if (waitHours >= 24) score += 20; 
-        
-        // 3. Exclusion Density
-        if ((analysis.exclusions?.length || 0) > 8) score += 15;
-        
-        // 4. Social Engineering Gaps
-        if (!analysis.coverageLimits?.socialEngineeringSubLimit) score += 15;
+      // ─── LEGAL & PROFESSIONAL SCORE CONTEXTUALISATION (40/30/20/10) ───────────────
+      let score = 0;
+      
+      // 1. Exclusions Factor (40%)
+      const exclusionCount = (analysis.exclusions?.length || 0);
+      const exclusionScore = Math.min(exclusionCount * 10, 100) * 0.4;
+      score += exclusionScore;
+      
+      // 2. Sub-Limits & Deductibles Factor (30%)
+      const agg = analysis.coverageLimits?.annualAggregate || 1000000;
+      const subLimits = [
+        analysis.coverageLimits?.ransomwareSubLimit,
+        analysis.coverageLimits?.socialEngineeringSubLimit,
+        analysis.coverageLimits?.forensicInvestigationSubLimit
+      ].filter(l => l && l < (agg * 0.2)).length;
+      const limitScore = (subLimits / 3) * 100 * 0.3;
+      score += limitScore;
+      
+      // 3. Waiting Periods Factor (20%)
+      const waitHours = parseInt(analysis.waitingPeriods?.businessInterruption || "24");
+      const waitScore = Math.min((waitHours / 24) * 100, 100) * 0.2;
+      score += waitScore;
+      
+      // 4. Notification Requirements (10%)
+      const hasReportingTime = !!analysis.notificationRequirements?.timeToReport;
+      const notificationScore = (hasReportingTime ? 0 : 100) * 0.1;
+      score += notificationScore;
 
-        analysis.claimRiskScore = Math.min(score, 100);
+      analysis.claimRiskScore = Math.round(score);
+
+      // Usage Tracking: Deduct credits (1 credit for policy analysis)
+      if (workspaceId) {
+        await storage.logUsageEvent({
+          workspaceId,
+          eventType: 'insurance_analysis',
+          creditsUsed: 1,
+          metadata: { carrier: analysis.carrierName }
+        });
       }
 
       return analysis;

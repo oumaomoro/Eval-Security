@@ -14,8 +14,16 @@ import type {
   MarketplacePurchase, InsertMarketplacePurchase
 } from "@shared/schema";
 
-// RLS HARDENING: Dynamically resolve the Supabase Client from the current AsyncLocalStorage context.
-// This seamlessly enforces enterprise RLS by using the authenticated user's client instead of the sovereign bypass.
+export interface UsageEvent {
+  id: number;
+  workspaceId: number;
+  userId?: string;
+  eventType: string;
+  creditsUsed: number;
+  metadata?: any;
+  createdAt: string;
+}
+
 // RLS HARDENING: Dynamically resolve the Supabase Client from the current AsyncLocalStorage context.
 // This seamlessly enforces enterprise RLS by using the authenticated user's client instead of the sovereign bypass.
 const supabase = new Proxy(adminClient, {
@@ -27,8 +35,6 @@ const supabase = new Proxy(adminClient, {
     if (typeof value === "function") {
       return (...args: any[]) => {
         const result = (value as Function).apply(activeClient, args);
-        // If we're calling .from(), we want the resulting builder to also be proxied if needed
-        // but for now, simple binding is enough as activeClient is already the right one.
         return result;
       };
     }
@@ -45,6 +51,7 @@ import {
   type InsertInfrastructureLog, type InsertBillingTelemetry, type InsertAuditLog,
   type InsertRemediationSuggestion, type InsertRegulatoryAlert,
   type InsertClause, type InsertContractClause, type InsertWorkspaceMember,
+  type InsertPlaybook,
   type InsurancePolicy as InsuranceItem, type Subscription as UserSubscription
 } from "@shared/schema";
 
@@ -147,9 +154,13 @@ export interface IStorage {
 
   // Playbooks & Marketplace
   getPlaybooks(): Promise<Playbook[]>;
+  createPlaybook(playbook: InsertPlaybook): Promise<Playbook>;
+  updatePlaybook(id: number, updates: Partial<Playbook>): Promise<Playbook>;
+  deletePlaybook(id: number): Promise<void>;
   getMarketplaceListings(): Promise<MarketplaceListing[]>;
   getMarketplaceListing(id: number): Promise<MarketplaceListing | undefined>;
   createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing>;
+  getMarketplacePurchases(): Promise<MarketplacePurchase[]>;
   createMarketplacePurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase>;
 
   // Notification Channels (Feature Option C)
@@ -162,10 +173,13 @@ export interface IStorage {
   getRegulatoryAlerts(status?: string): Promise<RegulatoryAlert[]>;
   createRegulatoryAlert(alert: InsertRegulatoryAlert): Promise<RegulatoryAlert>;
 
-  // Remediation Tasks
+  // Remediation
   getRemediationTasks(contractId?: number): Promise<RemediationTask[]>;
   createRemediationTask(task: InsertRemediationTask): Promise<RemediationTask>;
   updateRemediationTask(id: number, updates: Partial<RemediationTask>): Promise<RemediationTask>;
+  getRemediationSuggestions(contractId?: number): Promise<RemediationSuggestion[]>;
+  createRemediationSuggestion(suggestion: InsertRemediationSuggestion): Promise<RemediationSuggestion>;
+  updateRemediationSuggestion(id: string, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion>;
 
   // Benchmarking
   getVendorBenchmarks(category?: string): Promise<VendorBenchmark[]>;
@@ -302,12 +316,14 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- CLIENTS ---
   async getClients(): Promise<Client[]> {
-    // Explicit selection of known columns to bypass schema cache issues
-    const data = await this.handleResponse<any[]>(
-      supabase.from("clients")
-        .select("id, company_name, industry, contact_name, contact_email, contact_phone, annual_budget, status, created_at")
-        .order("company_name", { ascending: true })
-    );
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("clients")
+      .select("id, company_name, industry, contact_name, contact_email, contact_phone, annual_budget, status, created_at, workspace_id")
+      .order("company_name", { ascending: true });
+    
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any[]>(query);
     return (data || []).map(d => this.mapClient(d));
   }
 
@@ -323,7 +339,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createClient(client: InsertClient): Promise<Client> {
     const data = await this.handleResponse<any>(
-      supabase.from("clients")
+      adminClient.from("clients")
         .insert({
           workspace_id: storageContext.getStore()?.workspaceId || client.workspaceId,
           company_name: client.companyName,
@@ -347,9 +363,12 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- AUDIT LOGS ---
   async getAuditLogs(clientId?: number, userId?: string): Promise<AuditLog[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("audit_logs").select("*");
     if (clientId) query = query.eq("client_id", clientId);
     if (userId) query = query.eq("user_id", userId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
     const data = await this.handleResponse<any[]>(query.order("timestamp", { ascending: false }).limit(500));
     return (data || []).map(d => ({
       id: d.id,
@@ -377,9 +396,11 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- CONTRACTS ---
   async getContracts(filters?: { clientId?: number, status?: string }): Promise<(Contract & { client?: Client })[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("contracts").select("*");
     if (filters?.clientId) query = query.eq("client_id", filters.clientId);
     if (filters?.status) query = query.eq("status", filters.status);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
     if (!data || data.length === 0) return [];
@@ -535,7 +556,58 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- PLAYBOOKS (Marketplace E2E tests dependency) --- //
   async getPlaybooks(): Promise<Playbook[]> {
-    return this.handleResponse<Playbook[]>(supabase.from("playbooks").select("*"));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("playbooks").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    return this.handleResponse<Playbook[]>(query);
+  }
+
+  async createPlaybook(playbook: InsertPlaybook): Promise<Playbook> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const data = await this.handleResponse<any>(
+      supabase.from("playbooks")
+        .insert({
+          workspace_id: workspaceId || playbook.workspaceId,
+          name: playbook.name,
+          description: playbook.description,
+          category: playbook.category,
+          rules: playbook.rules,
+          is_active: true
+        })
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      isActive: data.is_active
+    };
+  }
+
+  async updatePlaybook(id: number, updates: Partial<Playbook>): Promise<Playbook> {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.rules !== undefined) payload.rules = updates.rules;
+    if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("playbooks")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      isActive: data.is_active
+    };
+  }
+
+  async deletePlaybook(id: number): Promise<void> {
+    await this.handleResponse(supabase.from("playbooks").delete().eq("id", id));
   }
 
   // --- NOTIFICATION CHANNELS (Enterprise Webhooks Option C) --- //
@@ -743,9 +815,12 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- SAVINGS ---
   async getSavingsOpportunities(contractId?: number): Promise<SavingsOpportunity[]> {
-    let query = supabase.from("savings_opportunities").select("*").order("created_at", { ascending: false });
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("savings_opportunities").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
-    const data = await this.handleResponse<any[]>(query);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
     return (data || []).map(d => ({
       id: d.id,
       workspaceId: d.workspace_id || null,
@@ -1041,9 +1116,14 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getMarketIntelligence(contractId: number): Promise<any> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     const contract = await this.getContract(contractId);
     if (!contract) throw new Error("Contract not found");
-    const allContracts = await this.handleResponse<any[]>(supabase.from("contracts").select("*").eq("category", contract.category));
+    
+    let query = supabase.from("contracts").select("*").eq("category", contract.category);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const allContracts = await this.handleResponse<any[]>(query);
     
     const avgCost = allContracts.reduce((sum, c) => sum + (c.annual_cost || 0), 0) / allContracts.length;
     const avgTerm = allContracts.reduce((sum, c) => sum + (c.contract_term_months || 0), 0) / allContracts.length;
@@ -1061,9 +1141,11 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- COLLABORATION ---
   async getComments(contractId?: number, auditId?: number): Promise<(Comment & { user: any })[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("comments").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
     if (auditId) query = query.eq("audit_id", auditId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: true }));
     if (!data || data.length === 0) return [];
@@ -1112,7 +1194,10 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- COMPARISONS ---
   async getContractComparisons(contractId: number): Promise<ContractComparison[]> {
-    return this.handleResponse<ContractComparison[]>(supabase.from("contract_comparisons").select("*").eq("contract_id", contractId).order("created_at", { ascending: false }));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("contract_comparisons").select("*").eq("contract_id", contractId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    return this.handleResponse<ContractComparison[]>(query.order("created_at", { ascending: false }));
   }
   async createContractComparison(comparison: InsertContractComparison): Promise<ContractComparison> {
     return this.handleResponse<ContractComparison>(supabase.from("contract_comparisons").insert(comparison).select().single());
@@ -1120,7 +1205,11 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- INFRASTRUCTURE ---
   async getInfrastructureLogs(): Promise<InfrastructureLog[]> {
-    const data = await this.handleResponse<any[]>(supabase.from("infrastructure_logs").select("*").order("timestamp", { ascending: false }).limit(50));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("infrastructure_logs").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any[]>(query.order("timestamp", { ascending: false }).limit(50));
     return (data || []).map(d => ({
       id: d.id,
       timestamp: d.timestamp ? new Date(d.timestamp) : null,
@@ -1182,7 +1271,11 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- CLAUSES & LEGAL ---
   async getClauseLibrary(): Promise<Clause[]> {
-    const data = await this.handleResponse<any[]>(supabase.from("clause_library").select("*"));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("clause_library").select("*");
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any[]>(query);
     return (data || []).map(d => ({
       id: d.id,
       clauseName: d.clause_name,
@@ -1196,9 +1289,26 @@ export class SupabaseRESTStorage implements IStorage {
     }));
   }
 
+  async logUsageEvent(event: { workspaceId: number, userId?: string, eventType: string, creditsUsed: number, metadata?: any }): Promise<void> {
+    await this.handleResponse(
+      supabase.from("usage_events")
+        .insert({
+          workspace_id: event.workspaceId,
+          user_id: event.userId,
+          event_type: event.eventType,
+          credits_used: event.creditsUsed,
+          metadata: event.metadata
+        })
+    );
+  }
+
+  // Note: Standardized Insurance methods are now located in the 'INSURANCE' section at the end of the file.
+
   async getContractClauses(contractId?: number): Promise<ContractClause[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("clauses").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
     const data = await this.handleResponse<any[]>(query);
     return (data || []).map(d => ({
       id: d.id,
@@ -1211,8 +1321,8 @@ export class SupabaseRESTStorage implements IStorage {
       createdAt: d.created_at ? new Date(d.created_at) : null,
       workspaceId: d.workspace_id
     }));
-
   }
+
 
   async createClause(clause: InsertContractClause): Promise<ContractClause> {
     const data = await this.handleResponse<any>(
@@ -1287,8 +1397,12 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- TELEMETRY ---
   async getBillingTelemetry(clientId?: number): Promise<BillingTelemetry[]> {
-    let query = supabase.from("billing_telemetry").select("*").order("timestamp", { ascending: false });
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("billing_telemetry").select("*");
     if (clientId) query = query.eq("client_id", clientId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    query = query.order("timestamp", { ascending: false });
+    
     const data = await this.handleResponse<any[]>(query);
     return (data || []).map(d => ({
       id: d.id,
@@ -1463,7 +1577,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createWorkspace(workspace: InsertWorkspace): Promise<Workspace> {
     const data = await this.handleResponse<any>(
-      supabase.from("workspaces")
+      adminClient.from("workspaces")
         .insert({
           name: workspace.name,
           owner_id: workspace.ownerId,
@@ -1496,7 +1610,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
     const data = await this.handleResponse<any>(
-      supabase.from("workspace_members")
+      adminClient.from("workspace_members")
         .insert({
           user_id: member.userId,
           workspace_id: member.workspaceId,
@@ -1536,7 +1650,7 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getUserWorkspaces(userId: string): Promise<Workspace[]> {
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("workspace_members")
       .select("workspace:workspaces(*)")
       .eq("user_id", userId);
@@ -1558,8 +1672,11 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- REMEDIATION TASKS ---
   async getRemediationTasks(contractId?: number): Promise<RemediationTask[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("remediation_tasks").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
     return (data || []).map(d => ({
       id: d.id,
@@ -1640,6 +1757,76 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
+  // --- REMEDIATION SUGGESTIONS (Phase 26) ---
+  async getRemediationSuggestions(contractId?: number): Promise<RemediationSuggestion[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("remediation_suggestions").select("*");
+    if (contractId) query = query.eq("contract_id", contractId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      originalClause: d.original_clause,
+      suggestedClause: d.suggested_clause,
+      status: d.status,
+      createdAt: d.created_at ? new Date(d.created_at) : null,
+      acceptedAt: d.accepted_at ? new Date(d.accepted_at) : null
+    }));
+  }
+
+  async createRemediationSuggestion(suggestion: InsertRemediationSuggestion): Promise<RemediationSuggestion> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions")
+        .insert({
+          workspace_id: workspaceId || suggestion.workspaceId,
+          contract_id: suggestion.contractId,
+          original_clause: suggestion.originalClause,
+          suggested_clause: suggestion.suggestedClause,
+          status: suggestion.status || "pending"
+        })
+        .select()
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      contractId: data.contract_id,
+      originalClause: data.original_clause,
+      suggestedClause: data.suggested_clause,
+      status: data.status,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
+    };
+  }
+
+  async updateRemediationSuggestion(id: string, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion> {
+    const payload: any = {};
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.acceptedAt !== undefined) payload.accepted_at = updates.acceptedAt;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      contractId: data.contract_id,
+      originalClause: data.original_clause,
+      suggestedClause: data.suggested_clause,
+      status: data.status,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
+    };
+  }
+
   // --- BENCHMARKING ---
   async getVendorBenchmarks(category?: string): Promise<VendorBenchmark[]> {
     let query = supabase.from("vendor_benchmarks").select("*");
@@ -1685,8 +1872,10 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- CONTINUOUS MONITORING ---
   async getContinuousMonitoringConfigs(clientId?: number): Promise<ContinuousMonitoring[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("continuous_monitoring").select("*");
     if (clientId) query = query.eq("client_id", clientId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
     return (data || []).map(d => ({
       id: d.id,
@@ -1780,15 +1969,32 @@ export class SupabaseRESTStorage implements IStorage {
         .select()
         .single()
     );
+    return this.mapInsurancePolicy(data);
+  }
+
+  // --- HELPER MAPPERS ---
+  private mapInsurancePolicy(d: any): InsurancePolicy {
     return {
-      ...data,
-      workspaceId: data.workspace_id,
-      carrierName: data.carrier_name,
-      policyNumber: data.policy_number,
-      coverageLimits: data.coverage_limits,
-      claimRiskScore: data.claim_risk_score,
-      aiAnalysisSummary: data.ai_analysis_summary,
-      createdAt: data.created_at ? new Date(data.created_at) : null
+      id: d.id,
+      workspaceId: d.workspace_id,
+      clientId: d.client_id,
+      carrierName: d.carrier_name,
+      policyNumber: d.policy_number,
+      premiumAmount: d.premium_amount ? Number(d.premium_amount) : 0,
+      effectiveDate: d.effective_date,
+      expirationDate: d.expiration_date,
+      fileUrl: d.file_url,
+      status: d.status,
+      coverageLimits: d.coverage_limits,
+      deductibles: d.deductibles,
+      waitingPeriods: d.waiting_periods,
+      exclusions: d.exclusions,
+      endorsements: d.endorsements,
+      notificationRequirements: d.notification_requirements,
+      claimRiskScore: d.claim_risk_score,
+      aiAnalysisSummary: d.ai_analysis_summary,
+      createdAt: d.created_at ? new Date(d.created_at) : null,
+      updatedAt: d.updated_at ? new Date(d.updated_at) : null
     };
   }
 
@@ -1881,6 +2087,7 @@ export class SupabaseRESTStorage implements IStorage {
       supabase.from("marketplace_purchases")
         .insert({
           buyer_workspace_id: purchase.buyerWorkspaceId,
+          workspace_id: storageContext.getStore()?.workspaceId || purchase.buyerWorkspaceId, // Align with core patterns
           buyer_id: purchase.buyerId,
           listing_id: purchase.listingId,
           amount: purchase.amount,
@@ -1901,6 +2108,33 @@ export class SupabaseRESTStorage implements IStorage {
       sellerPayout: data.seller_payout,
       purchasedAt: data.purchased_at ? new Date(data.purchased_at) : null
     };
+  }
+
+  async getMarketplacePurchases(): Promise<MarketplacePurchase[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    if (!workspaceId) return [];
+    
+    const data = await this.handleResponse<any[]>(
+      supabase.from("marketplace_purchases")
+        .select("*, marketplace_listings(*)")
+        .eq("buyer_workspace_id", workspaceId)
+        .order("purchased_at", { ascending: false })
+    );
+
+    return (data || []).map(d => ({
+      ...d,
+      buyerWorkspaceId: d.buyer_workspace_id,
+      buyerId: d.buyer_id,
+      listingId: d.listing_id,
+      platformFee: d.platform_fee,
+      sellerPayout: d.seller_payout,
+      purchasedAt: d.purchased_at ? new Date(d.purchased_at) : null,
+      listing: d.marketplace_listings ? {
+        ...d.marketplace_listings,
+        workspaceId: d.marketplace_listings.workspace_id,
+        sellerId: d.marketplace_listings.seller_id
+      } : undefined
+    }));
   }
 
   // --- SUBSCRIPTIONS ---
@@ -2007,16 +2241,7 @@ export class SupabaseRESTStorage implements IStorage {
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
-    return (data || []).map(p => ({
-      ...p,
-      workspaceId: p.workspace_id,
-      carrierName: p.carrier_name,
-      policyNumber: p.policy_number,
-      coverageLimits: p.coverage_limits,
-      claimRiskScore: p.claim_risk_score,
-      aiAnalysisSummary: p.ai_analysis_summary,
-      createdAt: p.created_at ? new Date(p.created_at) : null
-    }));
+    return (data || []).map(p => this.mapInsurancePolicy(p));
   }
 
   async getInsurancePolicy(id: number): Promise<InsurancePolicy | undefined> {
@@ -2024,15 +2249,24 @@ export class SupabaseRESTStorage implements IStorage {
       supabase.from("insurance_policies").select("*").eq("id", id).maybeSingle()
     );
     if (!data) return undefined;
-    return {
-      ...data,
-      workspaceId: data.workspace_id,
-      carrierName: data.carrier_name,
-      policyNumber: data.policy_number,
-      coverageLimits: data.coverage_limits,
-      claimRiskScore: data.claim_risk_score,
-      aiAnalysisSummary: data.ai_analysis_summary
-    };
+    return this.mapInsurancePolicy(data);
+  }
+
+  async getUsageEvents(workspaceId: number): Promise<UsageEvent[]> {
+    const data = await this.handleResponse<any[]>(
+      supabase.from("usage_events")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+    );
+    return (data || []).map(d => ({
+      ...d,
+      workspaceId: d.workspace_id,
+      userId: d.user_id,
+      eventType: d.event_type,
+      creditsUsed: d.credits_used,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
   }
 }
 

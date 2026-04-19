@@ -20,7 +20,7 @@ try {
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = 'https://api.costloci.com/api'; // Targeting true production domain for final health check
 
 const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }

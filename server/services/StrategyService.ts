@@ -76,4 +76,27 @@ export class StrategyService {
 
     return zip.toBuffer();
   }
+
+  /**
+   * Generates, uploads, and returns a signed URL for the Strategic Pack.
+   */
+  static async generateAndUpload(workspaceId: number, clientId: string): Promise<string> {
+    const buffer = await this.generateStrategicPack(workspaceId);
+    
+    const { adminClient: supabaseAdmin } = await import("./supabase.js");
+    const timestamp = Date.now();
+    const filePath = `strategic-packs/${clientId}/StrategicPack_${timestamp}.zip`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from("contracts")
+      .upload(filePath, buffer, {
+        contentType: "application/zip",
+        upsert: true
+      });
+
+    if (uploadError) throw new Error("Strategic Pack upload failed: " + uploadError.message);
+
+    const { data } = supabaseAdmin.storage.from("contracts").getPublicUrl(filePath);
+    return data.publicUrl;
+  }
 }

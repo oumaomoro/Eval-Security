@@ -90,10 +90,17 @@ export function registerAuthRoutes(app: Express): void {
         });
 
         console.log(`[AUTH-DIAG] Provisioning Workspace...`);
-        await storage.createWorkspace({
+        const workspace = await storage.createWorkspace({
           name: "Main Workspace",
           ownerId: data.user.id,
           plan: "starter"
+        });
+
+        console.log(`[AUTH-DIAG] Creating Workspace Membership...`);
+        await storage.addWorkspaceMember({
+          userId: data.user.id,
+          workspaceId: workspace.id,
+          role: "owner"
         });
 
         // 4. Harden Local User with full Enterprise Context
@@ -499,10 +506,17 @@ async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
         // Check if workspace already exists before creating
         const workspaces = await storage.getUserWorkspaces(userId);
         if (workspaces.length === 0) {
-            await storage.createWorkspace({
+            const workspace = await storage.createWorkspace({
               name: "Main Workspace",
               ownerId: userId,
               plan: "starter"
+            });
+
+            console.log(`[AUTH-DIAG] Healing Membership for ${userId}...`);
+            await storage.addWorkspaceMember({
+              userId,
+              workspaceId: workspace.id,
+              role: "owner"
             });
         }
       }
@@ -514,7 +528,7 @@ async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
         firstName,
         lastName,
         clientId,
-        role: localUser?.role || "admin",
+        role: "admin", // Explicitly force admin role for enterprise pivot regardless of legacy trigger
         subscriptionTier: "starter"
       });
 

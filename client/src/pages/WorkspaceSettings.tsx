@@ -174,11 +174,16 @@ export default function WorkspaceSettings() {
                         Cancel
                       </Button>
                       <Button
-                        onClick={() => inviteMutation.mutate({ email: inviteEmail, role: inviteRole, firstName: inviteFirstName, lastName: inviteLastName })}
-                        disabled={inviteMutation.isPending || !inviteEmail}
+                        onClick={() => inviteMutation.mutate({ 
+                          email: inviteEmail, 
+                          role: inviteRole, 
+                          firstName: inviteFirstName, 
+                          lastName: inviteLastName 
+                        })}
+                        disabled={inviteMutation.isPending || !inviteEmail || !inviteFirstName || !inviteLastName}
                         className="bg-primary hover:bg-primary/90"
                       >
-                        {inviteMutation.isPending ? "Sending..." : "Send Invite"}
+                        {inviteMutation.isPending ? "Inviting..." : "Send Invitation"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

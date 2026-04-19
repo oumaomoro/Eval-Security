@@ -20,7 +20,7 @@ export async function setupAuth(app: Express) {
   // Required for WebAuthn/Passkey challenges which cannot be stateless.
   const sessionStore = new PostgresStore({
     pool: pool!,
-    tableName: "session",
+    tableName: "sessions",
     createTableIfMissing: true
   });
 

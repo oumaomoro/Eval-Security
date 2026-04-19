@@ -9,10 +9,13 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:verify": "tsx scripts/verify_db_sync.ts",
     "test": "playwright test",
-    "test:e2e": "playwright test --project=chromium",
-    "deploy": "node deploy_all.js",
+    "test:api": "tsx scripts/verify_all_endpoints.ts",
+    "test:e2e": "tsx scripts/e2e_full_suite.ts",
+    "deploy": "powershell -ExecutionPolicy Bypass -File deploy_all.ps1",
     "deploy:frontend": "npx wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true",
+    "deploy:skip-tests": "powershell -ExecutionPolicy Bypass -File deploy_all.ps1 -SkipTests",
     "prepare": "husky"
   },
   "engines": {

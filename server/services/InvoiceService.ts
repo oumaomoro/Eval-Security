@@ -41,7 +41,7 @@ export class InvoiceService {
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184); // Slate-400
     doc.text("This is an automated receipt for your digital asset purchase.", 20, 270);
-    doc.text("CyberOptimize - Transforming Cybersecurity Contracting with Intelligence.", 20, 275);
+    doc.text("Costloci - Optimizing Cyber Costs with Intelligence.", 20, 275);
 
     return Buffer.from(doc.output("arraybuffer"));
   }

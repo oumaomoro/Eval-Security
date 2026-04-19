@@ -19,6 +19,8 @@ export default function CommentSidebar({ contractId }: CommentSidebarProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState("");
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const MAX_CHARS = 500;
 
@@ -55,10 +57,43 @@ export default function CommentSidebar({ contractId }: CommentSidebarProps) {
     },
   });
 
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value.slice(0, MAX_CHARS);
+    setContent(val);
+
+    // Basic @mention detection
+    const lastAtPos = val.lastIndexOf("@");
+    const isAtStartOrAfterSpace = lastAtPos === 0 || (lastAtPos > 0 && val[lastAtPos - 1] === " ");
+    
+    if (lastAtPos !== -1 && isAtStartOrAfterSpace) {
+      const textAfterAt = val.slice(lastAtPos + 1);
+      if (!textAfterAt.includes(" ")) {
+        setMentionQuery(textAfterAt.toLowerCase());
+        setShowMentions(true);
+        return;
+      }
+    }
+    setShowMentions(false);
+  };
+
+  const insertMention = (member: any) => {
+    const lastAtPos = content.lastIndexOf("@");
+    const before = content.slice(0, lastAtPos);
+    const after = content.slice(lastAtPos + mentionQuery.length + 1);
+    setContent(`${before}@${member.firstName}${after}`);
+    setShowMentions(false);
+  };
+
+  const filteredMembers = orgMembers?.filter(m => 
+    `${m.firstName} ${m.lastName}`.toLowerCase().includes(mentionQuery) ||
+    m.email.toLowerCase().includes(mentionQuery)
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
     postMutation.mutate(content);
+    setShowMentions(false);
   };
 
   return (
@@ -118,15 +153,39 @@ export default function CommentSidebar({ contractId }: CommentSidebarProps) {
           </div>
         </ScrollArea>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-900/80">
+        <div className="p-4 border-t border-slate-800 bg-slate-900/80 relative">
+          {showMentions && filteredMembers && filteredMembers.length > 0 && (
+            <div className="absolute bottom-full left-4 mb-2 w-64 max-h-48 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg shadow-2xl z-50 p-1">
+              <div className="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                Mention Teammate
+              </div>
+              {filteredMembers.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => insertMention(member)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-slate-800 rounded text-left transition-colors"
+                >
+                  <Avatar className="h-5 w-5 border border-slate-800">
+                    <AvatarFallback className="bg-slate-700 text-[8px]">{member.firstName?.[0] || member.email?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-white truncate">{member.firstName} {member.lastName}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{member.email}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-3">
             <Textarea
               placeholder="Type a comment or @mention a teammate..."
               value={content}
-              onChange={(e) => setContent(e.target.value.slice(0, MAX_CHARS))}
+              onChange={handleTextChange}
               className="min-h-[80px] text-xs border-slate-800 bg-slate-950 text-white resize-none"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
                   e.preventDefault();
                   handleSubmit(e as any);
                 }

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision, varchar, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision, varchar, pgEnum, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -14,7 +14,7 @@ export const workspaceRoleEnum = pgEnum('workspace_role', ['owner', 'admin', 'ed
 export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  ownerId: text("owner_id").references(() => users.id),
+  ownerId: uuid("owner_id").references(() => users.id),
   plan: text("plan").notNull().default("enterprise"),
   webhookUrl: text("webhook_url"),
   webhookEnabled: boolean("webhook_enabled").default(false),
@@ -26,7 +26,7 @@ export const workspaces = pgTable("workspaces", {
 
 export const workspaceMembers = pgTable('workspace_members', {
   id: serial('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   workspaceId: integer('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
   role: workspaceRoleEnum('role').notNull().default('viewer'),
   permissions: jsonb('permissions').default({}),
@@ -132,7 +132,7 @@ export const insurancePolicies = pgTable("insurance_policies", {
 export const subscriptions = pgTable("subscriptions", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id).notNull(),
-  userId: text("user_id").references(() => users.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   paypalSubscriptionId: text("paypal_subscription_id"),
@@ -250,7 +250,7 @@ export const savingsOpportunities = pgTable("savings_opportunities", {
 export const reports = pgTable("reports", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
-  userId: text("user_id"),
+  userId: uuid("user_id"),
   organizationId: text("organization_id"),
   title: text("title").notNull(),
   type: text("type").notNull(),
@@ -289,7 +289,7 @@ export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
   clientId: integer("client_id").references(() => clients.id),
-  userId: text("user_id").notNull(),
+  userId: uuid("user_id").notNull(),
   action: text("action").notNull(),
   resourceType: text("resource_type"),
   resourceId: text("resource_id"),
@@ -321,7 +321,7 @@ export const playbooks = pgTable("playbooks", {
 });
 
 export const userPlaybooks = pgTable("user_playbooks", {
-  userId: text("user_id").references(() => users.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
   playbookId: integer("playbook_id").references(() => playbooks.id).notNull(),
   assignedAt: timestamp("assigned_at").defaultNow(),
 });
@@ -340,7 +340,7 @@ export const notificationChannels = pgTable("notification_channels", {
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
-  userId: text("user_id").references(() => users.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
   contractId: integer("contract_id").references(() => contracts.id),
   auditId: integer("audit_id").references(() => complianceAudits.id),
   content: text("content").notNull(),
@@ -411,7 +411,7 @@ export const remediationTasks = pgTable("remediation_tasks", {
   description: text("description"),
   severity: text("severity").notNull(), 
   status: text("status").notNull().default("pending"), 
-  ownerId: text("owner_id").references(() => users.id),
+  ownerId: uuid("owner_id").references(() => users.id),
   dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -444,7 +444,7 @@ export const continuousMonitoring = pgTable("continuous_monitoring", {
 export const marketplaceListings = pgTable("marketplace_listings", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
-  sellerId: text("seller_id").references(() => users.id).notNull(),
+  sellerId: uuid("seller_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description"),
   category: text("category").notNull(), // data_protection, insurance, liability, etc.
@@ -460,7 +460,7 @@ export const marketplaceListings = pgTable("marketplace_listings", {
 export const marketplacePurchases = pgTable("marketplace_purchases", {
   id: serial("id").primaryKey(),
   buyerWorkspaceId: integer("buyer_workspace_id").references(() => workspaces.id).notNull(),
-  buyerId: text("buyer_id").references(() => users.id).notNull(),
+  buyerId: uuid("buyer_id").references(() => users.id).notNull(),
   listingId: integer("listing_id").references(() => marketplaceListings.id).notNull(),
   amount: doublePrecision("amount").notNull(),
   platformFee: doublePrecision("platform_fee").notNull(), // 30%

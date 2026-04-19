@@ -40,7 +40,7 @@ export class PlaybookService {
         
         ### IDENTIFIED VULNERABILITIES (LEVERAGE):
         - CRITICAL RISKS: ${criticalRisks.map(r => r.riskTitle).join(", ") || "None"}
-        - KEY CLAUSES: ${contractClauses.slice(0, 5).map(c => c.category + ": " + c.riskLevel).join(", ") || "Standard"}
+        - KEY CLAUSES: ${contractClauses.slice(0, 5).map((c: any) => c.category + ": " + c.riskLevel).join(", ") || "Standard"}
 
         ### INSTRUCTIONS:
         1. Identify 3 critical leverage points.
@@ -72,6 +72,18 @@ export class PlaybookService {
         delta: costDelta,
         status: costDelta > 0 ? "OVERPAYING" : "MARKET_LEADER"
       };
+
+      // Persist the playbook for historical tracking
+      await storage.createPlaybook({
+        name: `Strategic Playbook: ${contract.vendorName}`,
+        description: `AI-generated negotiation strategy for ${contract.category} services.`,
+        category: contract.category,
+        rules: [
+          `Target Savings: ${result.targetSavings}`,
+          ...result.leveragePoints,
+          `Script: ${result.scriptSnippet}`
+        ]
+      });
 
       return result;
     } catch (error: any) {

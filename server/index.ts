@@ -5,13 +5,13 @@ import { createServer } from "http";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { doubleCsrf } from "csrf-csrf";
-import { log } from "./vite.js";
 import { registerRoutes, seedDatabase } from "./routes.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { serveStatic } from "./static.js";
 
 const app = express();
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -36,7 +36,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       "https://costloci.com",
       "https://www.costloci.com",
-      "http://localhost:3001",
+      "http://localhost:3500",
       "http://localhost:5173"
     ];
 
@@ -123,7 +123,8 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      log(logLine);
+      const timestamp = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
+      console.log(`${timestamp} [express] ${logLine}`);
     }
   });
 
@@ -155,17 +156,28 @@ const httpServer = createServer(app);
       console.log("[BOOTSTRAP] Vite ready.");
     }
 
-    const port = parseInt(process.env.PORT || "3001", 10);
-    httpServer.listen(port, "0.0.0.0", () => {
-      console.log(`[SERVER] serving on port ${port}`);
+    if (!process.env.VERCEL) {
+      const port = parseInt(process.env.PORT || "3500", 10);
+      httpServer.listen(port, "0.0.0.0", () => {
+        console.log(`[SERVER] serving on port ${port}`);
+        setTimeout(() => {
+          console.log("[BOOTSTRAP] Starting background tasks...");
+          seedDatabase().catch((e: any) => console.error("Seed failed:", e));
+          AutonomicEngine.start();
+        }, 1000);
+      });
+    } else {
+      console.log("[Vercel] Bootstrapping Vercel Serverless Execution...");
       setTimeout(() => {
-        console.log("[BOOTSTRAP] Starting background tasks...");
         seedDatabase().catch((e: any) => console.error("Seed failed:", e));
         AutonomicEngine.start();
-      }, 1000);
-    });
+      }, 500);
+    }
   } catch (err: any) {
     console.error("CRITICAL STARTUP ERROR:", err);
     process.exit(1);
   }
 })();
+
+// @ts-ignore
+module.exports = app;

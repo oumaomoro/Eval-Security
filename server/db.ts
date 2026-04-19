@@ -25,7 +25,7 @@ export function getDb() {
       : {};
 
     _pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: process.env.DATABASE_URL.trim(),
       ...sslConfig,
       max: 5,
       idleTimeoutMillis: 30000,
