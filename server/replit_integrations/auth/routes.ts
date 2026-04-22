@@ -50,12 +50,26 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const { email, password, firstName, lastName } = registrationSchema.parse(req.body);
       // 1. Supabase Auth Secure Admin Provisioning (Verification Required)
-      const { data, error } = await adminClient.auth.admin.createUser({
+      let registrationResult = await adminClient.auth.admin.createUser({
         email,
         password,
-        email_confirm: false, // Force verification
+        email_confirm: false, 
         user_metadata: { first_name: firstName, last_name: lastName }
       });
+      
+      // FALLBACK: If admin creation fails (e.g. missing service_role key), try standard signUp
+      if (registrationResult.error && (registrationResult.error.message.includes("not allowed") || registrationResult.error.message.includes("service_role"))) {
+        console.warn(`[AUTH-DIAG] Admin provisioning restricted. Attempting standard Enterprise Sign-Up for ${email}...`);
+        registrationResult = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { first_name: firstName, last_name: lastName }
+          }
+        }) as any;
+      }
+      
+      const { data, error } = registrationResult;
 
       if (error) {
         if (error.message.includes("already registered")) {

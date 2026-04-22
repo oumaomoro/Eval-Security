@@ -64,10 +64,11 @@ export const adminClient = createClient(url, serviceKey || anonKey, {
 });
 
 if (!serviceKey) {
-  console.warn("⚠️  SUPABASE_SERVICE_ROLE_KEY is missing. Autonomic provisioning will fail at runtime.");
+  console.warn("⚠️  [SUPABASE] SUPABASE_SERVICE_ROLE_KEY is missing. Autonomic provisioning and RLS bypass will be DISABLED.");
+  console.warn("⚠️  [SUPABASE] E2E tests and administrative operations will fail RLS checks.");
 } else {
-  console.log(`[DIAGNOSTIC] Isolated Admin Client initialized. RLS bypass enabled.`);
-  console.log(`[DIAGNOSTIC] Target URL: ${url}`);
+  console.log(`[SUPABASE] Isolated Admin Client initialized. RLS bypass enabled.`);
+  console.log(`[SUPABASE] Target URL: ${url}`);
 }
 
 export const getSupabase = () => supabase;

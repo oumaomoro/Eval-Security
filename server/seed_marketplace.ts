@@ -53,7 +53,7 @@ export async function seedMarketplace() {
   for (const item of seedListings) {
     await storage.createMarketplaceListing({
       workspaceId: 1, // Default system workspace
-      sellerId: "system-agent",
+      sellerId: "00000000-0000-0000-0000-000000000000",
       title: item.title,
       description: item.description,
       category: item.category,
