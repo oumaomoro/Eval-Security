@@ -7,7 +7,7 @@
  *         Workspace, DPO, Telemetry, CSRF, RBAC, Paywall.
  *
  * Usage:  npx tsx scripts/api_e2e_full.ts
- * Target: http://127.0.0.1:3500  (override with E2E_API_URL env var)
+ * Target: http://127.0.0.1:3200  (override with E2E_API_URL env var)
  */
 
 import { createClient } from "@supabase/supabase-js";

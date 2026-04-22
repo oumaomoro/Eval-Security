@@ -1,6 +1,26 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: any = null;
+
+function getResend() {
+  if (!resend) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key || key === 're_123') {
+      console.warn("⚠️ [EMAIL_SERVICE] Missing RESEND_API_KEY. Using mock email engine.");
+      resend = {
+        emails: {
+          send: async (options: any) => {
+            console.log("🛠️ [MOCK_EMAIL] Sending email to:", options.to);
+            return { data: { id: "mock_id" }, error: null };
+          }
+        }
+      };
+    } else {
+      resend = new Resend(key);
+    }
+  }
+  return resend;
+}
 
 export class EmailService {
   /**
@@ -10,7 +30,7 @@ export class EmailService {
     try {
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3200'}/auth/verify?token=${token}`;
       
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await getResend().emails.send({
         from: "Costloci Governance <onboarding@costloci.com>",
         to: [email],
         subject: "Verify your Costloci Enterprise Identity",

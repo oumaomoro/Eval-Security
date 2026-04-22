@@ -35,7 +35,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       "https://costloci.com",
       "https://www.costloci.com",
-      "http://localhost:3500",
+      "http://localhost:3200",
+      "http://127.0.0.1:3200",
       "http://localhost:5173"
     ];
 
@@ -166,7 +167,7 @@ const httpServer = createServer(app);
     }
 
     if (!process.env.VERCEL) {
-      const port = parseInt(process.env.PORT || "3500", 10);
+      const port = parseInt(process.env.PORT || "3200", 10);
       httpServer.listen(port, "0.0.0.0", () => {
         console.log(`[SERVER] serving on port ${port}`);
         setTimeout(() => {
