@@ -18,7 +18,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL — reads from CI env var or falls back to local dev server */
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3500',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3200',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -38,11 +38,13 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests (disabled in CI — tests hit deployed URL) */
-  webServer: process.env.CI ? undefined : {
+  /* Run your local dev server before starting the tests */
+  webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3500',
+    url: 'http://127.0.0.1:3200',
     reuseExistingServer: true,
+    stdout: 'pipe',
+    stderr: 'pipe',
     timeout: 120 * 1000,
   },
 });
