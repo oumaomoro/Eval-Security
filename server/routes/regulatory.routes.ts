@@ -11,7 +11,7 @@ const router = Router();
  * GET /api/regulatory-alerts/live
  * Returns the real-time jurisdictional sync status for the dashboard.
  */
-router.get("/api/regulatory-alerts/live", isAuthenticated, async (_req, res) => {
+router.get("/regulatory-alerts/live", isAuthenticated, async (_req, res) => {
   try {
     const alerts = await storage.getRegulatoryAlerts();
     
@@ -63,7 +63,7 @@ router.get("/api/regulatory-alerts/live", isAuthenticated, async (_req, res) => 
  * POST /api/regulatory-alerts/trigger-rescan
  * Triggers an autonomic background rescan for a specific standard.
  */
-router.post("/api/regulatory-alerts/trigger-rescan", isAuthenticated, async (req: any, res: any) => {
+router.post("/regulatory-alerts/trigger-rescan", isAuthenticated, async (req: any, res: any) => {
   try {
     const { standard, alertTitle } = req.body;
     if (!standard) return res.status(400).json({ message: "standard is required" });
@@ -90,9 +90,30 @@ router.post("/api/regulatory-alerts/trigger-rescan", isAuthenticated, async (req
 
 import { StrategyService } from "../services/StrategyService";
 
-router.get("/api/reports/strategic-pack", isAuthenticated, async (req: any, res) => {
+// List generated reports
+router.get("/reports", isAuthenticated, async (req: any, res) => {
   try {
-    const workspaceId = req.user.workspaceId || (await storage.getUserWorkspaces(req.user.id))[0]?.id;
+    const reports = await storage.getReports();
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch reports" });
+  }
+});
+
+// List all schedules in workspace
+router.get("/report-schedules", isAuthenticated, async (req: any, res) => {
+  try {
+    const schedules = await storage.getReportSchedules();
+    res.json(schedules);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch report schedules" });
+  }
+});
+
+router.get("/reports/strategic-pack", isAuthenticated, async (req: any, res) => {
+  try {
+    const defaultWS = await storage.getUserWorkspaces(req.user.id);
+    const workspaceId = req.user.workspaceId || defaultWS[0]?.id;
     if (!workspaceId) return res.status(400).json({ message: "No active workspace." });
 
     const publicUrl = await StrategyService.generateAndUpload(workspaceId, req.user.clientId);
@@ -117,7 +138,7 @@ router.get("/api/reports/strategic-pack", isAuthenticated, async (req: any, res)
  * Dynamic endpoint driving the DPO Command Center with local regulatory logic.
  * Calculates compliance per standard (KDPA, GDPR, CBK).
  */
-router.get("/api/dpo/metrics", isAuthenticated, async (req: any, res) => {
+router.get("/dpo/metrics", isAuthenticated, async (req: any, res: any) => {
   try {
     const audits = await storage.getComplianceAudits();
     

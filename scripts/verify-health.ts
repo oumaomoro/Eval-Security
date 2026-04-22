@@ -30,17 +30,17 @@ async function verifyHealth() {
 
   // 2. AI Gateway Fallback Check
   try {
-    const testPrompt = "Respond with 'HEALTH_OK'";
+    const testPrompt = "Respond with exactly 'HEALTH_OK'";
     const response = await AIGateway.createCompletion({
       model: "gpt-4o",
       messages: [{ role: "user", content: testPrompt }]
     });
 
-    if (response.includes("HEALTH_OK")) {
-      console.log("✅ AI Gateway: Primary Path (OpenAI) OK");
+    if (response.toLowerCase().includes("health_ok")) {
+      console.log("✅ AI Gateway: Primary Path OK");
       results.aiGateway = true;
     } else {
-       console.warn("⚠️ AI Gateway: Unexpected Response.");
+       console.warn("⚠️ AI Gateway: Unexpected Response:", response);
     }
   } catch (err: any) {
     console.error("❌ AI Gateway: Primary Path Failed.", err.message);
@@ -57,6 +57,31 @@ async function verifyHealth() {
     console.error("❌ Auth: Supabase Connection Failed.", err.message);
   }
 
+  // 4. Supabase Storage Check
+  try {
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    if (error) throw error;
+    
+    if (buckets.some(b => b.name === 'contracts')) {
+      console.log("✅ Storage: 'contracts' bucket verified.");
+      results.storage = true;
+    } else {
+      console.warn("⚠️ Storage: 'contracts' bucket missing. Attempting to create...");
+      const { error: createError } = await supabase.storage.createBucket('contracts', {
+        public: false,
+        fileSizeLimit: 20971520, // 20MB
+        allowedMimeTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+      });
+      if (createError) {
+        console.error("❌ Storage: Bucket creation failed.", createError.message);
+      } else {
+        console.log("✅ Storage: 'contracts' bucket created successfully.");
+        results.storage = true;
+      }
+    }
+  } catch (err: any) {
+    console.error("❌ Storage: Check failed.", err.message);
+  }
   console.log("\n--- HEALTH SUMMARY ---");
   console.table(results);
 

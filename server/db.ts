@@ -20,7 +20,7 @@ export function getDb() {
       return null;
     }
 
-    const sslConfig = process.env.DATABASE_URL.includes("supabase.co")
+    const sslConfig = (process.env.DATABASE_URL.includes("supabase.co") || process.env.DATABASE_URL.includes("supabase.com"))
       ? { ssl: { rejectUnauthorized: false } }
       : {};
 
@@ -50,5 +50,8 @@ export const db = new Proxy({} as any, {
     return (d as any)[prop];
   }
 });
+
+// Ensure pool is initialized if possible on load
+getDb();
 
 export { _pool as pool };

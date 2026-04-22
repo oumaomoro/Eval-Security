@@ -2,18 +2,11 @@ import rateLimit from "express-rate-limit";
 import { type Request, type Response, type NextFunction } from "express";
 
 /**
- * Enterprise Rate Limiter.
- * Uses express-rate-limit for basic sliding window abuse protection.
- * In a full production scenario with Redis, this would link to `workspaces.apiUsageCount`.
+ * Standard API Limit.
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: (req, res) => {
-    // If we had the workspace authenticated in the token, we would check:
-    // req.user?.plan === 'starter' ? 100 : 1000
-    // Currently fallback to 100 reqs per 15 mins
-    return 100;
-  },
+  max: 1000, 
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response, next: NextFunction, options) => {
@@ -21,5 +14,33 @@ export const apiLimiter = rateLimit({
       message: "API Quota Exceeded. Please upgrade your enterprise plan to increase your limit.",
       retryAfter: Math.ceil(options.windowMs / 1000)
     });
+  }
+});
+
+/**
+ * Strict Limit for Authentication Endpoints (Brute-force protection).
+ */
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === "development" ? 100 : 5, // Relaxed for dev, strict for prod
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Too Many Requests",
+    message: "Too many authentication attempts from this IP, please try again after 15 minutes",
+  }
+});
+
+/**
+ * Strict Rate Limiter for Document Uploads (Preventing DDoS and Storage Abuse).
+ */
+export const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 Hour
+  max: process.env.NODE_ENV === "development" ? 100 : 20, // 20 Uploads per hour per IP (Strict for prod)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Quota Exceeded",
+    message: "Maximum document upload limits reached. Please wait before submitting more contracts."
   }
 });

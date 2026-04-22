@@ -598,25 +598,41 @@ export const insertContractComparisonSchema = createInsertSchema(contractCompari
 export type ContractComparison = typeof contractComparisons.$inferSelect;
 export type InsertContractComparison = z.infer<typeof insertContractComparisonSchema>;
 
-export const insertInfrastructureLogSchema = createInsertSchema(infrastructureLogs).omit({ id: true, timestamp: true });
+export const insertInfrastructureLogSchema = createInsertSchema(infrastructureLogs).omit({
+  id: true,
+  timestamp: true,
+});
 export type InfrastructureLog = typeof infrastructureLogs.$inferSelect;
 export type InsertInfrastructureLog = z.infer<typeof insertInfrastructureLogSchema>;
 
-export const insertBillingTelemetrySchema = createInsertSchema(billingTelemetry).omit({ id: true, timestamp: true });
+export const insertBillingTelemetrySchema = createInsertSchema(billingTelemetry).omit({
+  id: true,
+  timestamp: true,
+});
 export type BillingTelemetry = typeof billingTelemetry.$inferSelect;
 export type InsertBillingTelemetry = z.infer<typeof insertBillingTelemetrySchema>;
 
+export const insertNotificationChannelSchema = createInsertSchema(notificationChannels).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   id: true,
   timestamp: true,
 });
-
-export const insertNotificationChannelSchema = createInsertSchema(notificationChannels).omit({ id: true, createdAt: true, updatedAt: true });
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type NotificationChannel = typeof notificationChannels.$inferSelect;
 export type InsertNotificationChannel = z.infer<typeof insertNotificationChannelSchema>;
+
+export const insertRegulatoryAlertSchema = createInsertSchema(regulatoryAlerts).omit({ 
+  id: true, 
+  publishedDate: true 
+});
+export type RegulatoryAlert = typeof regulatoryAlerts.$inferSelect;
+export type InsertRegulatoryAlert = z.infer<typeof insertRegulatoryAlertSchema>;
 
 export const insertRemediationSuggestionSchema = createInsertSchema(remediationSuggestions).omit({ id: true, createdAt: true });
 export type RemediationSuggestion = typeof remediationSuggestions.$inferSelect;
@@ -630,43 +646,69 @@ export const insertUserPlaybookSchema = createInsertSchema(userPlaybooks).omit({
 export type UserPlaybook = typeof userPlaybooks.$inferSelect;
 export type InsertUserPlaybook = z.infer<typeof insertUserPlaybookSchema>;
 
-export const insertRegulatoryAlertSchema = createInsertSchema(regulatoryAlerts).omit({ id: true, publishedDate: true });
-export type RegulatoryAlert = typeof regulatoryAlerts.$inferSelect;
-export type InsertRegulatoryAlert = z.infer<typeof insertRegulatoryAlertSchema>;
-
-export const insertContractClauseSchema = createInsertSchema(clauses).omit({ id: true, createdAt: true });
+export const insertContractClauseSchema = createInsertSchema(clauses).omit({ 
+  id: true, 
+  createdAt: true 
+});
 export type ContractClause = typeof clauses.$inferSelect;
 export type InsertContractClause = z.infer<typeof insertContractClauseSchema>;
 
-export const insertWorkspaceMemberSchema = createInsertSchema(workspaceMembers).omit({ id: true, createdAt: true });
+export const insertWorkspaceMemberSchema = createInsertSchema(workspaceMembers).omit({
+  id: true,
+  createdAt: true,
+});
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type InsertWorkspaceMember = z.infer<typeof insertWorkspaceMemberSchema>;
 export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
 
-export const insertRemediationTaskSchema = createInsertSchema(remediationTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRemediationTaskSchema = createInsertSchema(remediationTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 export type RemediationTask = typeof remediationTasks.$inferSelect;
 export type InsertRemediationTask = z.infer<typeof insertRemediationTaskSchema>;
 
-export const insertVendorBenchmarkSchema = createInsertSchema(vendorBenchmarks).omit({ id: true, lastUpdated: true });
+export const insertVendorBenchmarkSchema = createInsertSchema(vendorBenchmarks).omit({
+  id: true,
+  lastUpdated: true,
+});
 export type VendorBenchmark = typeof vendorBenchmarks.$inferSelect;
 export type InsertVendorBenchmark = z.infer<typeof insertVendorBenchmarkSchema>;
 
-export const insertContinuousMonitoringSchema = createInsertSchema(continuousMonitoring).omit({ id: true, createdAt: true });
+export const insertContinuousMonitoringSchema = createInsertSchema(continuousMonitoring).omit({
+  id: true,
+  createdAt: true,
+});
 export type ContinuousMonitoring = typeof continuousMonitoring.$inferSelect;
 export type InsertContinuousMonitoring = z.infer<typeof insertContinuousMonitoringSchema>;
 
-export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({ id: true, createdAt: true });
+export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({
+  id: true,
+  createdAt: true,
+});
 export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
 export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;
 
-export const insertMarketplacePurchaseSchema = createInsertSchema(marketplacePurchases).omit({ id: true, purchasedAt: true });
+export const insertMarketplacePurchaseSchema = createInsertSchema(marketplacePurchases).omit({
+  id: true,
+  purchasedAt: true,
+});
 export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
 export type InsertMarketplacePurchase = z.infer<typeof insertMarketplacePurchaseSchema>;
 
-export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export type InsertInsurancePolicy = z.infer<typeof insertInsurancePolicySchema>;
 
-export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;

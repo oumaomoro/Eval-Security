@@ -60,7 +60,7 @@ export function ComparisonView({ contractId }: ComparisonViewProps) {
             {/* Sidebar: History & Selection */}
             <Card className="col-span-4 bg-slate-950 border-slate-800 h-fit">
                 <CardHeader>
-                    <CardTitle className="text-sm flex items-center gap-2 text-slate-100 uppercase tracking-widest font-black">
+                    <CardTitle className="text-sm flex items-center gap-2 text-slate-100 font-semibold font-black">
                         <History className="w-4 h-4 text-primary" /> Intelligence Hub
                     </CardTitle>
                 </CardHeader>
@@ -76,7 +76,7 @@ export function ComparisonView({ contractId }: ComparisonViewProps) {
                         </Button>
 
                         <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-4">
-                            <h4 className="text-[10px] font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            <h4 className="text-[10px] font-bold font-semibold flex items-center gap-2">
                                 <Globe className="w-3 h-3" /> Multi-Jurisdictional
                             </h4>
                             <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 scrollbar-thin">
@@ -109,7 +109,7 @@ export function ComparisonView({ contractId }: ComparisonViewProps) {
                     <div className="h-px bg-slate-800" />
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest block mb-2 px-1">Analysis History</label>
+                        <label className="text-[10px] font-bold font-semibold block mb-2 px-1">Analysis History</label>
                         <ScrollArea className="h-[250px] pr-4">
                             <div className="space-y-2">
                                 {comparisons?.map((c) => (
@@ -147,7 +147,7 @@ export function ComparisonView({ contractId }: ComparisonViewProps) {
                                 <div>
                                     <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-primary/10 border border-primary/20 mb-2">
                                         <ShieldCheck className="w-3 h-3 text-primary" />
-                                        <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Active Analysis</span>
+                                        <span className="text-[10px] font-bold text-primary font-semibold">Active Analysis</span>
                                     </div>
                                     <CardTitle className="text-2xl text-slate-100 font-extrabold uppercase tracking-tight">
                                         {activeComp.comparisonType.replace('multi_standard_', '').replace('_', ' ')} Intelligence
@@ -156,7 +156,7 @@ export function ComparisonView({ contractId }: ComparisonViewProps) {
                                 </div>
                                 <div className="text-right">
                                     <div className="text-5xl font-black text-slate-100 tracking-tighter">{activeComp.overallScore}%</div>
-                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Score</div>
+                                    <div className="text-[10px] text-slate-500 font-semibold font-black">Score</div>
                                 </div>
                             </div>
                             <Progress value={activeComp.overallScore} className="h-1.5 bg-slate-900 mt-6" indicatorClassName="bg-gradient-to-r from-primary to-cyan-500" />

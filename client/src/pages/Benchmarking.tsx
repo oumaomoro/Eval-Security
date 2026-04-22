@@ -133,7 +133,7 @@ export default function Benchmarking() {
 function BenchmarkKPI({ label, value }: any) {
   return (
     <div className="px-6">
-       <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">{label}</p>
+       <p className="text-[9px] font-black text-slate-600 font-semibold mb-1">{label}</p>
        <p className="text-xl font-black text-white italic leading-none truncate">{value}</p>
     </div>
   );
@@ -142,7 +142,7 @@ function BenchmarkKPI({ label, value }: any) {
 function StatusItem({ label, value }: any) {
   return (
     <div className="flex items-center justify-between text-[10px] bg-white/5 p-3 rounded-xl border border-white/5">
-       <span className="font-black uppercase tracking-widest text-slate-500 italic">{label}</span>
+       <span className="font-black font-semibold text-slate-500 italic">{label}</span>
        <span className="font-bold text-slate-300">{value}</span>
     </div>
   );

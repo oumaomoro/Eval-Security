@@ -109,7 +109,7 @@ export default function NotificationSettings() {
               <Button 
                 onClick={() => createMutation.mutate({ provider, webhookUrl, events: ["contract.uploaded", "risk.critical"] })}
                 disabled={!webhookUrl || createMutation.isPending}
-                className="w-full bg-primary hover:bg-primary/90 font-bold uppercase tracking-widest text-xs h-12"
+                className="w-full bg-primary hover:bg-primary/90 font-bold font-semibold text-xs h-12"
               >
                 {createMutation.isPending ? "Connecting..." : "Connect Channel"}
               </Button>
@@ -118,7 +118,7 @@ export default function NotificationSettings() {
 
           {/* Active Channels List */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-400 font-semibold px-1 flex items-center gap-2">
               <Plus className="h-4 w-4" /> Active Integrations
             </h3>
             

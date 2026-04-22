@@ -22,9 +22,9 @@ export default function LandingPage() {
           </div>
           
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-bold uppercase tracking-widest text-slate-400 hover:text-emerald-400 transition-colors">Solutions</a>
-            <a href="#trust" className="text-sm font-bold uppercase tracking-widest text-slate-400 hover:text-emerald-400 transition-colors">Trust</a>
-            <a href="#pricing" className="text-sm font-bold uppercase tracking-widest text-slate-400 hover:text-emerald-400 transition-colors">Pricing</a>
+            <a href="#features" className="text-sm font-bold font-semibold text-slate-400 hover:text-emerald-400 transition-colors">Solutions</a>
+            <a href="#trust" className="text-sm font-bold font-semibold text-slate-400 hover:text-emerald-400 transition-colors">Trust</a>
+            <a href="#pricing" className="text-sm font-bold font-semibold text-slate-400 hover:text-emerald-400 transition-colors">Pricing</a>
             <Link href="/auth">
               <Button variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300">
                 Access Portal
@@ -85,7 +85,7 @@ export default function LandingPage() {
               <div key={i} className="flex flex-col items-center justify-center grayscale hover:grayscale-0 transition-all opacity-50 hover:opacity-100 cursor-pointer">
                 <ShieldCheck className={`w-8 h-8 mb-2 ${badge.color}`} />
                 <span className="text-xs font-black uppercase tracking-tighter">{badge.name}</span>
-                <span className="text-[8px] font-medium text-slate-600 uppercase tracking-widest">{badge.region}</span>
+                <span className="text-[8px] font-medium text-slate-600 font-semibold">{badge.region}</span>
               </div>
             ))}
           </div>
@@ -156,7 +156,7 @@ export default function LandingPage() {
             ].map((tier, i) => (
               <div key={i} className={`p-8 rounded-[2.5rem] border ${tier.popular ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-slate-900/40 border-white/5'} flex flex-col`}>
                 <div className="mb-8">
-                  <span className="text-xs font-black uppercase text-emerald-500 tracking-widest">{tier.name}</span>
+                  <span className="text-xs font-black font-semibold">{tier.name}</span>
                   <div className="flex items-baseline gap-1 mt-2">
                     <span className="text-4xl font-black text-white">{tier.price === 'Custom' ? '' : '$'}</span>
                     <span className="text-5xl font-black text-white leading-none tracking-tighter">{tier.price}</span>
@@ -198,7 +198,7 @@ export default function LandingPage() {
             </p>
           </div>
           <div>
-             <h4 className="text-white font-black uppercase tracking-widest text-xs mb-6 italic">Company</h4>
+             <h4 className="text-white font-black font-semibold text-xs mb-6 italic">Company</h4>
              <ul className="space-y-4">
                 <li><a href="#" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">Privacy</a></li>
                 <li><a href="#" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">Compliance</a></li>
@@ -206,10 +206,10 @@ export default function LandingPage() {
              </ul>
           </div>
           <div>
-             <h4 className="text-white font-black uppercase tracking-widest text-xs mb-6 italic">Portal</h4>
+             <h4 className="text-white font-black font-semibold text-xs mb-6 italic">Portal</h4>
              <ul className="space-y-4">
-                <li><Link href="/auth" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors tracking-widest">Sign In</Link></li>
-                <li><Link href="/auth" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors tracking-widest">Secure Register</Link></li>
+                <li><Link href="/auth" className="text-slate-500 hover:text-emerald-400 text-xs font-bold font-semibold">Sign In</Link></li>
+                <li><Link href="/auth" className="text-slate-500 hover:text-emerald-400 text-xs font-bold font-semibold">Secure Register</Link></li>
              </ul>
           </div>
         </div>

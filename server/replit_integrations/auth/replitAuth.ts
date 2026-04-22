@@ -99,12 +99,7 @@ export async function setupAuth(app: Express) {
       const userClient = createUserClient(token);
       
       if (workspaceId) {
-          try {
-            userClient.rpc('set_workspace_context', { wid: String(workspaceId) })
-              .then(({ error }) => { if (error) console.error("[AUTH] DB Context Error:", error.message); });
-          } catch (err: any) {
-            console.error("[AUTH] RPC Exception:", err.message);
-          }
+          // storageContext.run handles the workspace isolation in the application layer.
       }
 
       return storageContext.run({ client: userClient, workspaceId }, () => next());

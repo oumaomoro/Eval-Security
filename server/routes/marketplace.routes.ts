@@ -11,7 +11,7 @@ const router = Router();
  * GET /api/marketplace/listings
  * Lists all available clause templates for purchase.
  */
-router.get("/api/marketplace/listings", isAuthenticated, async (req: any, res) => {
+router.get("/marketplace/listings", isAuthenticated, async (req: any, res) => {
   try {
     const listings = await storage.getMarketplaceListings();
     res.json(listings);
@@ -25,7 +25,7 @@ router.get("/api/marketplace/listings", isAuthenticated, async (req: any, res) =
  * POST /api/marketplace/listings
  * Allows legal professionals to list their clauses for sale.
  */
-router.post("/api/marketplace/listings", isAuthenticated, async (req: any, res) => {
+router.post("/marketplace/listings", isAuthenticated, async (req: any, res) => {
   try {
     const { title, description, category, content, price } = req.body;
     
@@ -66,7 +66,7 @@ router.post("/api/marketplace/listings", isAuthenticated, async (req: any, res) 
  * POST /api/marketplace/purchase
  * Process a purchase for a clause template.
  */
-router.post("/api/marketplace/purchase", isAuthenticated, async (req: any, res) => {
+router.post("/marketplace/purchase", isAuthenticated, async (req: any, res) => {
   try {
     const { listingId } = req.body;
     const workspaceId = storageContext.getStore()?.workspaceId;

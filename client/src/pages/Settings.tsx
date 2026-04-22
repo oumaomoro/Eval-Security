@@ -117,11 +117,11 @@ export default function Settings() {
               <CardContent className="pt-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Full Name</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold ml-1">Full Name</label>
                     <Input value={`${user?.firstName} ${user?.lastName}`} readOnly className="bg-black/50 border-slate-800 rounded-xl h-11" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Enterprise Email</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold ml-1">Enterprise Email</label>
                     <Input value={user?.email || ""} readOnly disabled className="bg-slate-800/30 border-slate-800 rounded-xl h-11 text-slate-500" />
                   </div>
                 </div>
@@ -205,7 +205,7 @@ export default function Settings() {
               </div>
               <CardHeader>
                 <CardTitle className="text-white uppercase tracking-tighter italic text-2xl">Strategic Pack</CardTitle>
-                <CardDescription className="text-slate-300 font-bold uppercase text-[10px] tracking-widest opacity-70">Executive Compliance & Risk Toolkit</CardDescription>
+                <CardDescription className="text-slate-300 font-bold font-semibold opacity-70">Executive Compliance & Risk Toolkit</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-slate-400 font-medium leading-relaxed">
@@ -248,14 +248,14 @@ export default function Settings() {
                             <Globe className="w-4 h-4 text-slate-500" />
                             <span className="text-[10px] font-black text-slate-400 uppercase">Cloudflare Gateway</span>
                         </div>
-                        <span className="text-[8px] bg-emerald-500 text-emerald-950 font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
+                        <span className="text-[8px] bg-emerald-500 text-emerald-950 font-black px-2 py-0.5 rounded-full font-semibold">Active</span>
                     </div>
                     <div className="flex items-center justify-between p-3 rounded-xl bg-black/40 border border-slate-800">
                         <div className="flex items-center gap-3">
                             <Brain className="w-4 h-4 text-slate-500" />
                             <span className="text-[10px] font-black text-slate-400 uppercase">OpenAI Cortex-4</span>
                         </div>
-                        <span className="text-[8px] bg-emerald-500 text-emerald-950 font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
+                        <span className="text-[8px] bg-emerald-500 text-emerald-950 font-black px-2 py-0.5 rounded-full font-semibold">Active</span>
                     </div>
                 </CardContent>
             </Card>

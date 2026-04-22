@@ -117,7 +117,7 @@ export default function Savings() {
                     </div>
                     <div className="flex items-center gap-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
                        <div className="text-right">
-                          <p className="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-1">Est. Annual Savings</p>
+                          <p className="text-[10px] font-semibold text-slate-500 mb-1">Est. Annual Savings</p>
                           <p className="text-2xl font-black text-emerald-400 italic">${(opp.estimatedSavings || 0).toLocaleString()}</p>
                        </div>
                        <Button variant="outline" size="sm" className="bg-slate-900/50 border-white/10 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all rounded-xl">

@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getCsrfToken } from "./csrf";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -22,12 +23,22 @@ export async function apiRequest(
   const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL === 'https://api.costloci.com' ? '' : (import.meta.env.VITE_API_URL || ""));
   const fullUrl = url.startsWith("http") ? url : `${apiUrl}${url.startsWith("/") ? url : `/${url}`}`;
 
+  // Fetch CSRF token for mutating requests (Phase 28 Secure Sync)
+  let csrfHeader = {};
+  if (method !== "GET" && method !== "HEAD") {
+    const token = await getCsrfToken();
+    if (token) {
+      csrfHeader = { "x-csrf-token": token };
+    }
+  }
+
   const res = await fetch(fullUrl, {
     method,
     credentials: "include",
     headers: {
       ...(data ? { "Content-Type": "application/json" } : {}),
-      "X-Requested-With": "XMLHttpRequest"
+      "X-Requested-With": "XMLHttpRequest",
+      ...csrfHeader
     },
     body: data ? JSON.stringify(data) : undefined,
   });

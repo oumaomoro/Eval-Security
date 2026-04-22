@@ -62,10 +62,11 @@ export default function Dashboard() {
                   <XAxis dataKey="vendor" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }}
-                    className="dark:!bg-slate-900 dark:!border-slate-800"
-                    itemStyle={{ fontSize: "12px" }}
-                    cursor={{ fill: "#f8fafc" }}
+                    {...({
+                      contentStyle: { backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" },
+                      itemStyle: { fontSize: "12px" },
+                      cursor: { fill: "#f8fafc" }
+                    } as any)}
                   />
                   <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32}>
                     {stats?.costByVendor?.map((entry: any, index: number) => (
@@ -99,8 +100,9 @@ export default function Dashboard() {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px" }}
-                    className="dark:!bg-slate-900 dark:!border-slate-800"
+                    {...({
+                      contentStyle: { backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px" }
+                    } as any)}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -162,7 +164,7 @@ function MetricCard({ label, value, icon: Icon, color }: any) {
     >
       <div className="flex justify-between items-start relative z-10">
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{label}</p>
+          <p className="text-xs font-semibold text-slate-500 font-semibold">{label}</p>
           <h3 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
             {value}
           </h3>

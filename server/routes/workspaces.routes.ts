@@ -154,4 +154,39 @@ router.post("/api/workspaces/:workspaceId/notifications/channels", isAuthenticat
   }
 });
 
+// POST /api/workspaces/:workspaceId/api-key
+// Enterprise Security: Generate a new platform API key.
+// Stored securely using bcryptjs; plain text returned exactly once.
+router.post("/api/workspaces/:workspaceId/api-key", isAuthenticated, requireWorkspacePermission('admin'), async (req: any, res) => {
+  try {
+    const workspaceId = parseInt(req.params.workspaceId);
+    if (isNaN(workspaceId)) return res.status(400).json({ message: "Invalid workspace ID" });
+
+    // Generate a high-entropy key
+    const crypto = await import("crypto");
+    const rawKey = `sk.${crypto.randomBytes(24).toString('hex')}`;
+    
+    // storage.updateUser will automatically hash this via Phase 32 logic
+    await storage.updateUser(req.user.id, { apiKey: rawKey });
+
+    await SOC2Logger.logEvent(req, {
+      userId: req.user.id,
+      action: "API_KEY_GENERATED",
+      workspaceId,
+      resourceType: "UserSecurity",
+      resourceId: req.user.id,
+      details: "User rotated/generated a new platform API key."
+    });
+
+    res.json({
+      apiKey: rawKey,
+      message: "API key generated successfully. This is the ONLY time it will be shown in plain text. Please save it securely.",
+      securityWarning: "Costloci hashes all API keys using bcryptjs. We cannot recover lost keys."
+    });
+  } catch (err: any) {
+    console.error("[API_KEY_GEN_ERROR]", err.message);
+    res.status(500).json({ message: "Failed to generate API key" });
+  }
+});
+
 export default router;

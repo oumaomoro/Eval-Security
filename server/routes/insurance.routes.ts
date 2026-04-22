@@ -13,7 +13,7 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
 });
 
-router.post("/api/insurance/upload", isAuthenticated, upload.single("file"), async (req: any, res) => {
+router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (req: any, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
@@ -80,7 +80,7 @@ router.post("/api/insurance/upload", isAuthenticated, upload.single("file"), asy
   }
 });
 
-router.post("/api/insurance/redline", isAuthenticated, async (req: any, res) => {
+router.post("/insurance/redline", isAuthenticated, async (req: any, res) => {
   try {
     const { originalClause, standardLanguage, instructions } = req.body;
     
@@ -105,7 +105,21 @@ router.post("/api/insurance/redline", isAuthenticated, async (req: any, res) => 
   }
 });
 
-router.post("/api/insurance/compare", isAuthenticated, async (req: any, res) => {
+// GET /api/insurance/policies - List all policies for the active organization
+router.get("/insurance/policies", isAuthenticated, async (req: any, res) => {
+  try {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    if (!workspaceId) return res.status(400).json({ message: "No workspace context" });
+
+    const policies = await storage.getInsurancePolicies(workspaceId);
+    res.json(policies);
+  } catch (error: any) {
+    console.error("[INSURANCE LIST]", error);
+    res.status(500).json({ message: "Failed to fetch insurance policies" });
+  }
+});
+
+router.post("/insurance/compare", isAuthenticated, async (req: any, res) => {
   try {
     const { policyIdA, policyIdB } = req.body;
     if (!policyIdA || !policyIdB) {
@@ -148,7 +162,7 @@ router.post("/api/insurance/compare", isAuthenticated, async (req: any, res) => 
 });
 
 // ─── TRACK 3: DPO METRICS ──────────────────────────────────────────
-router.get("/api/dpo/metrics", isAuthenticated, async (req: any, res) => {
+router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
   try {
     const workspaceId = storageContext.getStore()?.workspaceId;
     if (!workspaceId) return res.status(400).json({ message: "No workspace context" });

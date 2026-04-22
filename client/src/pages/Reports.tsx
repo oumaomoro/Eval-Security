@@ -176,7 +176,7 @@ export default function Reports() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reports?.[0] ? format(new Date(reports[0].createdAt), "MMM d, yyyy") : "N/A"}</div>
+              <div className="text-2xl font-bold">{reports?.[0]?.createdAt ? format(new Date(reports[0].createdAt as string | Date), "MMM d, yyyy") : "N/A"}</div>
               <p className="text-[10px] text-muted-foreground mt-1">Latest jurisdictional verification run.</p>
             </CardContent>
           </Card>
@@ -241,7 +241,7 @@ export default function Reports() {
                           <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{report.title}</span>
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 uppercase font-medium">
-                              {report.type.replace('_', ' ')} • {format(new Date(report.createdAt), "MMM d, yyyy")}
+                              {report.type.replace('_', ' ')} • {report.createdAt ? format(new Date(report.createdAt as string | Date), "MMM d, yyyy") : "Unknown Date"}
                             </span>
                           </div>
                         </TableCell>

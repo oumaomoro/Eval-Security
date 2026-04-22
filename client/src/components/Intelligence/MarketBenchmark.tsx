@@ -33,7 +33,7 @@ export function MarketBenchmark({ contractId }: MarketBenchmarkProps) {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
             <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <CardTitle className="text-xs font-black text-slate-500 font-semibold flex items-center gap-2">
                         <Globe className="w-4 h-4 text-primary" />
                         Market Positioning: {benchmark.category}
                     </CardTitle>
@@ -55,7 +55,7 @@ export function MarketBenchmark({ contractId }: MarketBenchmarkProps) {
                     
                     {potentialSavings > 0 && (
                         <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl">
-                             <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Potential Savings Opportunity</p>
+                             <p className="text-[10px] font-black text-emerald-500 font-semibold mb-1">Potential Savings Opportunity</p>
                              <div className="text-2xl font-mono font-bold text-emerald-400">
                                 +${potentialSavings.toLocaleString()}<span className="text-sm">/yr</span>
                              </div>
@@ -81,7 +81,7 @@ export function MarketBenchmark({ contractId }: MarketBenchmarkProps) {
                 <BarChart3 className="w-16 h-16" />
             </div>
             <CardHeader>
-                <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Market Logic</CardTitle>
+                <CardTitle className="text-[10px] font-black text-slate-500 font-semibold">Market Logic</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 pt-2">
                 <div>

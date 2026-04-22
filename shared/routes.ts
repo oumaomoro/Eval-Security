@@ -18,6 +18,7 @@ import {
   clauseLibrary,
   savingsOpportunities,
   reports,
+  reportSchedules,
   vendorScorecards,
   workspaces,
   comments,

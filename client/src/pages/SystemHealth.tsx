@@ -126,7 +126,7 @@ export default function SystemHealth() {
                                         <span className="text-lg font-black text-emerald-500 font-mono">$0.42</span>
                                     </div>
                                     <Progress value={85} className="h-1.5 mt-3" />
-                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-3">Target Efficiency: 95%</p>
+                                    <p className="text-[9px] text-slate-500 font-bold font-semibold mt-3">Target Efficiency: 95%</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -194,7 +194,7 @@ function HealthCard({ label, value, icon: Icon, trend, color }: any) {
                         <Icon className="w-5 h-5" />
                     </div>
                     {trend && (
-                        <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest bg-slate-900 text-slate-400">
+                        <Badge variant="secondary" className="text-[9px] font-black font-semibold bg-slate-900 text-slate-400">
                             {trend}
                         </Badge>
                     )}
@@ -211,7 +211,7 @@ function HealthCard({ label, value, icon: Icon, trend, color }: any) {
 function ResourceMetric({ label, value }: { label: string, value: number }) {
     return (
         <div className="space-y-2">
-            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <div className="flex justify-between items-center text-[10px] font-black font-semibold text-slate-400">
                 <span>{label}</span>
                 <span className={value > 80 ? "text-red-500" : "text-primary"}>{value}%</span>
             </div>

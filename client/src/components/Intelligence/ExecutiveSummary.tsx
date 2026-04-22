@@ -31,7 +31,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
           </div>
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-slate-800 uppercase tracking-tight">Executive Compliance Resilience Report</h2>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">Confidential Board-Ready Briefing • Q2 2026</p>
+            <p className="text-xs font-black text-slate-400 font-semibold italic">Confidential Board-Ready Briefing • Q2 2026</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-4 print:hidden">
@@ -54,7 +54,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="p-8 bg-slate-50 rounded-3xl space-y-4 border border-slate-100">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Resilience Index</span>
+                <span className="text-[10px] font-black text-slate-500 font-semibold">Resilience Index</span>
                 <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black italic">{stats.avgComplianceScore}%</Badge>
             </div>
             <div className="text-5xl font-black tracking-tighter italic text-slate-900">{stats.avgComplianceScore > 90 ? 'A' : stats.avgComplianceScore > 80 ? 'B+' : 'C'}</div>
@@ -63,7 +63,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
 
         <div className="p-8 bg-primary/5 rounded-3xl space-y-4 border border-primary/10">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Financial Exposure</span>
+                <span className="text-[10px] font-black text-primary font-semibold">Financial Exposure</span>
                 <TrendingDown className="w-4 h-4 text-primary" />
             </div>
             <div className="text-4xl font-black tracking-tighter italic text-slate-900">${(stats.totalAnnualCost * 0.12).toLocaleString()}</div>
@@ -72,7 +72,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
 
         <div className="p-8 bg-emerald-500/5 rounded-3xl space-y-4 border border-emerald-500/10 text-emerald-950">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Autonomous ROI</span>
+                <span className="text-[10px] font-black text-emerald-600 font-semibold">Autonomous ROI</span>
                 <ShieldCheck className="w-4 h-4" />
             </div>
             <div className="text-4xl font-black tracking-tighter italic">{Math.round(stats.timeSavedHours)} <span className="text-sm">HRS</span></div>
@@ -81,7 +81,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
       </div>
 
       <div className="space-y-6">
-        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+        <h3 className="text-sm font-black text-slate-900 font-semibold flex items-center gap-3">
             <Landmark className="w-4 h-4 text-slate-400" /> Jurisdictional Adherence Ledger
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -89,7 +89,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
                 <div key={j} className="p-6 border border-slate-100 rounded-2xl flex flex-col items-center gap-2 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-default group">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse group-hover:scale-150 transition-transform" />
                     <span className="text-xs font-black text-slate-900 italic tracking-tighter uppercase">{j}</span>
-                    <Badge variant="outline" className="text-[8px] font-black border-emerald-100 text-emerald-600 bg-emerald-50/50 uppercase tracking-widest px-2">Verified</Badge>
+                    <Badge variant="outline" className="text-[8px] font-black border-emerald-100 text-emerald-600 bg-emerald-50/50 font-semibold px-2">Verified</Badge>
                 </div>
             ))}
         </div>
@@ -101,7 +101,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-3">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Immediate Actions</span>
+                <span className="text-[10px] font-black text-slate-500 font-semibold">Immediate Actions</span>
                 <ul className="space-y-3">
                     <li className="text-[11px] font-bold text-slate-700 flex gap-3 uppercase tracking-tight">
                         <span className="w-1.5 h-1.5 bg-primary rounded-full mt-1.5 shrink-0" />
@@ -114,7 +114,7 @@ export function ExecutiveSummary({ stats, jurisdictions = ["KDPA", "NDPR", "SAMA
                 </ul>
             </div>
             <div className="space-y-3">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Strategic Vision</span>
+                <span className="text-[10px] font-black text-slate-500 font-semibold">Strategic Vision</span>
                 <p className="text-[11px] font-bold text-slate-600 uppercase leading-relaxed italic">
                     The transition to autonomous governance has reduced compliance-related overhead by 42%. Management recommends shifting resources to proactive vendor lifecycle optimization.
                 </p>

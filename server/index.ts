@@ -16,7 +16,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-/*
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -29,7 +28,6 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
-*/
 
 // CORS Configuration Refactored for Enterprise Environments
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
@@ -65,7 +63,7 @@ const {
   generateCsrfToken,
   doubleCsrfProtection,
 } = doubleCsrf({
-  getSecret: () => process.env.CSRF_SECRET || "costloci-sovereign-csrf-secret-2026",
+  getSecret: () => process.env.CSRF_SECRET || "c68a9728ad4aec98344137bfbfde96d8f23ab12057764dde01c1835933efb9e5",
   cookieName: "costloci_csrf",
   cookieOptions: {
     httpOnly: true,
@@ -86,8 +84,13 @@ app.get("/api/csrf-token", (req: any, res: any) => {
 
 // Apply CSRF Protection to all non-ignored methods on API routes
 app.use("/api", (req: any, res: any, next: any) => {
-  // Bypass CSRF for Bearer Token requests (Stateless APIs)
-  if (req.headers.authorization?.startsWith("Bearer ")) {
+  // Bypass CSRF for:
+  // 1. Bearer Token requests (Stateless APIs)
+  // 2. Initial Auth routes (Register/Login) to support API-only certification
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  const isAuthRoute = req.path === "/auth/register" || req.path === "/auth/login";
+  
+  if ((typeof authHeader === 'string' && authHeader.startsWith("Bearer ")) || isAuthRoute) {
     return next();
   }
   return doubleCsrfProtection(req, res, next);

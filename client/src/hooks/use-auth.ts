@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 import { getApiUrl } from "@/lib/api-config";
+import { useEffect } from "react";
+import { identifyUser, resetIdentity } from "@/lib/observability";
 
 async function fetchUser(): Promise<User | null> {
   try {
@@ -29,6 +31,7 @@ async function fetchUser(): Promise<User | null> {
 
 async function logout(): Promise<void> {
   await fetch("/api/auth/logout", { method: "POST" });
+  resetIdentity(); // Clear identifying traits from observability session
   window.location.href = "/auth";
 }
 
@@ -40,6 +43,16 @@ export function useAuth() {
     retry: false,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  // Track user identity in observability tools when session is established
+  useEffect(() => {
+    if (user && user.id) {
+      identifyUser(user.id.toString(), user.email || "", {
+        clientId: user.clientId,
+        role: user.role
+      });
+    }
+  }, [user]);
 
   const logoutMutation = useMutation({
     mutationFn: logout,

@@ -55,7 +55,7 @@ export default function RedliningStudio() {
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-4"
           >
             <BrainCircuit className="w-3.5 h-3.5 text-primary" />
-            <span className="text-[10px] font-black text-primary uppercase tracking-widest">Autonomous Legal Agent</span>
+            <span className="text-[10px] font-black text-primary font-semibold">Autonomous Legal Agent</span>
           </motion.div>
           <h1 className="text-4xl font-black text-white tracking-tighter uppercase italic">
             AI Redline <span className="text-primary">Studio</span>
@@ -106,7 +106,7 @@ export default function RedliningStudio() {
 
             <div className="flex flex-col gap-4">
                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block tracking-widest">Negotiation Instructions</label>
+                  <label className="text-[10px] font-black font-semibold">Negotiation Instructions</label>
                   <Textarea 
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
@@ -129,7 +129,7 @@ export default function RedliningStudio() {
             {!redlinedResult && !isProcessing && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/40 backdrop-blur-[2px] rounded-3xl border border-dashed border-slate-800/60">
                 <GitCompare className="w-12 h-12 text-slate-800 mb-4" />
-                <p className="text-slate-600 font-bold uppercase tracking-widest text-[10px]">Awaiting Processing</p>
+                <p className="text-slate-600 font-bold font-semibold text-[10px]">Awaiting Processing</p>
               </div>
             )}
 
@@ -137,7 +137,7 @@ export default function RedliningStudio() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-800 pb-4">
                 <div>
                    <CardTitle className="text-white text-lg font-black uppercase italic tracking-tight">Negotiated Result</CardTitle>
-                   <CardDescription className="text-[10px] font-bold text-primary uppercase tracking-widest">Optimized for Corporate Protection</CardDescription>
+                   <CardDescription className="text-[10px] font-bold text-primary font-semibold">Optimized for Corporate Protection</CardDescription>
                 </div>
                 <div className="flex gap-2">
                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-slate-800" onClick={() => {

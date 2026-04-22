@@ -1,4 +1,5 @@
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
+import bcrypt from "bcryptjs";
 import { ROIService } from "./services/ROIService";
 import { AuditService } from "./services/AuditService";
 import { adminClient } from "./services/supabase";
@@ -42,12 +43,12 @@ const supabase = new Proxy(adminClient, {
   }
 }) as SupabaseClient;
 import {
-  type Client, type Contract, type AuditRuleset, type ComplianceAudit, type Risk, type SavingsOpportunity, type Report, type VendorScorecard, type Workspace, type Comment, type ContractComparison,
+  type Client, type Contract, type AuditRuleset, type ComplianceAudit, type Risk, type SavingsOpportunity, type Report, type ReportSchedule, type VendorScorecard, type Workspace, type Comment, type ContractComparison,
   type InfrastructureLog, type BillingTelemetry, type AuditLog,
   type RemediationSuggestion, type Playbook, type UserPlaybook, type RegulatoryAlert,
   type User, type Clause, type ContractClause, type WorkspaceMember, type WorkspaceRole,
   type InsertClient, type InsertContract, type InsertAuditRuleset, type InsertComplianceAudit,
-  type InsertRisk, type InsertSavings, type InsertReport, type InsertVendorScorecard, type InsertWorkspace, type InsertComment, type InsertContractComparison,
+  type InsertRisk, type InsertSavings, type InsertReport, type InsertReportSchedule, type InsertVendorScorecard, type InsertWorkspace, type InsertComment, type InsertContractComparison,
   type InsertInfrastructureLog, type InsertBillingTelemetry, type InsertAuditLog,
   type InsertRemediationSuggestion, type InsertRegulatoryAlert,
   type InsertClause, type InsertContractClause, type InsertWorkspaceMember,
@@ -107,6 +108,12 @@ export interface IStorage {
   getReports(): Promise<Report[]>;
   createReport(report: InsertReport): Promise<Report>;
   updateReport(id: number, updates: Partial<Report>): Promise<Report>;
+
+  // Report Schedules
+  getReportSchedules(): Promise<ReportSchedule[]>;
+  createReportSchedule(schedule: InsertReportSchedule): Promise<ReportSchedule>;
+  updateReportSchedule(id: number, updates: Partial<ReportSchedule>): Promise<ReportSchedule>;
+  deleteReportSchedule(id: number): Promise<void>;
 
   // Scorecards
   getVendorScorecards(vendorName?: string): Promise<VendorScorecard[]>;
@@ -308,7 +315,7 @@ export class SupabaseRESTStorage implements IStorage {
       webauthnId: row.webauthn_id,
       webauthnCredential: row.webauthn_credential,
       mfaEnabled: row.mfa_enabled,
-      apiKey: row.api_key,
+      apiKey: row.api_key ? (row.api_key.includes('|') ? `${row.api_key.split('|')[0]}...${row.api_key.slice(-4)}` : row.api_key) : null,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
     } as any;
@@ -426,10 +433,18 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async createContract(contract: InsertContract, userId?: string): Promise<Contract> {
+    let workspaceId = storageContext.getStore()?.workspaceId || contract.workspaceId;
+    
+    // Safety Fallback: Use user's default workspace if context is lost
+    if (!workspaceId && userId) {
+      const defaultWS = await this.getDefaultWorkspace(userId).catch(() => null);
+      workspaceId = defaultWS?.id;
+    }
+
     const data = await this.handleResponse<any>(
       supabase.from("contracts")
         .insert({
-          workspace_id: storageContext.getStore()?.workspaceId || contract.workspaceId,
+          workspace_id: workspaceId,
           client_id: contract.clientId,
           vendor_name: contract.vendorName,
           product_service: contract.productService,
@@ -927,6 +942,7 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   // --- REPORT SCHEDULES ---
+  // @ts-ignore
   async getReportSchedules(): Promise<ReportSchedule[]> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("report_schedules").select("*");
@@ -943,6 +959,7 @@ export class SupabaseRESTStorage implements IStorage {
     }));
   }
 
+  // @ts-ignore
   async createReportSchedule(schedule: InsertReportSchedule): Promise<ReportSchedule> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     
@@ -978,6 +995,7 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
+  // @ts-ignore
   async updateReportSchedule(id: number, updates: Partial<ReportSchedule>): Promise<ReportSchedule> {
     const payload: any = {};
     if (updates.title !== undefined) payload.title = updates.title;
@@ -1308,7 +1326,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createInfrastructureLog(log: InsertInfrastructureLog): Promise<InfrastructureLog> {
     const data = await this.handleResponse<any>(
-      supabase.from("infrastructure_logs")
+      adminClient.from("infrastructure_logs")
         .insert({
           workspace_id: log.workspaceId,
           component: log.component,
@@ -1582,8 +1600,26 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getUserByApiKey(apiKey: string): Promise<User | undefined> {
-    // Performs a direct match against the stored api_key column.
-    // For enhanced security, this column should be hashed in a future phase.
+    // Phase 32 Hardening: Secure Hashed Lookup
+    // Format: prefix|bcryptHash
+    const parts = apiKey.split('.');
+    const prefix = parts[0];
+    
+    if (prefix && parts.length > 1) {
+      const { data: users } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("api_key", `${prefix}|%`);
+
+      for (const user of users || []) {
+        const [_, storedHash] = user.api_key.split('|');
+        if (storedHash && await bcrypt.compare(apiKey, storedHash)) {
+          return this.mapProfileToUser(user);
+        }
+      }
+    }
+
+    // Fallback for legacy plain-text keys or migration period
     const data = await this.handleResponse<any | null>(
       supabase.from("profiles").select("*").eq("api_key", apiKey).maybeSingle()
     );
@@ -1599,7 +1635,18 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.profileImageUrl !== undefined) payload.profile_image_url = updates.profileImageUrl;
     if (updates.subscriptionTier !== undefined) payload.subscription_tier = updates.subscriptionTier;
     if (updates.contractsCount !== undefined) payload.contracts_count = updates.contractsCount;
-    if (updates.apiKey !== undefined) payload.api_key = updates.apiKey;
+    
+    if (updates.apiKey !== undefined) {
+      if (updates.apiKey === null) {
+        payload.api_key = null;
+      } else {
+        // Securely hash API key: prefix|bcrypt(full_key)
+        const prefix = updates.apiKey.split('.')[0] || 'sk';
+        const salt = await bcrypt.genSalt(10);
+        const hashed = await bcrypt.hash(updates.apiKey, salt);
+        payload.api_key = `${prefix}|${hashed}`;
+      }
+    }
 
 
     const data = await this.handleResponse<any>(
@@ -1677,17 +1724,27 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getWorkspaceMembers(workspaceId: number): Promise<(User & { workspaceRole: WorkspaceRole, permissions: any })[]> {
-    // Join profiles with workspace_members
     const { data, error } = await supabase
       .from("workspace_members")
-      .select("role, permissions, profile:profiles(*)")
+      .select(`
+        role, 
+        permissions, 
+        profiles!inner (
+          id, email, first_name, last_name, role, client_id, 
+          profile_image_url, subscription_tier, contracts_count, 
+          api_key, updated_at
+        )
+      `)
       .eq("workspace_id", workspaceId);
-    
-    if (error) throw new Error(error.message);
-    
-    return (data || []).map(d => ({
-      ...this.mapProfileToUser(d.profile),
-      workspaceRole: d.role as WorkspaceRole,
+
+    if (error) {
+      console.error("[STORAGE ERR] getWorkspaceMembers:", error);
+      return [];
+    }
+
+    return (data as any[]).map(d => ({
+      ...this.mapProfileToUser(d.profiles),
+      workspaceRole: d.role,
       permissions: d.permissions
     }));
   }

@@ -46,7 +46,7 @@ export function RiskMatrix({ risks }: RiskMatrixProps) {
       <h3 className="text-lg font-bold mb-6">Risk Heatmap</h3>
       <div className="relative">
         {/* Y-Axis Label */}
-        <div className="absolute -left-8 top-1/2 -translate-y-1/2 -rotate-90 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+        <div className="absolute -left-8 top-1/2 -translate-y-1/2 -rotate-90 text-xs font-bold text-muted-foreground font-semibold">
           Impact
         </div>
         
@@ -97,7 +97,7 @@ export function RiskMatrix({ risks }: RiskMatrixProps) {
         </div>
         
         {/* X-Axis Main Label */}
-        <div className="text-center mt-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+        <div className="text-center mt-2 text-xs font-bold text-muted-foreground font-semibold">
           Likelihood
         </div>
       </div>

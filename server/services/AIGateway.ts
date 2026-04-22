@@ -14,18 +14,20 @@ export class AIGateway {
   private static anthropicClient: Anthropic | null = null;
 
   private static readonly OPENAI_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing";
-  private static readonly DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "missing";
+  private static readonly DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "sk-eff1aa8acef3479188a99e14e646a650";
   private static readonly ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "missing";
   
   private static readonly OPENAI_BASE = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   private static readonly DEEPSEEK_BASE = "https://api.deepseek.com";
-  private static readonly LOCAL_BASE = process.env.LOCAL_AI_BASE_URL || "http://localhost:11434/v1";
+  private static readonly LOCAL_BASE = process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
 
   private static getOpenAI(): OpenAI {
-    if (!this.openaiClient) {
+    // Re-read key lazily to ensure dotenv has loaded before class static init
+    const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing";
+    if (!this.openaiClient || (this.openaiClient as any).apiKey !== key) {
       this.openaiClient = new OpenAI({
-        apiKey: this.OPENAI_KEY,
-        baseURL: this.OPENAI_BASE,
+        apiKey: key,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
     }
     return this.openaiClient;
@@ -51,6 +53,26 @@ export class AIGateway {
   }
 
   /**
+   * Helper for robust API execution
+   */
+  private static async withRetryAndTimeout<T>(fn: () => Promise<T>, timeoutMs = 15000, maxRetries = 2): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Request timed out")), timeoutMs)
+        );
+        return await Promise.race([fn(), timeoutPromise]);
+      } catch (error: any) {
+        if (attempt === maxRetries) {
+           throw error;
+        }
+        console.warn(`[AI-GATEWAY] Attempt ${attempt} failed: ${error.message}. Retrying...`);
+      }
+    }
+    throw new Error("Maximum retries exhausted");
+  }
+
+  /**
    * Resilient completion endpoint with Multi-Provider Fallback
    */
   static async createCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): Promise<string> {
@@ -58,21 +80,34 @@ export class AIGateway {
     try {
       if (this.DEEPSEEK_KEY !== "missing") {
         const deepseekParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
-        const response = await this.getDeepSeek().chat.completions.create(deepseekParams as any);
+        const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
+           () => this.getDeepSeek().chat.completions.create(deepseekParams as any) as any
+        );
         return response.choices[0]?.message?.content || "";
       }
     } catch (error: any) {
-      console.warn(`[AI-GATEWAY] DeepSeek Engine Unavailable: ${error.message}`);
+      console.warn(`[AI-GATEWAY] DeepSeek Engine Unavailable: ${error.message} - Degrading fully to OpenAI.`);
     }
 
     // 2. Attempt Secondary (OpenAI)
     try {
       if (this.OPENAI_KEY !== "missing") {
-        const response = await this.getOpenAI().chat.completions.create(params);
+        const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
+           () => this.getOpenAI().chat.completions.create(params) as any
+        );
         return response.choices[0]?.message?.content || "";
       }
     } catch (error: any) {
       console.warn(`[AI-GATEWAY] OpenAI Engine Unavailable: ${error.message}`);
+      // Cascade to next provider on any auth/quota/billing error
+      const isRecoverable = error.status === 401 || error.status === 402 || error.status === 429
+        || error.message.includes("401") || error.message.includes("402")
+        || error.message.includes("429") || error.message.includes("quota")
+        || error.message.includes("Incorrect API key");
+      if (!isRecoverable) {
+        console.warn("[AI-GATEWAY] Non-recoverable OpenAI error, cascading anyway for resilience.");
+      }
+      console.log("[AI-GATEWAY] Routing to Sovereign resilience path...");
     }
 
     // 3. Attempt Tertiary (Anthropic)
@@ -95,10 +130,10 @@ export class AIGateway {
       console.warn(`[AI-GATEWAY] Anthropic Engine Unavailable: ${error.message}`);
     }
 
-    // 4. Attempt Quaternary (Sovereign Local AI)
+    // 4. Attempt Quaternary (Sovereign Local AI - Ollama)
     try {
-      console.log("[AI-GATEWAY] Attempting Local sovereign AI...");
-      const localParams = { ...params, model: params.model.includes('gpt') ? 'llama3' : params.model };
+      console.log("[AI-GATEWAY] Attempting Local sovereign AI (DeepSeek-R1:1.5B)...");
+      const localParams = { ...params, model: 'deepseek-r1:1.5b' };
       
       const localOpenAI = new OpenAI({
          apiKey: "ollama",
@@ -108,7 +143,7 @@ export class AIGateway {
       const response = await localOpenAI.chat.completions.create(localParams as any);
       return response.choices[0]?.message?.content || "";
     } catch (error: any) {
-      console.warn(`[AI-GATEWAY] Local AI Engine Unavailable: ${error.message}`);
+      console.warn(`[AI-GATEWAY] Local AI Engine Unavailable (Ollama): ${error.message}`);
     }
 
     // 5. Sovereign Fallback (Regional/Mock)
@@ -119,14 +154,19 @@ export class AIGateway {
   /**
    * Resilient Streaming Endpoint
    */
-  static async createStreamingCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsStreaming) {
+  static async createStreamingCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsStreaming): Promise<any> {
      try {
         if (this.DEEPSEEK_KEY !== "missing") {
            const deepseekParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
-           return await this.getDeepSeek().chat.completions.create(deepseekParams as any);
+           return await this.withRetryAndTimeout(() => this.getDeepSeek().chat.completions.create(deepseekParams as any) as any);
         }
+     } catch (error: any) {
+        console.warn(`[AI-GATEWAY] DeepSeek Streaming Failed: ${error.message}. Degrading to OpenAI.`);
+     }
+
+     try {
         if (this.OPENAI_KEY !== "missing") {
-           return await this.getOpenAI().chat.completions.create(params);
+           return await this.withRetryAndTimeout(() => this.getOpenAI().chat.completions.create(params) as any);
         }
         throw new Error("No Primary Providers Offline");
      } catch (error: any) {

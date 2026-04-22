@@ -171,7 +171,7 @@ export default function Marketplace() {
                          <p className="text-xs text-slate-400 font-medium line-clamp-3">{listing.description || "Premium pre-vetted legal clause for cybersecurity compliance."}</p>
                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                             <div>
-                               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Global Payout</p>
+                               <p className="text-[9px] font-black text-slate-500 font-semibold">Global Payout</p>
                                <p className="text-white font-black text-xs">PayPal & Paystack Protected</p>
                             </div>
                             <ShieldCheck className="w-5 h-5 text-emerald-500" />
@@ -179,7 +179,7 @@ export default function Marketplace() {
                       </CardContent>
                       <CardFooter className="bg-slate-950/40 border-t border-slate-800 flex justify-between items-center">
                          <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Price</span>
+                            <span className="text-[9px] font-black text-slate-500 font-semibold">Price</span>
                             <span className="text-lg font-black text-primary italic tracking-tighter">${listing.price}</span>
                          </div>
                          <Button 
@@ -216,7 +216,7 @@ export default function Marketplace() {
                     <div key={i} className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-3xl">
                        <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mb-4">{s.icon}</div>
                        <div className="text-2xl font-black">{s.val}</div>
-                       <div className="text-[10px] font-black uppercase tracking-widest opacity-60">{s.label}</div>
+                       <div className="text-[10px] font-black font-semibold opacity-60">{s.label}</div>
                     </div>
                   ))}
                </div>

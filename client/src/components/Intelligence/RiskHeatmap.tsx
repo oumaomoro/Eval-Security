@@ -21,7 +21,7 @@ export function RiskHeatmap({ data }: RiskHeatmapProps) {
             const data = payload[0].payload;
             return (
                 <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl shadow-2xl backdrop-blur-md">
-                    <div className="text-xs font-black uppercase text-primary mb-1 tracking-widest">{data.name}</div>
+                    <div className="text-xs font-black font-semibold">{data.name}</div>
                     <div className="flex flex-col gap-1">
                         <div className="flex justify-between gap-4 text-[10px]">
                             <span className="text-slate-500 font-bold">COMPLIANCE</span>
@@ -42,7 +42,7 @@ export function RiskHeatmap({ data }: RiskHeatmapProps) {
         <Card className="bg-slate-950 border-slate-900 shadow-2xl overflow-hidden group">
             <CardHeader className="pb-2 border-b border-slate-900/50">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-100 flex items-center gap-2">
+                    <CardTitle className="text-sm font-black font-semibold text-slate-100 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-primary" /> Strategic Risk Posture
                     </CardTitle>
                     <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">LIVE ENGINE</Badge>

@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 import Dashboard from "@/pages/Dashboard";
-import DPODashboard from "@/pages/DPODashboard";
 import Contracts from "@/pages/Contracts";
 import Compliance from "@/pages/Compliance";
 import Clauses from "@/pages/Clauses";
@@ -18,17 +17,18 @@ import AuditLog from "@/pages/AuditLog";
 import Billing from "@/pages/Billing";
 import Settings from "@/pages/Settings";
 import WorkspaceSettings from "@/pages/WorkspaceSettings";
-import Marketplace from "@/pages/Marketplace";
 import ExecutiveROI from "@/pages/ExecutiveROI";
 import History from "@/pages/History";
 import NotificationSettings from "@/pages/NotificationSettings";
 import Savings from "@/pages/Savings";
 import Benchmarking from "@/pages/Benchmarking";
-import CyberInsurance from "@/pages/CyberInsurance";
 import RedliningStudio from "@/pages/RedliningStudio";
 import AdminDashboard from "@/pages/AdminDashboard";
 
 import React, { Suspense } from "react";
+const DPODashboard = React.lazy(() => import("@/pages/DPODashboard"));
+const Marketplace = React.lazy(() => import("@/pages/Marketplace"));
+const CyberInsurance = React.lazy(() => import("@/pages/CyberInsurance"));
 const ContractDetail = React.lazy(() => import("@/pages/ContractDetail"));
 const Risks = React.lazy(() => import("@/pages/Risks"));
 const Rulesets = React.lazy(() => import("@/pages/Rulesets"));

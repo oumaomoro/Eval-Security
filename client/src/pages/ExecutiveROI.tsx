@@ -119,7 +119,7 @@ export default function ExecutiveROI() {
                                 <div className="w-full md:w-1/2 space-y-6 px-4">
                                     {pieData.map((item) => (
                                         <div key={item.name} className="space-y-2">
-                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            <div className="flex justify-between items-center text-[10px] font-black font-semibold text-slate-400">
                                                 <span className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                                                     {item.name}
@@ -137,7 +137,7 @@ export default function ExecutiveROI() {
                     {/* Sector Benchmarking */}
                     <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm self-start">
                         <CardHeader>
-                            <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                            <CardTitle className="text-sm font-black font-semibold flex items-center gap-2">
                                 <Globe className="w-4 h-4 text-cyan-400" /> Sector Benchmarking
                             </CardTitle>
                             <CardDescription className="text-[10px] uppercase font-bold">Category: All Vendors (Internal Org)</CardDescription>
@@ -223,12 +223,12 @@ function ImpactCard({ label, value, icon: Icon, trend, description, color }: any
                     <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
                         <Icon className={`w-5 h-5 ${color}`} />
                     </div>
-                    <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest bg-slate-900 text-slate-400 group-hover:text-primary transition-colors">
+                    <Badge variant="secondary" className="text-[9px] font-black font-semibold bg-slate-900 text-slate-400 group-hover:text-primary transition-colors">
                         {trend}
                     </Badge>
                 </div>
                 <div className="mt-4">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</p>
+                    <p className="text-[10px] font-black text-slate-500 font-semibold">{label}</p>
                     <h3 className="text-3xl font-black text-slate-100 mt-1 font-mono tracking-tighter">{value}</h3>
                     <p className="text-[10px] text-slate-500 font-bold uppercase mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <ChevronRight className="w-3 h-3 inline mr-1" /> {description}
@@ -260,7 +260,7 @@ function BenchmarkItem({ label, current, target, status }: any) {
 function StatItem({ label, value, color, detail }: any) {
     return (
         <div className="p-6 rounded-2xl bg-slate-900/30 border border-slate-900 hover:border-slate-800 transition-all">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</h4>
+            <h4 className="text-[10px] font-black text-slate-500 font-semibold mb-1">{label}</h4>
             <div className={`text-2xl font-black font-mono tracking-tighter ${color}`}>{value}</div>
             <p className="text-[10px] text-slate-500 font-bold uppercase mt-3 leading-relaxed">{detail}</p>
         </div>

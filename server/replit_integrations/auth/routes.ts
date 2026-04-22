@@ -9,6 +9,8 @@ import rateLimit from "express-rate-limit";
 import { cookieHandler } from "../../middleware/cookie-handler";
 import { SOC2Logger } from "../../services/SOC2Logger";
 import { EmailService } from "../../services/EmailService";
+import { z } from "zod";
+import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from "../../../shared/auth-schemas";
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
@@ -46,7 +48,7 @@ export function registerAuthRoutes(app: Express): void {
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName } = registrationSchema.parse(req.body);
       // 1. Supabase Auth Secure Admin Provisioning (Verification Required)
       const { data, error } = await adminClient.auth.admin.createUser({
         email,
@@ -143,6 +145,9 @@ export function registerAuthRoutes(app: Express): void {
         userId: data.user.id 
       });
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
       console.error(`[AUTH-DIAG] Registration Critical Error:`, err.message);
       res.status(400).json({ message: err.message });
     }
@@ -151,7 +156,7 @@ export function registerAuthRoutes(app: Express): void {
   // Login
   app.post("/api/auth/login", async (req: any, res) => {
     try {
-      const { email, password } = req.body;
+      const { email, password } = loginSchema.parse(req.body);
       console.log(`[AUTH-DIAG] Login Handler entry: email=${email}`);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -191,6 +196,9 @@ export function registerAuthRoutes(app: Express): void {
         token: data.session.access_token // Keep for backwards compatibility for non-browser clients
       });
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
       res.status(401).json({ message: err.message });
     }
   });
@@ -198,13 +206,16 @@ export function registerAuthRoutes(app: Express): void {
   // Forgot Password
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email } = forgotPasswordSchema.parse(req.body);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${process.env.FRONTEND_URL}/reset-password`
       });
       if (error) throw error;
       res.json({ message: "Password reset link sent successfully." });
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
       res.status(400).json({ message: err.message });
     }
   });
@@ -280,11 +291,14 @@ export function registerAuthRoutes(app: Express): void {
   // Reset Password
   app.post("/api/auth/reset-password", async (req: any, res) => {
     try {
-      const { password } = req.body;
+      const { password } = resetPasswordSchema.parse(req.body);
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       res.json({ message: "Password updated successfully" });
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
       res.status(400).json({ message: err.message });
     }
   });
@@ -362,6 +376,14 @@ export function registerAuthRoutes(app: Express): void {
             req.session.expires_at = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 day parity
           }
 
+          // ── BRIDGE IDENTITY HEALING (Phase 30 Fix) ───────
+          // Ensure new SSO users are provisioned with enterprise assets
+          let localUser = await authStorage.getUser(user.id).catch(() => null);
+          if (!localUser || !localUser.clientId) {
+            console.log(`[AUTH-DIAG] SSO Provisioning detected for ${user.email}. Running healing...`);
+            await healUserIdentity(user, localUser);
+          }
+
           await SOC2Logger.logEvent(req, {
             userId: user.id,
             action: "SSO_SESSION_ESTABLISHED",
@@ -369,7 +391,7 @@ export function registerAuthRoutes(app: Express): void {
             resourceId: "AUTH_GATEWAY",
             details: `Secure HttpOnly session cookie and server-side state established via OAuth token exchange.`
           });
-          console.log(`[AUTH-DIAG] SSO Session established for ${user.email} (Bridged to Stateful)`);
+          console.log(`[AUTH-DIAG] SSO Session established for ${user.email} (Bridged & Healed)`);
       }
 
       res.json({ message: "Secure session established" });
@@ -379,17 +401,33 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  // API Key Rotation
+  // API Key Rotation (Phase 32 Secure Hashing Aligned)
   app.post("/api/auth/api-key", async (req: any, res) => {
     try {
       if (!req.user) return res.status(401).json({ message: "Unauthorized" });
-      const newApiKey = `sk_live_${randomUUID().replace(/-/g, '')}`;
-      const updatedUser = await storage.updateUser(req.user.id, {
+      
+      const crypto = await import("crypto");
+      const newApiKey = `sk.${crypto.randomBytes(24).toString('hex')}`;
+      
+      // storage.updateUser handles the bcrypt hashing automatically
+      await storage.updateUser(req.user.id, {
         apiKey: newApiKey
       });
-      res.json({ message: "API key rotated", apiKey: newApiKey });
+      
+      await SOC2Logger.logEvent(req, {
+        userId: req.user.id,
+        action: "API_KEY_ROTATED",
+        details: "User rotated platform API key via standard auth route."
+      });
+
+      res.json({ 
+        message: "API key rotated successfully. This is the ONLY time it will be shown in plain text.", 
+        apiKey: newApiKey,
+        securityWarning: "Costloci results are hashed. We cannot recover lost keys."
+      });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("[API_KEY_ROTATE_ERROR]", err.message);
+      res.status(500).json({ message: "Failed to rotate API key" });
     }
   });
 
@@ -482,68 +520,86 @@ export function registerAuthRoutes(app: Express): void {
  * SOVEREIGN IDENTITY HEALING: Autocorrects provisioning failures
  */
 async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
-    const userId = authUser.id;
-    const email = authUser.email;
-    console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
-    
-    try {
-      // 1. Recover metadata
-      const userMeta = authUser.user_metadata || {};
-      const firstName = authUser.firstName || userMeta.first_name || "Enterprise";
-      const lastName = authUser.lastName || userMeta.last_name || "User";
-      
-      let clientId = localUser?.clientId;
+  const userId = authUser.id;
+  const email = authUser.email;
+  console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
 
-      // 2. Provision missing Client/Workspace
-      if (!clientId) {
-        const client = await storage.createClient({
-          companyName: `${firstName}'s Enterprise Hub`,
-          industry: "Professional Services",
-          contactName: `${firstName} ${lastName}`,
-          contactEmail: email,
-          status: "active"
-        });
-        clientId = client.id;
+  try {
+    // 1. Recover metadata
+    const userMeta = authUser.user_metadata || {};
+    let firstName = authUser.firstName || userMeta.first_name || "";
+    let lastName = authUser.lastName || userMeta.last_name || "";
 
-        // Check if workspace already exists before creating
-        const workspaces = await storage.getUserWorkspaces(userId);
-        if (workspaces.length === 0) {
-            const workspace = await storage.createWorkspace({
-              name: "Main Workspace",
-              ownerId: userId,
-              plan: "starter"
-            });
-
-            console.log(`[AUTH-DIAG] Healing Membership for ${userId}...`);
-            await storage.addWorkspaceMember({
-              userId,
-              workspaceId: workspace.id,
-              role: "owner"
-            });
-        }
-      }
-
-      // 3. Sync local profile
-      const healedUser = await authStorage.upsertUser({
-        id: userId,
-        email: email,
-        firstName,
-        lastName,
-        clientId,
-        role: "admin", // Explicitly force admin role for enterprise pivot regardless of legacy trigger
-        subscriptionTier: "starter"
-      });
-
-      await storage.createInfrastructureLog({
-        component: "IdentityHealing",
-        event: "IDENTITY_REPAIRED",
-        status: "resolved",
-        actionTaken: `Atomic Identity Repair for ${email}`
-      });
-
-      return healedUser;
-    } catch (err: any) {
-      console.error(`[IDENTITY-RESILLIENCE] Healing CRITICAL FAILURE:`, err.message);
-      return localUser; // Fallback to raw user to avoid blocking access
+    // Handle Google/SSO full_name format
+    if (!firstName && userMeta.full_name) {
+      const parts = userMeta.full_name.split(" ");
+      firstName = parts[0] || "Enterprise";
+      lastName = parts.slice(1).join(" ") || "User";
+    } else if (!firstName) {
+      firstName = "Enterprise";
+      lastName = "User";
     }
+
+    let clientId = localUser?.clientId;
+
+    // 2. Provision missing Client/Workspace
+    if (!clientId) {
+      const client = await storage.createClient({
+        companyName: `${firstName}'s Enterprise Hub`,
+        industry: "Professional Services",
+        contactName: `${firstName} ${lastName}`,
+        contactEmail: email,
+        contactPhone: "",
+        annualBudget: 0,
+        status: "active"
+      });
+      clientId = client.id;
+
+      // Persist the association to the profile
+      await storage.updateUser(userId, { clientId });
+      console.log(`[IDENTITY-RESILLIENCE] Created and linked Client ID ${clientId} for ${email}`);
+    }
+
+    // 3. Ensure a workspace exists for the user
+    // Check if workspace already exists before creating
+    const workspaces = await storage.getUserWorkspaces(userId);
+    if (workspaces.length === 0) {
+      const workspace = await storage.createWorkspace({
+        name: "Main Workspace",
+        ownerId: userId,
+        plan: "starter"
+      });
+      const workspaceId = Array.isArray(workspace) ? workspace[0]?.id : (workspace as any).id;
+
+      console.log(`[AUTH-DIAG] Healing Membership for ${userId}...`);
+      await storage.addWorkspaceMember({
+        userId,
+        workspaceId,
+        role: "owner"
+      });
+    }
+
+    // 4. Sync local profile
+    const healedUser = await authStorage.upsertUser({
+      id: userId,
+      email: email,
+      firstName,
+      lastName,
+      clientId,
+      role: "admin", // Explicitly force admin role for enterprise pivot
+      subscriptionTier: "starter"
+    });
+
+    await storage.createInfrastructureLog({
+      component: "IdentityHealing",
+      event: "IDENTITY_REPAIRED",
+      status: "resolved",
+      actionTaken: `Atomic Identity Repair for ${email}`
+    });
+
+    return healedUser;
+  } catch (err: any) {
+    console.error(`[IDENTITY-RESILLIENCE] Healing CRITICAL FAILURE:`, err.message);
+    return localUser; // Fallback to raw user to avoid blocking access
+  }
 }

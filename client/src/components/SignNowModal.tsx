@@ -62,7 +62,7 @@ export function SignNowModal({ isOpen, onClose, url }: SignNowModalProps) {
               {!url ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
                   <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                  <p className="text-sm font-black text-slate-500 uppercase tracking-widest">Initializing Secure Stream...</p>
+                  <p className="text-sm font-black text-slate-500 font-semibold">Initializing Secure Stream...</p>
                 </div>
               ) : (
                 <iframe

@@ -69,7 +69,7 @@ export default function History() {
             <div className="py-20 text-center"><Activity className="w-8 h-8 animate-spin mx-auto text-primary" /></div>
           ) : filteredLogs?.length === 0 ? (
             <Card className="bg-slate-950 border-slate-800 border-dashed py-20 text-center">
-              <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No ledger entries found matching criteria.</p>
+              <p className="text-slate-500 font-bold font-semibold text-xs">No ledger entries found matching criteria.</p>
             </Card>
           ) : (
             filteredLogs?.map((log, index) => (
@@ -90,7 +90,7 @@ export default function History() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">TX-ID: {log.id.toString().padStart(6, '0')}</span>
+                            <span className="text-[10px] font-black text-slate-500 font-semibold">TX-ID: {log.id.toString().padStart(6, '0')}</span>
                             <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[8px] font-black uppercase text-primary py-0 px-2 h-4 shrink-0">
                                 PERSISTENT
                             </Badge>

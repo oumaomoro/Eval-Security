@@ -99,7 +99,7 @@ export default function AuditLog() {
             ) : filteredLogs?.length === 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <Card className="bg-slate-950 border-slate-800 border-dashed py-20 text-center rounded-[2rem]">
-                  <p className="text-slate-500 font-black uppercase tracking-widest text-xs">No ledger entries found matching criteria.</p>
+                  <p className="text-slate-500 font-black font-semibold text-xs">No ledger entries found matching criteria.</p>
                 </Card>
               </motion.div>
             ) : (
@@ -112,7 +112,7 @@ export default function AuditLog() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="bg-slate-950 border-slate-900 hover:border-slate-800 transition-all group overflow-hidden relative rounded-[2rem] animate-cyber-scan">
+                  <Card className="bg-slate-950 border-slate-900 hover:border-slate-800 transition-all group overflow-hidden relative rounded-[2rem]">
                     <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary to-indigo-500 opacity-20" />
                     <CardContent className="p-6">
                       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
@@ -125,7 +125,7 @@ export default function AuditLog() {
                           <div>
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">DIGITAL_SIG: {Math.random().toString(36).substring(2, 10).toUpperCase()}</span>
-                              <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[8px] font-black uppercase text-primary py-0 px-2 h-4 shrink-0 shadow-lg shadow-primary/5 animate-biometric">
+                              <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[8px] font-black uppercase text-primary py-0 px-2 h-4 shrink-0 shadow-lg shadow-primary/5">
                                   SIGNED
                               </Badge>
                             </div>

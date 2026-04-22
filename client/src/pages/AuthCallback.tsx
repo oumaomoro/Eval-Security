@@ -76,7 +76,7 @@ export function AuthCallback() {
         </div>
         <Loader2 className="w-6 h-6 animate-spin text-slate-500 mb-4" />
         <h1 className="text-xl font-black text-white uppercase tracking-tighter">Establishing Secure Gateway</h1>
-        <p className="text-slate-400 mt-2 text-xs font-bold uppercase tracking-widest">Verifying Enterprise Identity</p>
+        <p className="text-slate-400 mt-2 text-xs font-bold font-semibold">Verifying Enterprise Identity</p>
       </motion.div>
     </div>
   );

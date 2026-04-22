@@ -12,7 +12,7 @@ const router = Router();
  * Benchmarks the target contract against anonymized category peers 
  * from the Costloci global hub.
  */
-router.get("/api/contracts/:id/benchmarking", isAuthenticated, async (req, res) => {
+router.get("/contracts/:id/benchmarking", isAuthenticated, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });

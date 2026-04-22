@@ -20,7 +20,7 @@ export function CustomerJourney() {
             <Zap className="w-5 h-5 text-primary animate-pulse" />
             ENTERPRISE MATURITY JOURNEY
           </h3>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Real-time status of your sovereign compliance lifecycle</p>
+          <p className="text-[10px] text-slate-500 font-bold font-semibold mt-1">Real-time status of your sovereign compliance lifecycle</p>
         </div>
 
         <div className="flex-1 flex items-center gap-4 w-full max-w-4xl">
@@ -30,7 +30,7 @@ export function CustomerJourney() {
                 <div className={cn(
                   "w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-xl",
                   step.status === "complete" ? "bg-emerald-500/20 shadow-emerald-500/10 border border-emerald-500/30 text-emerald-500" :
-                  step.status === "current" ? "bg-primary/20 shadow-primary/10 border border-primary/50 text-primary animate-ring-pulse" :
+                  step.status === "current" ? "bg-primary/20 shadow-primary/10 border border-primary/50 text-primary" :
                   "bg-slate-900 border border-slate-800 text-slate-600"
                 )}>
                   <step.icon className="w-5 h-5" />
@@ -76,9 +76,9 @@ export function CustomerJourney() {
                 <div key={i} className="w-6 h-6 rounded-full bg-slate-800 border-2 border-slate-950 flex items-center justify-center text-[8px] font-black">{i}</div>
               ))}
            </div>
-           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">3 Autonomic agents active in this jurisdiction</p>
+           <p className="text-[9px] text-slate-500 font-bold font-semibold">3 Autonomic agents active in this jurisdiction</p>
         </div>
-        <button className="text-[9px] font-black text-primary uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform">
+        <button className="text-[9px] font-black text-primary font-semibold flex items-center gap-2 hover:translate-x-1 transition-transform">
           View Detail Logic <ArrowRight className="w-3 h-3" />
         </button>
       </div>

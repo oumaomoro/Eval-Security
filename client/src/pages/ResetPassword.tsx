@@ -47,11 +47,11 @@ export default function ResetPassword() {
                     <ShieldCheck className="w-9 h-9 text-primary" />
                 </div>
                 <CardTitle className="text-3xl font-black text-white uppercase tracking-tighter italic">Key Rotation</CardTitle>
-                <CardDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2">Initialize your new enterprise access credentials</CardDescription>
+                <CardDescription className="text-slate-500 font-bold font-semibold mt-2">Initialize your new enterprise access credentials</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 px-8">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">New Master Key</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold ml-1">New Master Key</label>
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <Input 
@@ -64,7 +64,7 @@ export default function ResetPassword() {
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Confirm Identity Key</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold ml-1">Confirm Identity Key</label>
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <Input 
@@ -89,7 +89,7 @@ export default function ResetPassword() {
                 </Button>
             </CardContent>
             <CardFooter className="bg-slate-950/50 p-6 border-t border-slate-800">
-                <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest text-center mx-auto leading-relaxed">
+                <p className="text-[10px] text-slate-600 font-black font-semibold text-center mx-auto leading-relaxed">
                     Identity verification is managed via the Costloci Autonomic Gateway.
                 </p>
             </CardFooter>

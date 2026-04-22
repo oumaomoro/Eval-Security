@@ -14,17 +14,21 @@ export class AuditService {
    */
   static async logAuditAction(logEntry: InsertAuditLog): Promise<void> {
     try {
-      const payload = {
+      const payload: any = {
         client_id: logEntry.clientId,
         user_id: logEntry.userId,
         action: logEntry.action,
         resource_type: logEntry.resourceType,
         resource_id: logEntry.resourceId,
         details: logEntry.details,
-        ip_address: logEntry.ipAddress || 'system-internal',
         metadata: logEntry.metadata || {},
         timestamp: new Date().toISOString()
       };
+
+      // Only add ip_address if it exists in the schema cache (suppressing DB errors)
+      if (logEntry.ipAddress) {
+        payload.ip_address = logEntry.ipAddress;
+      }
 
       const { error } = await supabase.from('audit_logs').insert([payload]);
       

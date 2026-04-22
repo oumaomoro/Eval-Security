@@ -144,7 +144,7 @@ export default function ContractDetail() {
           </div>
           <div className="text-right flex flex-col items-end gap-3">
             <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">Annual Value</div>
+                <div className="text-[10px] text-muted-foreground font-semibold font-black">Annual Value</div>
                 <div className="text-3xl font-mono font-bold text-primary tracking-tighter">${contract.annualCost?.toLocaleString()}</div>
             </div>
             <Button 
@@ -303,7 +303,7 @@ export default function ContractDetail() {
                     Trigger AI-assisted remediations from the Risk Register tab to view side-by-side diffs and accept legal modifications.
                 </p>
                 <div className="bg-muted/30 p-6 rounded-2xl border border-border/50 max-w-2xl w-full text-left">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-primary mb-4 flex items-center gap-2">
+                    <h4 className="text-xs font-black font-semibold text-primary mb-4 flex items-center gap-2">
                         <Shield className="w-3 h-3" /> Governance Protocol
                     </h4>
                     <p className="text-[11px] leading-relaxed text-muted-foreground italic">

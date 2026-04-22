@@ -81,4 +81,27 @@ test.describe('Costloci Full Enterprise Journey', () => {
     const downloadLink = await page.getAttribute('a.download-btn', 'href');
     expect(downloadLink).toContain('supabase.co/storage');
   });
+
+  test('Stage 8: Automated Reporting & Scheduler Pipeline', async ({ page }) => {
+    // Navigate to Intelligence/Reporting Bureau
+    await page.goto('/reports');
+
+    // Select the "Automated Schedules" tab
+    await page.click('button[value="schedules"]');
+
+    // Open Schedule Configurator
+    await page.click('button:has-text("Initiate first schedule")');
+
+    // Fill the configuration details
+    await page.fill('input[id="sched-title"]', 'E2E Compliance Validation');
+    await page.click('button[role="combobox"]');
+    await page.click('div[role="option"]:has-text("Weekly Operational")');
+
+    // Commit Schedule
+    await page.click('button:has-text("Activate Schedule")');
+
+    // Validate confirmation and presence in active routines
+    await expect(page.locator('text=Schedule Created')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=E2E Compliance Validation')).toBeVisible();
+  });
 });

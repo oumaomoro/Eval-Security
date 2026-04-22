@@ -97,7 +97,7 @@ const publishInputSchema = z.object({
  *   findings: Array<{ requirement, severity, description }>
  * }
  */
-router.post("/api/integrations/word/analyze", authenticateAddinRequest, async (req: any, res) => {
+router.post("/integrations/word/analyze", authenticateAddinRequest, async (req: any, res) => {
   try {
     const { textBlock } = analyzeInputSchema.parse(req.body);
 
@@ -170,7 +170,7 @@ Be precise, cite KDPA sections when applicable, and prioritize actionable intell
  * Syncs a user-accepted AI-suggested clause back to the Costloci
  * central Clause Library, making it available across the web platform.
  */
-router.post("/api/integrations/word/publish", authenticateAddinRequest, async (req: any, res) => {
+router.post("/integrations/word/publish", authenticateAddinRequest, async (req: any, res) => {
   try {
     const input = publishInputSchema.parse(req.body);
 

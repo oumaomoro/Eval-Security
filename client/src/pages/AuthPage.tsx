@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { DiamondIcon } from "@/components/DiamondIcon";
 import { SEO } from "@/components/SEO";
 import { getApiUrl } from "@/lib/api-config";
+import { apiRequest } from "@/lib/queryClient";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
@@ -30,22 +31,10 @@ export default function AuthPage() {
 
   const loginMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(getApiUrl("/api/auth/login"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || err.error || "Login failed");
-      }
+      const res = await apiRequest("POST", "/api/auth/login", { email, password });
       const data = await res.json();
       if (data.token) {
-        await fetch("/api/auth/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access_token: data.token })
-        });
+        await apiRequest("POST", "/api/auth/session", { access_token: data.token });
       }
       return data;
     },
@@ -59,22 +48,10 @@ export default function AuthPage() {
 
   const registerMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(getApiUrl("/api/auth/register"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, firstName, lastName })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Registration failed");
-      }
+      const res = await apiRequest("POST", "/api/auth/register", { email, password, firstName, lastName });
       const data = await res.json();
       if (data.token) {
-        await fetch("/api/auth/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access_token: data.token })
-        });
+        await apiRequest("POST", "/api/auth/session", { access_token: data.token });
       }
       return data;
     },
@@ -89,12 +66,7 @@ export default function AuthPage() {
 
   const forgotMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(getApiUrl("/api/auth/forgot-password"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      if (!res.ok) throw new Error("Could not initiate reset");
+      const res = await apiRequest("POST", "/api/auth/forgot-password", { email });
       return res.json();
     },
     onSuccess: () => {
@@ -105,15 +77,7 @@ export default function AuthPage() {
 
   const magicLinkMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(getApiUrl("/api/auth/magic-link"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || err.error || "Failed to dispatch magic link");
-      }
+      const res = await apiRequest("POST", "/api/auth/magic-link", { email });
       return res.json();
     },
     onSuccess: () => {
@@ -216,7 +180,7 @@ export default function AuthPage() {
         </div>
 
         <div className="relative z-10 flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/5 border border-emerald-500/10 text-[9px] font-black text-emerald-500 uppercase tracking-widest">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/5 border border-emerald-500/10 text-[9px] font-black text-emerald-500 font-semibold">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -261,7 +225,7 @@ export default function AuthPage() {
               
               <div className="relative flex py-6 items-center">
                   <div className="flex-grow border-t border-slate-800/80"></div>
-                  <span className="flex-shrink-0 mx-4 text-slate-500 text-[10px] uppercase font-bold tracking-widest">Or proceed with credentials</span>
+                  <span className="flex-shrink-0 mx-4 text-slate-500 text-[10px] font-semibold">Or proceed with credentials</span>
                   <div className="flex-grow border-t border-slate-800/80"></div>
               </div>
             </div>
@@ -275,7 +239,7 @@ export default function AuthPage() {
               <Card className="bg-slate-900 border-slate-800 shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
                 <CardContent className="pt-6 space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Enterprise Email</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold">Enterprise Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <Input
@@ -288,7 +252,7 @@ export default function AuthPage() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Master Key</label>
+                      <label className="text-[10px] font-black text-slate-500 font-semibold">Master Key</label>
                       <button onClick={() => setMode("forgot")} className="text-[10px] text-primary font-black uppercase hover:underline">Forgot?</button>
                     </div>
                     <div className="relative">
@@ -326,7 +290,7 @@ export default function AuthPage() {
                   </Button>
                 </CardContent>
                 <CardFooter className="bg-slate-950/50 p-4 border-t border-slate-800 flex justify-center">
-                  <p className="text-[10px] text-slate-600 font-bold uppercase flex items-center gap-2 tracking-widest">
+                  <p className="text-[10px] text-slate-600 font-bold font-semibold">
                     <ShieldCheck className="w-3 h-3" /> RSA-4096 Secure Gateway Active
                   </p>
                 </CardFooter>
@@ -338,7 +302,7 @@ export default function AuthPage() {
                 <CardContent className="pt-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">First Name</label>
+                      <label className="text-[10px] font-black text-slate-500 font-semibold">First Name</label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <Input
@@ -350,7 +314,7 @@ export default function AuthPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Last Name</label>
+                      <label className="text-[10px] font-black text-slate-500 font-semibold">Last Name</label>
                       <Input
                         placeholder="Doe"
                         value={lastName}
@@ -360,7 +324,7 @@ export default function AuthPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Corporate Email</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold">Corporate Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <Input
@@ -372,7 +336,7 @@ export default function AuthPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Secure Password</label>
+                    <label className="text-[10px] font-black text-slate-500 font-semibold">Secure Password</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <Input
@@ -409,7 +373,7 @@ export default function AuthPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Account Email</label>
+                      <label className="text-[10px] font-black text-slate-500 font-semibold">Account Email</label>
                       <Input
                         placeholder="your-email@enterprise.com"
                         value={email}
@@ -426,7 +390,7 @@ export default function AuthPage() {
                     </Button>
                   </CardContent>
                   <CardFooter>
-                    <button onClick={() => setMode("login")} className="text-[10px] text-slate-500 hover:text-white font-black uppercase mx-auto tracking-widest">Back to Secure Login</button>
+                    <button onClick={() => setMode("login")} className="text-[10px] text-slate-500 hover:text-white font-black font-semibold">Back to Secure Login</button>
                   </CardFooter>
                 </Card>
               </motion.div>

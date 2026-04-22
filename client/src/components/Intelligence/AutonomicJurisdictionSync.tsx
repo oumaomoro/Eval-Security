@@ -40,7 +40,7 @@ export function AutonomicJurisdictionSync() {
           <div className="space-y-4">
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Global Governance Resonance</p>
+                <p className="text-[10px] font-semibold">Global Governance Resonance</p>
                 <div className="text-4xl font-mono font-black text-slate-100 flex items-baseline gap-1 mt-1">
                   {syncData?.overallHealth} <span className="text-sm text-primary">%</span>
                 </div>
@@ -67,7 +67,7 @@ export function AutonomicJurisdictionSync() {
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
             <div>
-               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest flex items-center gap-1 mb-2">
+               <p className="text-[10px] text-slate-500 font-black font-semibold flex items-center gap-1 mb-2">
                  <Zap className="w-3 h-3 text-cyan-500" /> Autonomic Resolutions
                </p>
                {syncData?.recentShifts.map((shift, i) => (

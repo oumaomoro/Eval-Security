@@ -18,7 +18,7 @@ const cachedPosture = memoize(
  * GET /api/governance/posture
  * Returns the Chief Governance Officer (CGO) AI review of the platform.
  */
-router.get("/api/governance/posture", isAuthenticated, async (req: any, res) => {
+router.get("/governance/posture", isAuthenticated, async (req: any, res) => {
   try {
     const report = await cachedPosture();
 

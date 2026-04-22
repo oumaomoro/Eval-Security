@@ -86,7 +86,7 @@ export function RedlineView({
         <div className="flex flex-col gap-1">
           <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic leading-none">Cognitive Remediation</h3>
           <div className="flex gap-2 mt-1">
-              <Badge variant="outline" className="text-[8px] font-black border-primary/40 text-primary bg-primary/5 uppercase tracking-widest px-2 py-0.5">
+              <Badge variant="outline" className="text-[8px] font-black border-primary/40 text-primary bg-primary/5 font-semibold px-2 py-0.5">
                   <Landmark className="w-2.5 h-2.5 mr-1" /> {jurisdictionCitation}
               </Badge>
           </div>
@@ -94,7 +94,7 @@ export function RedlineView({
         <div className="flex items-center gap-3">
             <div className="flex gap-4 mr-4">
                 <div className="flex flex-col items-end">
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Confidence</span>
+                    <span className="text-[8px] font-black text-slate-500 font-semibold mb-1">Confidence</span>
                     <div className="flex items-center gap-2">
                         <span className="text-xl font-black text-emerald-500 italic tracking-tighter">{confidenceScore}%</span>
                         <div className="w-12 h-1.5 bg-slate-900 rounded-full overflow-hidden p-0.5">
@@ -103,7 +103,7 @@ export function RedlineView({
                     </div>
                 </div>
                 <div className="flex flex-col items-end border-l border-slate-900 pl-4">
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk Delta</span>
+                    <span className="text-[8px] font-black text-slate-500 font-semibold mb-1">Risk Delta</span>
                     <div className="flex items-center gap-2">
                         <span className="text-xl font-black text-primary italic tracking-tighter">-{riskDelta}%</span>
                         <TrendingDown className="w-4 h-4 text-primary" />
@@ -154,7 +154,7 @@ export function RedlineView({
                     <div className="p-2 bg-primary/10 rounded-lg">
                         <Bot className="w-5 h-5 text-primary" />
                     </div>
-                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">Cognitive Rationale & Jurisdictional Logic</span>
+                    <span className="text-[10px] font-black text-primary font-semibold">Cognitive Rationale & Jurisdictional Logic</span>
                 </div>
                 <p className="text-sm text-slate-400 font-bold leading-relaxed italic relative z-10 max-w-4xl">{explanation}</p>
             </div>
@@ -166,7 +166,7 @@ export function RedlineView({
                     <ShieldCheck className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Self-Healing Active</span>
+                    <span className="text-[10px] font-black text-slate-300 font-semibold">Self-Healing Active</span>
                     <p className="text-[10px] text-slate-500 font-bold italic uppercase tracking-tight">Applying this fix will mitigate identified high-level risks.</p>
                 </div>
             </div>
