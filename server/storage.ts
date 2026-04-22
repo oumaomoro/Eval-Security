@@ -52,7 +52,7 @@ import {
   type InsertInfrastructureLog, type InsertBillingTelemetry, type InsertAuditLog,
   type InsertRemediationSuggestion, type InsertRegulatoryAlert,
   type InsertClause, type InsertContractClause, type InsertWorkspaceMember,
-  type InsertPlaybook,
+  type InsertPlaybook, type PlaybookRule, type InsertPlaybookRule,
   type InsurancePolicy as InsuranceItem, type Subscription as UserSubscription
 } from "@shared/schema";
 
@@ -164,6 +164,10 @@ export interface IStorage {
   createPlaybook(playbook: InsertPlaybook): Promise<Playbook>;
   updatePlaybook(id: number, updates: Partial<Playbook>): Promise<Playbook>;
   deletePlaybook(id: number): Promise<void>;
+  getPlaybookRules(playbookId: number): Promise<PlaybookRule[]>;
+  createPlaybookRule(rule: InsertPlaybookRule): Promise<PlaybookRule>;
+  updatePlaybookRule(id: number, updates: Partial<PlaybookRule>): Promise<PlaybookRule>;
+  deletePlaybookRule(id: number): Promise<void>;
   getMarketplaceListings(): Promise<MarketplaceListing[]>;
   getMarketplaceListing(id: number): Promise<MarketplaceListing | undefined>;
   createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing>;
@@ -586,9 +590,7 @@ export class SupabaseRESTStorage implements IStorage {
           workspace_id: workspaceId || playbook.workspaceId,
           name: playbook.name,
           description: playbook.description,
-          category: playbook.category,
-          rules: playbook.rules,
-          is_active: true
+          is_active: playbook.isActive ?? true
         })
         .select()
         .single()
@@ -596,7 +598,9 @@ export class SupabaseRESTStorage implements IStorage {
     return {
       ...data,
       workspaceId: data.workspace_id,
-      isActive: data.is_active
+      isActive: data.is_active,
+      createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+      updatedAt: data.updated_at ? new Date(data.updated_at) : new Date()
     };
   }
 
@@ -604,9 +608,8 @@ export class SupabaseRESTStorage implements IStorage {
     const payload: any = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.description !== undefined) payload.description = updates.description;
-    if (updates.category !== undefined) payload.category = updates.category;
-    if (updates.rules !== undefined) payload.rules = updates.rules;
     if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+    payload.updated_at = new Date().toISOString();
 
     const data = await this.handleResponse<any>(
       supabase.from("playbooks")
@@ -618,12 +621,82 @@ export class SupabaseRESTStorage implements IStorage {
     return {
       ...data,
       workspaceId: data.workspace_id,
-      isActive: data.is_active
+      isActive: data.is_active,
+      createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+      updatedAt: data.updated_at ? new Date(data.updated_at) : new Date()
     };
   }
 
   async deletePlaybook(id: number): Promise<void> {
     await this.handleResponse(supabase.from("playbooks").delete().eq("id", id));
+  }
+
+  // --- PLAYBOOK RULES --- //
+  async getPlaybookRules(playbookId: number): Promise<PlaybookRule[]> {
+    const data = await this.handleResponse<any[]>(
+      supabase.from("playbook_rules").select("*").eq("playbook_id", playbookId).order("priority", { ascending: false })
+    );
+    return (data || []).map(d => ({
+       id: d.id,
+       playbookId: d.playbook_id,
+       name: d.name,
+       condition: d.condition,
+       action: d.action,
+       priority: d.priority,
+       isActive: d.is_active,
+       createdAt: d.created_at ? new Date(d.created_at) : new Date()
+    }));
+  }
+
+  async createPlaybookRule(rule: InsertPlaybookRule): Promise<PlaybookRule> {
+    const data = await this.handleResponse<any>(
+      supabase.from("playbook_rules")
+        .insert({
+          playbook_id: rule.playbookId,
+          name: rule.name,
+          condition: rule.condition,
+          action: rule.action,
+          priority: rule.priority || 0,
+          is_active: rule.isActive ?? true
+        })
+        .select()
+        .single()
+    );
+    return {
+       id: data.id,
+       playbookId: data.playbook_id,
+       name: data.name,
+       condition: data.condition,
+       action: data.action,
+       priority: data.priority,
+       isActive: data.is_active,
+       createdAt: data.created_at ? new Date(data.created_at) : new Date()
+    };
+  }
+
+  async updatePlaybookRule(id: number, updates: Partial<PlaybookRule>): Promise<PlaybookRule> {
+     const payload: any = {};
+     if (updates.name !== undefined) payload.name = updates.name;
+     if (updates.condition !== undefined) payload.condition = updates.condition;
+     if (updates.action !== undefined) payload.action = updates.action;
+     if (updates.priority !== undefined) payload.priority = updates.priority;
+     if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+
+     const data = await this.handleResponse<any>(supabase.from("playbook_rules").update(payload).eq("id", id).select().single());
+     return {
+       id: data.id,
+       playbookId: data.playbook_id,
+       name: data.name,
+       condition: data.condition,
+       action: data.action,
+       priority: data.priority,
+       isActive: data.is_active,
+       createdAt: data.created_at ? new Date(data.created_at) : new Date()
+    };
+  }
+
+  async deletePlaybookRule(id: number): Promise<void> {
+    await this.handleResponse(supabase.from("playbook_rules").delete().eq("id", id));
   }
 
   // --- NOTIFICATION CHANNELS (Enterprise Webhooks Option C) --- //
@@ -1914,6 +1987,8 @@ export class SupabaseRESTStorage implements IStorage {
       originalClause: d.original_clause,
       suggestedClause: d.suggested_clause,
       status: d.status,
+      userId: d.user_id,
+      ruleId: d.rule_id,
       createdAt: d.created_at ? new Date(d.created_at) : null,
       acceptedAt: d.accepted_at ? new Date(d.accepted_at) : null
     }));
@@ -1928,7 +2003,9 @@ export class SupabaseRESTStorage implements IStorage {
           contract_id: suggestion.contractId,
           original_clause: suggestion.originalClause,
           suggested_clause: suggestion.suggestedClause,
-          status: suggestion.status || "pending"
+          status: suggestion.status || "pending",
+          user_id: suggestion.userId,
+          rule_id: suggestion.ruleId
         })
         .select()
         .single()
@@ -1940,6 +2017,8 @@ export class SupabaseRESTStorage implements IStorage {
       originalClause: data.original_clause,
       suggestedClause: data.suggested_clause,
       status: data.status,
+      userId: data.user_id,
+      ruleId: data.rule_id,
       createdAt: data.created_at ? new Date(data.created_at) : null,
       acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
     };
@@ -1949,6 +2028,7 @@ export class SupabaseRESTStorage implements IStorage {
     const payload: any = {};
     if (updates.status !== undefined) payload.status = updates.status;
     if (updates.acceptedAt !== undefined) payload.accepted_at = updates.acceptedAt;
+    if (updates.userId !== undefined) payload.user_id = updates.userId;
 
     const data = await this.handleResponse<any>(
       supabase.from("remediation_suggestions")
@@ -1964,6 +2044,8 @@ export class SupabaseRESTStorage implements IStorage {
       originalClause: data.original_clause,
       suggestedClause: data.suggested_clause,
       status: data.status,
+      userId: data.user_id,
+      ruleId: data.rule_id,
       createdAt: data.created_at ? new Date(data.created_at) : null,
       acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
     };

@@ -14,6 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RedlineView } from "@/components/Intelligence/RedlineView";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { RedlineSuggestion } from "@/components/RedlineSuggestion";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { SignNowModal } from "@/components/SignNowModal";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -104,6 +107,30 @@ export default function ContractDetail() {
     }
   };
 
+  const { data: suggestions, isLoading: loadingSugs } = useQuery<any[]>({
+    queryKey: ["/api/contracts", id, "redlines"],
+    queryFn: async () => {
+      const res = await fetch(`/api/contracts/${id}/redlines`);
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  const applyPlaybooksMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/contracts/${id}/apply-playbooks`, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts", id, "redlines"] });
+      toast({ title: "Rules Applied", description: "Playbook rules evaluated successfully." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to apply rules", description: err.message, variant: "destructive" });
+    }
+  });
+
   if (isLoading) return <Layout><div>Loading...</div></Layout>;
   if (!contract) return <Layout><div>Contract not found</div></Layout>;
 
@@ -123,7 +150,9 @@ export default function ContractDetail() {
               jurisdictionCitation={activeRedline?.jurisdictionCitation}
               onComplete={() => {
                   setActiveRedline(null);
-                  window.location.reload(); // Refresh to show mitigated status
+                  queryClient.invalidateQueries({ queryKey: ["/api/risks", { contractId: String(id) }] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/contracts", id] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/contracts", id, "redlines"] });
               }}
             />
           </div>
@@ -294,24 +323,40 @@ export default function ContractDetail() {
           <MarketBenchmark contractId={id} />
           <ComparisonView contractId={id} />
         </TabsContent>
-        <TabsContent value="redline" className="animate-in fade-in slide-in-from-bottom-2">
-          <Card className="bg-card border border-border rounded-2xl p-8">
-            <div className="flex flex-col items-center justify-center text-center py-12">
+        <TabsContent value="redline" className="animate-in fade-in slide-in-from-bottom-2 flex flex-col gap-6">
+          <Card className="bg-card border border-border rounded-2xl p-6">
+            <h3 className="font-bold flex items-center mb-6">
+               <ShieldCheck className="w-5 h-5 text-emerald-500 mr-2" />
+               Automated Redline Suggestions
+            </h3>
+            
+            {loadingSugs ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : !suggestions || suggestions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-12">
                 <PenTool className="w-12 h-12 text-primary/50 mb-4" />
-                <h3 className="text-xl font-bold mb-2">Manual Redlining Hub</h3>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto mb-8">
-                    Trigger AI-assisted remediations from the Risk Register tab to view side-by-side diffs and accept legal modifications.
+                <h3 className="text-xl font-bold mb-2">Automated Rules Engine</h3>
+                <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                  Playbook rules will trigger AI-assisted redline remediation automatically when compliance deficiencies are found.
                 </p>
-                <div className="bg-muted/30 p-6 rounded-2xl border border-border/50 max-w-2xl w-full text-left">
-                    <h4 className="text-xs font-black font-semibold text-primary mb-4 flex items-center gap-2">
-                        <Shield className="w-3 h-3" /> Governance Protocol
-                    </h4>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground italic">
-                        All AI suggestions must be reviewed by legal counsel before being incorporated into the master agreement. 
-                        Accepting a redline will generate a remediation asset and log the decision to the immutable audit ledger.
-                    </p>
-                </div>
-            </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => applyPlaybooksMutation.mutate()} 
+                  disabled={isAnalyzing || applyPlaybooksMutation.isPending}
+                >
+                  {applyPlaybooksMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <PenTool className="w-4 h-4 mr-2" />}
+                  {applyPlaybooksMutation.isPending ? "Applying..." : "Run Playbook Rules"}
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {suggestions.map((s) => (
+                  <RedlineSuggestion key={s.id} suggestion={{...s, contractId: id}} />
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
 

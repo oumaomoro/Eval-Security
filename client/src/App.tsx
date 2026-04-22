@@ -32,6 +32,8 @@ const CyberInsurance = React.lazy(() => import("@/pages/CyberInsurance"));
 const ContractDetail = React.lazy(() => import("@/pages/ContractDetail"));
 const Risks = React.lazy(() => import("@/pages/Risks"));
 const Rulesets = React.lazy(() => import("@/pages/Rulesets"));
+const Playbooks = React.lazy(() => import("@/pages/Playbooks"));
+const PlaybookRules = React.lazy(() => import("@/pages/PlaybookRules"));
 
 import AuthPage from "@/pages/AuthPage";
 import { AuthCallback } from "@/pages/AuthCallback";
@@ -52,6 +54,8 @@ function PrivateRouter() {
         <Route path="/clauses" component={Clauses} />
         <Route path="/vendors" component={Vendors} />
         <Route path="/policies" component={Rulesets} />
+        <Route path="/playbooks" component={Playbooks} />
+        <Route path="/playbooks/:id/rules" component={PlaybookRules} />
         <Route path="/system" component={SystemHealth} />
         <Route path="/audit" component={AuditLog} />
         <Route path="/reports" component={Reports} />

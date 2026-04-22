@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+Set-Location $PSScriptRoot
 
 function Step($msg) {
   Write-Host "`n╠══ $msg" -ForegroundColor Cyan
@@ -23,9 +24,9 @@ function Fail($msg) {
   exit 1
 }
 
-Write-Host "`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-Write-Host "║   COSTLOCI ENTERPRISE DEPLOY PIPELINE                    ║" -ForegroundColor Magenta
-Write-Host "╚══════════════════════════════════════════════════════════╝`n" -ForegroundColor Magenta
+Write-Host "`n************************************************************" -ForegroundColor Magenta
+Write-Host "*   COSTLOCI ENTERPRISE DEPLOY PIPELINE                    *" -ForegroundColor Magenta
+Write-Host "************************************************************`n" -ForegroundColor Magenta
 
 # ── Step 1: TypeScript Check ─────────────────────────────────────────────────
 Step "STEP 1: TypeScript Certification"
@@ -47,18 +48,18 @@ Ok "Database: All tables confirmed"
 # ── Step 3: E2E Test Suite ────────────────────────────────────────────────────
 if (-not $SkipTests) {
   Step "STEP 3: End-to-End Test Suite"
-  Write-Host "  Checking if dev server is running on port 3001..." -ForegroundColor Yellow
+  Write-Host "  Checking if dev server is running on port 3200..." -ForegroundColor Yellow
   
   $serverCheck = $null
-  try { $serverCheck = Invoke-RestMethod -Uri "http://127.0.0.1:3001/api/health" -TimeoutSec 5 } catch {}
+  try { $serverCheck = Invoke-RestMethod -Uri "http://127.0.0.1:3200/api/health" -TimeoutSec 5 } catch {}
   
   if (-not $serverCheck) {
     Write-Host "  ⚠️  Dev server not detected. Starting it in background..." -ForegroundColor Yellow
     $serverJob = Start-Job -ScriptBlock { 
-      Set-Location "c:\Users\Jack.Ouma\Downloads\New folder\Cyber-Optimize\Cyber-Optimize"
+      Set-Location $using:PSScriptRoot
       npx cross-env NODE_ENV=development tsx server/index.ts 
     }
-    Start-Sleep -Seconds 8
+    Start-Sleep -Seconds 15
     Write-Host "  Server started (Job ID: $($serverJob.Id))" -ForegroundColor Yellow
   }
   
@@ -97,11 +98,11 @@ if ($LASTEXITCODE -ne 0) {
 Ok "Frontend deployed → https://costloci-frontend.pages.dev"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
-Write-Host "`n╔══════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║   ✅ DEPLOYMENT COMPLETE                                  ║" -ForegroundColor Green
-Write-Host "║                                                          ║" -ForegroundColor Green
-Write-Host "║   Frontend: https://costloci-frontend.pages.dev          ║" -ForegroundColor Green
-Write-Host "║                                                          ║" -ForegroundColor Green
-Write-Host "║   Backend (manual): Push server/ to Railway/Render       ║" -ForegroundColor Green
-Write-Host "║   Or run: npm start (uses dist/index.cjs)                ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════╝`n" -ForegroundColor Green
+Write-Host "`n************************************************************" -ForegroundColor Green
+Write-Host "*   ✅ DEPLOYMENT COMPLETE                                  *" -ForegroundColor Green
+Write-Host "*                                                          *" -ForegroundColor Green
+Write-Host "*   Frontend: https://costloci-frontend.pages.dev          *" -ForegroundColor Green
+Write-Host "*                                                          *" -ForegroundColor Green
+Write-Host "*   Backend (manual): Push server/ to Railway/Render       *" -ForegroundColor Green
+Write-Host "*   Or run: npm start (uses dist/index.cjs)                *" -ForegroundColor Green
+Write-Host "************************************************************`n" -ForegroundColor Green

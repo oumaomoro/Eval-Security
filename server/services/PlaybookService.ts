@@ -75,14 +75,10 @@ export class PlaybookService {
 
       // Persist the playbook for historical tracking
       await storage.createPlaybook({
+        workspaceId: contract.workspaceId!,
         name: `Strategic Playbook: ${contract.vendorName}`,
-        description: `AI-generated negotiation strategy for ${contract.category} services.`,
+        description: `AI-generated negotiation strategy for ${contract.category} services. Rules identified: ${result.leveragePoints.join(", ")}`,
         category: contract.category,
-        rules: [
-          `Target Savings: ${result.targetSavings}`,
-          ...result.leveragePoints,
-          `Script: ${result.scriptSnippet}`
-        ]
       });
 
       return result;

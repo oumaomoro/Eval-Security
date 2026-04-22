@@ -38,10 +38,13 @@ export function RedlineView({
   const handleAccept = async () => {
     setIsAccepting(true);
     try {
-      await fetch(`/api/risks/${riskId}/resolve`, {
-        method: "POST",
+      await fetch(`/api/risks/${riskId}/mitigate`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strategy: "Accepted AI redline suggestion." })
+        body: JSON.stringify({ 
+          status: "mitigated",
+          strategy: "Accepted AI redline suggestion." 
+        })
       });
 
       await fetch("/api/audit-logs", {

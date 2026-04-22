@@ -20,7 +20,7 @@ try {
   }
 } catch { /* ok */ }
 
-const API_BASE = process.env.E2E_API_URL || "http://127.0.0.1:3500";
+const API_BASE = process.env.E2E_API_URL || "http://127.0.0.1:3200";
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || SUPABASE_SERVICE_KEY;

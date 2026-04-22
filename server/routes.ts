@@ -453,6 +453,12 @@ Analyze the contract text and return JSON with exactly these fields:
               severity: "info"
           });
 
+          // TRIGGER REDLINES & PLAYBOOK RULES ENGINE
+          const { RulesEngine } = await import("./services/RulesEngine");
+          await RulesEngine.evaluateContract(contract.id, workspaceId).catch(err => {
+              console.error("[RulesEngine] Autonomous execution failed, but not failing request:", err.message);
+          });
+
           return res.status(201).json({
             url: contract.fileUrl || "#",
             filename: req.file.originalname,
@@ -1292,14 +1298,88 @@ Analyze the contract text and return JSON with exactly these fields:
     } catch { res.status(500).json({ message: "Optimization report failed" }); }
   });
 
+  // ─── PLAYBOOKS RULES ENGINE (Phase X) ──────────────────────────────────────
   app.get("/api/playbooks", isAuthenticated, async (req: any, res) => {
     try {
-      // Return global/marketplace playbooks
       const data = await storage.getPlaybooks();
       res.json(data);
-    } catch (err: any) {
-      res.status(500).json({ message: "Failed to fetch playbooks" });
-    }
+    } catch (err: any) { res.status(500).json({ message: "Failed to fetch playbooks" }); }
+  });
+
+  app.post("/api/playbooks", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.user?.workspaceId) return res.status(403).json({ message: "Workspace required" });
+      const playbook = await storage.createPlaybook({...req.body, workspaceId: req.user.workspaceId});
+      res.json(playbook);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.put("/api/playbooks/:id", isAuthenticated, async (req, res) => {
+    try {
+      const playbook = await storage.updatePlaybook(Number(req.params.id), req.body);
+      res.json(playbook);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.delete("/api/playbooks/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deletePlaybook(Number(req.params.id));
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // Playbook Rules Endpoints
+  app.get("/api/playbooks/:id/rules", isAuthenticated, async (req, res) => {
+    try {
+      const rules = await storage.getPlaybookRules(Number(req.params.id));
+      res.json(rules);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.post("/api/playbooks/:id/rules", isAuthenticated, async (req, res) => {
+    try {
+      const rule = await storage.createPlaybookRule({...req.body, playbookId: Number(req.params.id)});
+      res.json(rule);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.put("/api/playbooks/:id/rules/:ruleId", isAuthenticated, async (req, res) => {
+    try {
+      const rule = await storage.updatePlaybookRule(Number(req.params.ruleId), req.body);
+      res.json(rule);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.delete("/api/playbooks/:id/rules/:ruleId", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deletePlaybookRule(Number(req.params.ruleId));
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // Redlines Endpoints
+  app.post("/api/contracts/:id/apply-playbooks", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.user?.workspaceId) return res.status(403).json({ message: "Workspace required" });
+      const { RulesEngine } = await import("./services/RulesEngine");
+      await RulesEngine.evaluateContract(Number(req.params.id), req.user.workspaceId);
+      res.json({ success: true, message: "Playbooks evaluated successfully." });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.get("/api/contracts/:id/redlines", isAuthenticated, async (req, res) => {
+    try {
+      const data = await storage.getRemediationSuggestions(Number(req.params.id));
+      res.json(data);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  app.post("/api/redlines/:id/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const { RedlineEngine } = await import("./services/RedlineEngine");
+      await RedlineEngine.acceptRedline(req.params.id, req.user.id);
+      res.json({ success: true, message: "Redline accepted." });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
   app.get("/api/vendors/:id/savings-strategy", isAuthenticated, async (req, res) => {
