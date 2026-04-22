@@ -1584,6 +1584,83 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
+  // --- REMEDIATION SUGGESTIONS ---
+  async getRemediationSuggestions(contractId?: number): Promise<RemediationSuggestion[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("remediation_suggestions").select("*");
+    if (contractId) query = query.eq("contract_id", contractId);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      originalClause: d.original_clause,
+      suggestedClause: d.suggested_clause,
+      status: d.status,
+      userId: d.user_id,
+      ruleId: d.rule_id,
+      createdAt: d.created_at ? new Date(d.created_at) : null,
+      acceptedAt: d.accepted_at ? new Date(d.accepted_at) : null
+    }));
+  }
+
+  async createRemediationSuggestion(suggestion: InsertRemediationSuggestion): Promise<RemediationSuggestion> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions")
+        .insert({
+          workspace_id: workspaceId || suggestion.workspaceId,
+          contract_id: suggestion.contractId,
+          original_clause: suggestion.originalClause,
+          suggested_clause: suggestion.suggestedClause,
+          status: suggestion.status || "pending",
+          user_id: suggestion.userId,
+          rule_id: suggestion.ruleId
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      contractId: data.contract_id,
+      originalClause: data.original_clause,
+      suggestedClause: data.suggested_clause,
+      status: data.status,
+      userId: data.user_id,
+      ruleId: data.rule_id,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
+    };
+  }
+
+  async updateRemediationSuggestion(id: string, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion> {
+    const payload: Record<string, any> = {};
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.userId !== undefined) payload.user_id = updates.userId;
+    if (updates.acceptedAt !== undefined) payload.accepted_at = (updates.acceptedAt as Date).toISOString();
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      workspaceId: data.workspace_id,
+      contractId: data.contract_id,
+      originalClause: data.original_clause,
+      suggestedClause: data.suggested_clause,
+      status: data.status,
+      userId: data.user_id,
+      ruleId: data.rule_id,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
+    };
+  }
+
   // --- TELEMETRY ---
   async getBillingTelemetry(clientId?: number): Promise<BillingTelemetry[]> {
     const workspaceId = storageContext.getStore()?.workspaceId;

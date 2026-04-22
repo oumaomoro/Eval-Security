@@ -154,7 +154,7 @@ test.describe('Contract Lifecycle Management', () => {
     
     await page.goto('/cyber-insurance');
     // The specific text contains 'Cyber Insurance Portfolio' in the new implementation
-    await expect(page.locator('text=Cyber Insurance Portfolio')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /Cyber Insurance Portfolio/i })).toBeVisible({ timeout: 15000 });
     
     // Check for metrics cards
     await expect(page.locator('text=Active Policies')).toBeVisible();
@@ -201,8 +201,8 @@ test.describe('Contract Lifecycle Management', () => {
     await page.waitForSelector('#root');
     
     // Updated placeholders to match RedliningStudio.tsx
-    await page.fill('textarea[placeholder*="Vendor shall not be liable"]', 'The vendor shall not be liable for any data breach.');
-    await page.fill('textarea[placeholder*="Liability for data breaches"]', 'The vendor is fully liable for all data breaches.');
+    await page.fill('textarea[placeholder*="Paste the vendor\'s clause here..."]', 'The vendor shall not be liable for any data breach.');
+    await page.fill('textarea[placeholder*="Paste your ideal clause or select from library..."]', 'The vendor is fully liable for all data breaches.');
     
     // Mock the AI redline response
     await page.route('**/api/insurance/redline', async route => {

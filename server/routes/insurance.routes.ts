@@ -230,4 +230,66 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
   }
 });
 
+// ─── REMEDIATION SUGGESTIONS ───────────────────────────────────────────────
+// GET /api/remediation-suggestions?contractId=X
+router.get("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
+  try {
+    const contractId = req.query.contractId ? Number(req.query.contractId) : undefined;
+    const suggestions = await storage.getRemediationSuggestions(contractId);
+    res.json(suggestions);
+  } catch (error: any) {
+    console.error("[REMEDIATION SUGGESTIONS GET]", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PATCH /api/remediation-suggestions/:id/accept
+router.patch("/remediation-suggestions/:id/accept", isAuthenticated, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await storage.updateRemediationSuggestion(id, {
+      status: "accepted",
+      userId: req.user?.id,
+      acceptedAt: new Date()
+    });
+
+    await SOC2Logger.logEvent(req, {
+      action: "REDLINE_SUGGESTION_ACCEPTED",
+      userId: req.user.id,
+      resourceType: "RemediationSuggestion",
+      resourceId: id,
+      details: "User accepted an AI-generated redline suggestion."
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("[REMEDIATION SUGGESTION ACCEPT]", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PATCH /api/remediation-suggestions/:id/reject
+router.patch("/remediation-suggestions/:id/reject", isAuthenticated, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await storage.updateRemediationSuggestion(id, {
+      status: "rejected",
+      userId: req.user?.id
+    });
+
+    await SOC2Logger.logEvent(req, {
+      action: "REDLINE_SUGGESTION_REJECTED",
+      userId: req.user.id,
+      resourceType: "RemediationSuggestion",
+      resourceId: id,
+      details: "User rejected an AI-generated redline suggestion."
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("[REMEDIATION SUGGESTION REJECT]", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;
