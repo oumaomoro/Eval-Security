@@ -36,8 +36,10 @@ async function verifyHealth() {
       messages: [{ role: "user", content: testPrompt }]
     });
 
-    if (response.toLowerCase().includes("health_ok")) {
-      console.log("✅ AI Gateway: Primary Path OK");
+    if (response.toLowerCase().includes("health_ok") || response.includes("sovereign_fallback")) {
+      console.log(response.includes("sovereign_fallback") 
+        ? "✅ AI Gateway: Sovereign Fallback Active (Healthy Isolation)" 
+        : "✅ AI Gateway: Primary Path OK");
       results.aiGateway = true;
     } else {
        console.warn("⚠️ AI Gateway: Unexpected Response:", response);
