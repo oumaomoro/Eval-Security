@@ -5,6 +5,12 @@
   "env": {
     "VITE_API_URL": "https://api.costloci.com"
   },
+  "crons": [
+    {
+      "path": "/api/cron/process-schedules",
+      "schedule": "0 * * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/api/api/:path*", "destination": "https://api.costloci.com/api/:path*" },
     { "source": "/api/:path*", "destination": "https://api.costloci.com/api/:path*" }
