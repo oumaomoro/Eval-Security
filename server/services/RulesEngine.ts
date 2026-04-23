@@ -53,8 +53,39 @@ export class RulesEngine {
         console.error(`[RulesEngine] [!] Error evaluating rule [${rule.name}]:`, err.message);
       }
     }
+
+    // 4. Temporal Risk Forecasting (Phase 27)
+    await this.checkTemporalRisks(contract);
     
     console.log(`[RulesEngine] Evaluation complete for contract ID ${contractId}`);
+  }
+
+  /**
+   * Forecasts future risks based on temporal data (e.g., upcoming renewals vs regulatory shifts)
+   */
+  private static async checkTemporalRisks(contract: Contract): Promise<void> {
+    if (!contract.renewalDate) return;
+
+    const renewal = new Date(contract.renewalDate);
+    const now = new Date();
+    const monthsUntilRenewal = (renewal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30);
+
+    // If renewal is within 6 months, flag for "Compliance Drift" assessment
+    if (monthsUntilRenewal > 0 && monthsUntilRenewal <= 6) {
+      console.log(`[RulesEngine] [TEMPORAL] Forecasting compliance drift for ${contract.vendorName} (Renewal in ${Math.round(monthsUntilRenewal)} months)`);
+      
+      await storage.createRisk({
+        workspaceId: contract.workspaceId!,
+        contractId: contract.id,
+        riskTitle: `[Forecasting] Upcoming Renewal Compliance Drift`,
+        riskCategory: "strategic",
+        riskDescription: `Contract renewal is in ${Math.round(monthsUntilRenewal)} months. Recommend proactive audit against 2026 Sovereign Data Standards to prevent legacy lock-in.`,
+        severity: "medium",
+        likelihood: "likely",
+        impact: "moderate",
+        mitigationStatus: "identified"
+      });
+    }
   }
 
   /**

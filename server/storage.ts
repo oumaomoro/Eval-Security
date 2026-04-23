@@ -207,9 +207,9 @@ export interface IStorage {
   createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy>;
   updateInsurancePolicy(id: number, updates: Partial<InsurancePolicy>): Promise<InsurancePolicy>;
 
-  // Subscriptions
-  getSubscription(userId: string): Promise<Subscription | undefined>;
-  upsertSubscription(sub: InsertSubscription): Promise<Subscription>;
+  // AI Cache
+  getAiCache(promptHash: string): Promise<any | undefined>;
+  createAiCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void>;
 
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] };
 }
@@ -300,6 +300,7 @@ export class SupabaseRESTStorage implements IStorage {
       apiUsageCount: d.api_usage_count,
       apiUsageResetDate: d.api_usage_reset_date ? new Date(d.api_usage_reset_date) : null,
       activeStandards: d.active_standards || [],
+      region: d.region || "east-africa",
       createdAt: d.created_at ? new Date(d.created_at) : new Date()
     };
   }
@@ -2505,6 +2506,36 @@ export class SupabaseRESTStorage implements IStorage {
       creditsUsed: d.credits_used,
       createdAt: d.created_at ? new Date(d.created_at) : null
     }));
+  }
+  // --- AI CACHE ---
+  async getAiCache(promptHash: string): Promise<any | undefined> {
+    const data = await this.handleResponse<any | null>(
+      supabase.from("ai_cache")
+        .select("*")
+        .eq("prompt_hash", promptHash)
+        .maybeSingle()
+    );
+    if (data) {
+      // Update last_used_at in the background
+      adminClient.from("ai_cache")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", data.id)
+        .then(() => {});
+      return JSON.parse(data.response);
+    }
+    return undefined;
+  }
+
+  async createAiCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void> {
+    await this.handleResponse(
+      adminClient.from("ai_cache")
+        .insert({
+          prompt_hash: cache.promptHash,
+          response: cache.response,
+          provider: cache.provider,
+          model: cache.model
+        })
+    );
   }
 }
 

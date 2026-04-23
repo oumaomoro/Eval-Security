@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "../storage";
+import { createHash } from "crypto";
 
 /**
  * SOVEREIGN API GATEWAY: AI Resilience Layer
@@ -73,9 +74,27 @@ export class AIGateway {
   }
 
   /**
-   * Resilient completion endpoint with Multi-Provider Fallback
+   * Resilient completion endpoint with Multi-Provider Fallback & Semantic Caching
    */
   static async createCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): Promise<string> {
+    const promptText = params.messages.map(m => `${m.role}:${m.content}`).join("|");
+    const promptHash = createHash("sha256").update(promptText).digest("hex");
+
+    // 0. Check Semantic Cache
+    try {
+      const cached = await storage.getAiCache(promptHash);
+      if (cached) {
+        console.log(`[AI-GATEWAY] Semantic Cache Hit: ${promptHash}`);
+        return cached;
+      }
+    } catch (e) {
+      console.warn("[AI-GATEWAY] Cache check failed, proceeding to live inference.");
+    }
+
+    let responseContent = "";
+    let usedProvider = "openai";
+    let usedModel = params.model;
+
     // 1. Attempt Primary (DeepSeek - cost effective & high context)
     try {
       if (this.DEEPSEEK_KEY !== "missing") {
@@ -83,72 +102,85 @@ export class AIGateway {
         const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
            () => this.getDeepSeek().chat.completions.create(deepseekParams as any) as any
         );
-        return response.choices[0]?.message?.content || "";
+        responseContent = response.choices[0]?.message?.content || "";
+        usedProvider = "deepseek";
+        usedModel = deepseekParams.model;
       }
     } catch (error: any) {
       console.warn(`[AI-GATEWAY] DeepSeek Engine Unavailable: ${error.message} - Degrading fully to OpenAI.`);
     }
 
-    // 2. Attempt Secondary (OpenAI)
-    try {
-      if (this.OPENAI_KEY !== "missing") {
-        const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
-           () => this.getOpenAI().chat.completions.create(params) as any
-        );
-        return response.choices[0]?.message?.content || "";
-      }
-    } catch (error: any) {
-      console.warn(`[AI-GATEWAY] OpenAI Engine Unavailable: ${error.message}`);
-      // Cascade to next provider on any auth/quota/billing error
-      const isRecoverable = error.status === 401 || error.status === 402 || error.status === 429
-        || error.message.includes("401") || error.message.includes("402")
-        || error.message.includes("429") || error.message.includes("quota")
-        || error.message.includes("Incorrect API key");
-      if (!isRecoverable) {
-        console.warn("[AI-GATEWAY] Non-recoverable OpenAI error, cascading anyway for resilience.");
-      }
-      console.log("[AI-GATEWAY] Routing to Sovereign resilience path...");
-    }
-
-    // 3. Attempt Tertiary (Anthropic)
-    try {
-      if (this.ANTHROPIC_KEY !== "missing") {
-        console.log("[AI-GATEWAY] Attempting Anthropic Resilience Path...");
-        const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
-        const response = await this.getAnthropic().messages.create({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 1024,
-          messages: [{ role: "user", content: prompt }],
-        });
-        
-        const content = response.content[0];
-        if (content.type === 'text') {
-           return content.text;
+    if (!responseContent) {
+      // 2. Attempt Secondary (OpenAI)
+      try {
+        if (this.OPENAI_KEY !== "missing") {
+          const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
+             () => this.getOpenAI().chat.completions.create(params) as any
+          );
+          responseContent = response.choices[0]?.message?.content || "";
+          usedProvider = "openai";
+          usedModel = params.model;
         }
+      } catch (error: any) {
+        console.warn(`[AI-GATEWAY] OpenAI Engine Unavailable: ${error.message}`);
       }
-    } catch (error: any) {
-      console.warn(`[AI-GATEWAY] Anthropic Engine Unavailable: ${error.message}`);
     }
 
-    // 4. Attempt Quaternary (Sovereign Local AI - Ollama)
+    if (!responseContent) {
+      // 3. Attempt Tertiary (Anthropic)
+      try {
+        if (this.ANTHROPIC_KEY !== "missing") {
+          const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
+          const response = await this.getAnthropic().messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 1024,
+            messages: [{ role: "user", content: prompt }],
+          });
+          
+          const content = response.content[0];
+          if (content.type === 'text') {
+             responseContent = content.text;
+             usedProvider = "anthropic";
+             usedModel = "claude-3-5-sonnet";
+          }
+        }
+      } catch (error: any) {
+        console.warn(`[AI-GATEWAY] Anthropic Engine Unavailable: ${error.message}`);
+      }
+    }
+
+    if (!responseContent) {
+      // 4. Attempt Quaternary (Sovereign Local AI - Ollama)
+      try {
+        const localParams = { ...params, model: 'deepseek-r1:1.5b' };
+        const localOpenAI = new OpenAI({ apiKey: "ollama", baseURL: this.LOCAL_BASE });
+        const response = await localOpenAI.chat.completions.create(localParams as any);
+        responseContent = response.choices[0]?.message?.content || "";
+        usedProvider = "ollama";
+        usedModel = "deepseek-r1:1.5b";
+      } catch (error: any) {
+        console.warn(`[AI-GATEWAY] Local AI Engine Unavailable (Ollama): ${error.message}`);
+      }
+    }
+
+    if (!responseContent) {
+       console.warn(`[AI-GATEWAY] All AI Providers Exhausted. Activating Sovereign Fallback.`);
+       return this.executeSovereignFallback(params);
+    }
+
+    // Populate Cache
     try {
-      console.log("[AI-GATEWAY] Attempting Local sovereign AI (DeepSeek-R1:1.5B)...");
-      const localParams = { ...params, model: 'deepseek-r1:1.5b' };
-      
-      const localOpenAI = new OpenAI({
-         apiKey: "ollama",
-         baseURL: this.LOCAL_BASE
+      await storage.createAiCache({
+        promptHash,
+        response: JSON.stringify(responseContent),
+        provider: usedProvider,
+        model: usedModel
       });
-
-      const response = await localOpenAI.chat.completions.create(localParams as any);
-      return response.choices[0]?.message?.content || "";
-    } catch (error: any) {
-      console.warn(`[AI-GATEWAY] Local AI Engine Unavailable (Ollama): ${error.message}`);
+    } catch (e) {
+      console.warn("[AI-GATEWAY] Failed to populate semantic cache.");
     }
 
-    // 5. Sovereign Fallback (Regional/Mock)
-    console.warn(`[AI-GATEWAY] All AI Providers Exhausted. Activating Sovereign Fallback.`);
-    return this.executeSovereignFallback(params);
+    return responseContent;
   }
 
   /**

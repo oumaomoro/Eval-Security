@@ -21,6 +21,7 @@ export const workspaces = pgTable("workspaces", {
   apiUsageCount: integer("api_usage_count").default(0),
   apiUsageResetDate: timestamp("api_usage_reset_date"),
   activeStandards: jsonb("active_standards").default([]),
+  region: text("region").default("east-africa"), // east-africa, south-africa, europe, etc.
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -424,6 +425,16 @@ export const billingTelemetry = pgTable("billing_telemetry", {
   value: doublePrecision("value").notNull(),
   cost: doublePrecision("cost"),
   timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const aiCache = pgTable("ai_cache", {
+  id: serial("id").primaryKey(),
+  promptHash: text("prompt_hash").notNull().unique(),
+  response: text("response").notNull(),
+  provider: text("provider"),
+  model: text("model"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastUsedAt: timestamp("last_used_at").defaultNow(),
 });
 
 export const clauses = pgTable("clauses", {
