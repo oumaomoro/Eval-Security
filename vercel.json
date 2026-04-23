@@ -12,7 +12,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/api/:path*", "destination": "https://api.costloci.com/api/:path*" },
-    { "source": "/api/:path*", "destination": "https://api.costloci.com/api/:path*" }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

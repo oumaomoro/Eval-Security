@@ -97,6 +97,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 Ok "Frontend deployed → https://costloci-frontend.pages.dev"
 
+# ── Step 6: Trigger Backend Deployment (Git Push) ─────────────────────────────
+Step "STEP 6: Synchronizing Repository & Triggering Backend (Vercel)"
+git add .
+$status = git status --porcelain
+if ($status) {
+    git commit -m "chore: automated production sync - $(Get-Date -Format 'yyyy-MM-dd HH:mm')" --no-verify
+    git push origin main
+    if ($LASTEXITCODE -ne 0) {
+        Fail "Git push failed. Ensure your remote is configured correctly."
+    }
+    Ok "Repository synchronized. Vercel backend build triggered."
+} else {
+    Ok "No changes to synchronize."
+}
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 Write-Host "`n************************************************************" -ForegroundColor Green
 Write-Host "*   ✅ DEPLOYMENT COMPLETE                                  *" -ForegroundColor Green
