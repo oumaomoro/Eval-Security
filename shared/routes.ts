@@ -512,6 +512,16 @@ export const api = {
             mitigated_exposure: z.number(),
             roi_ratio: z.number(),
           }).optional(),
+          regionalDistribution: z.array(z.object({ region: z.string(), count: z.number() })).optional(),
+          aiEfficiency: z.object({
+            totalCached: z.number(),
+            totalSavedUsd: z.number(),
+            avgLatencyMs: z.number(),
+          }).optional(),
+          collaborativeMetrics: z.object({
+            activeCollaborators: z.number(),
+            studioSessions: z.number(),
+          }).optional(),
         }),
       },
     },
