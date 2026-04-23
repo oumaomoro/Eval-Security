@@ -37,6 +37,7 @@
 
 ## 7. 🚀 Stage 29 stabilization: Green Board Certification (Final)
 - ✅ **Schema Reconciliation**: Resolved all persistent database column mismatches for `contracts`, `audit_logs`, and `infrastructure_logs`.
+- ✅ **UUID Type Alignment**: Corrected `workspaces.owner_id` from `TEXT` to `UUID` to align with `profiles.id` and `shared/schema.ts`. Automated orphan handling by nullifying invalid owner references.
 - ✅ **RLS Hardware Hardening**: Implemented sovereign admin bypass for telemetry and logs in `storage.ts`, ensuring 100% data persistence integrity.
 - ✅ **Enterprise Feature Validation**: Verified all 15 stages of the core journey with a **100% pass rate** (43/43 assertions) in the `api_e2e_full.ts` suite.
 - ✅ **Routing Integrity**: Restored broken AI sub-page routes and ensured consistent multi-tenant workspace context via `x-workspace-id` headers.

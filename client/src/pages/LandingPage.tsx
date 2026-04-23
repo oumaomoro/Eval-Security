@@ -200,9 +200,9 @@ export default function LandingPage() {
           <div>
              <h4 className="text-white font-black font-semibold text-xs mb-6 italic">Company</h4>
              <ul className="space-y-4">
-                <li><a href="#" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">Privacy</a></li>
-                <li><a href="#" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">Compliance</a></li>
-                <li><a href="#" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">ROI Model</a></li>
+                <li><a href="#trust" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">Privacy & Trust</a></li>
+                <li><a href="#features" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">Compliance</a></li>
+                <li><a href="#pricing" className="text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase transition-colors">ROI & Pricing</a></li>
              </ul>
           </div>
           <div>

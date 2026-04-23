@@ -3,21 +3,56 @@ import { useEffect } from "react";
 interface SEOProps {
   title?: string;
   description?: string;
+  url?: string;
+  image?: string;
 }
 
-export function SEO({ title, description }: SEOProps) {
+export function SEO({ title, description, url, image }: SEOProps) {
   useEffect(() => {
     const baseTitle = "Costloci | Enterprise Intelligence";
     const fullTitle = title ? `${title} | ${baseTitle}` : baseTitle;
+    const desc = description || "AI-driven contract governance, forensic risk mapping, and autonomic compliance (KDPA, POPIA, GDPR) for MSPs and global enterprises.";
+    const currentUrl = url || window.location.href;
+    const ogImage = image || "https://costloci.com/og-image.jpg";
+
     document.title = fullTitle;
 
-    if (description) {
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        metaDesc.setAttribute("content", description);
+    const setMetaTag = (name: string, content: string, isProperty = false) => {
+      const selector = isProperty ? `meta[property="${name}"]` : `meta[name="${name}"]`;
+      let tag = document.querySelector(selector);
+      if (!tag) {
+        tag = document.createElement("meta");
+        if (isProperty) {
+          tag.setAttribute("property", name);
+        } else {
+          tag.setAttribute("name", name);
+        }
+        document.head.appendChild(tag);
       }
+      tag.setAttribute("content", content);
+    };
+
+    setMetaTag("description", desc);
+    setMetaTag("og:title", fullTitle, true);
+    setMetaTag("og:description", desc, true);
+    setMetaTag("og:type", "website", true);
+    setMetaTag("og:url", currentUrl, true);
+    setMetaTag("og:image", ogImage, true);
+    setMetaTag("twitter:card", "summary_large_image");
+    setMetaTag("twitter:title", fullTitle);
+    setMetaTag("twitter:description", desc);
+    setMetaTag("twitter:image", ogImage);
+
+    // Canonical link
+    let link = document.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      document.head.appendChild(link);
     }
-  }, [title, description]);
+    link.setAttribute('href', currentUrl);
+
+  }, [title, description, url, image]);
 
   return null;
 }

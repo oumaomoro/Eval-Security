@@ -189,5 +189,4 @@ const httpServer = createServer(app);
   }
 })();
 
-// @ts-ignore
-module.exports = app;
+export default app;
