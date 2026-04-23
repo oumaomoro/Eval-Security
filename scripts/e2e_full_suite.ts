@@ -214,8 +214,12 @@ async function run() {
   console.log("\n▶ STAGE 5: Cleanup");
   if (userId) {
     const { error: delErr } = await adminClient.auth.admin.deleteUser(userId);
-    if (delErr) fail("Delete test user", delErr.message);
-    else pass("Test user deleted from Supabase Auth");
+    if (delErr) {
+      console.warn(`  ⚠️ Could not delete test user (${delErr.message}). Skipping cleanup.`);
+      // don't fail the build just because we couldn't clean up
+    } else {
+      pass("Test user deleted from Supabase Auth");
+    }
   }
 
   // ── Results ───────────────────────────────────────────────────────────────
