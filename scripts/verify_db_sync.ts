@@ -59,6 +59,7 @@ const REQUIRED_TABLES = [
   "subscriptions",
   "notification_channels",
   "ai_cache",
+  "presence",
 ];
 
 async function checkTable(table: string): Promise<{ table: string; exists: boolean; count?: number; error?: string }> {

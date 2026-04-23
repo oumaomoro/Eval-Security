@@ -427,6 +427,15 @@ export const billingTelemetry = pgTable("billing_telemetry", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+export const presence = pgTable("presence", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  resourceType: text("resource_type"), // 'contract', 'studio', etc.
+  resourceId: text("resource_id"),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+});
+
 export const aiCache = pgTable("ai_cache", {
   id: serial("id").primaryKey(),
   promptHash: text("prompt_hash").notNull().unique(),

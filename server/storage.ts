@@ -211,6 +211,10 @@ export interface IStorage {
   getAiCache(promptHash: string): Promise<any | undefined>;
   createAiCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void>;
 
+  // Real-time Collaboration (Phase 27)
+  updatePresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void>;
+  getActivePresence(workspaceId: number, resourceType: string, resourceId: string): Promise<any[]>;
+
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] };
 }
 
@@ -2536,6 +2540,28 @@ export class SupabaseRESTStorage implements IStorage {
           model: cache.model
         })
     );
+  async updatePresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void> {
+    await this.adminClient
+      .from("presence")
+      .upsert({
+        workspace_id: presence.workspaceId,
+        user_id: presence.userId,
+        resource_type: presence.resourceType,
+        resource_id: presence.resourceId,
+        last_seen_at: new Date().toISOString()
+      }, { onConflict: 'workspace_id,user_id,resource_type,resource_id' });
+  }
+
+  async getActivePresence(workspaceId: number, resourceType: string, resourceId: string): Promise<any[]> {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data } = await this.adminClient
+      .from("presence")
+      .select("user_id, last_seen_at, profiles(username)")
+      .eq("workspace_id", workspaceId)
+      .eq("resource_type", resourceType)
+      .eq("resource_id", resourceId)
+      .gt("last_seen_at", fiveMinutesAgo);
+    return data || [];
   }
 }
 

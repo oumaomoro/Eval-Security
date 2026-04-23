@@ -21,6 +21,7 @@ import intelligenceRouter from "./routes/intelligence.routes.js";
 import signnowRouter from "./routes/signnow.routes.js";
 import marketplaceRouter from "./routes/marketplace.routes.js";
 import insuranceRouter from "./routes/insurance.routes.js";
+import apiV1Router from "./routes/api_v1.js";
 import cronRouter from "./cron/process-schedules.js";
 import { telemetryMiddleware } from "./middleware/telemetry";
 
@@ -100,6 +101,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use("/api", signnowRouter);
   app.use("/api", marketplaceRouter);
   app.use("/api", insuranceRouter);
+  app.use("/api/v1", apiV1Router);
   
   // Enterprise Scheduled Cron Endpoint
   app.use("/api/cron", cronRouter);

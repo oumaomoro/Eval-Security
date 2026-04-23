@@ -20,3 +20,16 @@ COMMENT ON COLUMN workspaces.region IS 'Target jurisdiction for data residency (
 
 -- 3. Telemetry Indexing for Temporal Forecasting
 CREATE INDEX IF NOT EXISTS idx_contracts_renewal_date ON contracts(renewal_date);
+
+-- 4. Real-time Collaboration Presence
+CREATE TABLE IF NOT EXISTS presence (
+  id SERIAL PRIMARY KEY,
+  workspace_id INTEGER REFERENCES workspaces(id),
+  user_id UUID REFERENCES auth.users(id) NOT NULL,
+  resource_type TEXT,
+  resource_id TEXT,
+  last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_presence_resource ON presence(resource_type, resource_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_presence_unique ON presence(workspace_id, user_id, resource_type, resource_id);
