@@ -2,6 +2,8 @@ import { Router } from "express";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../replit_integrations/auth/index.js";
 import { SignnowService } from "../services/SignnowService.js";
+import { adminClient } from "../services/supabase.js";
+import { NotificationService } from "../services/NotificationService.js";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -86,7 +88,7 @@ router.post("/api/integrations/signnow/webhook", async (req: any, res) => {
     
     if (eventType === "document.update" || eventType === "document.complete") {
        // Search for the contract with matching signnow metadata
-       const { adminClient } = await import("../services/supabase");
+       // adminClient imported at top level
        
        const { data: contract } = await adminClient
          .from("contracts")
@@ -101,7 +103,7 @@ router.post("/api/integrations/signnow/webhook", async (req: any, res) => {
            await storage.updateContract(contract.id, { status: "active" });
            
            // Broadcast completion network event
-           const { NotificationService } = await import("../services/NotificationService");
+           // NotificationService imported at top level
            await NotificationService.broadcastEvent(contract.workspace_id, "signature.completed", {
                title: "Contract Signed Successfully",
                message: `The pending contract ${contract.vendorName} has been fully executed via SignNow.`,

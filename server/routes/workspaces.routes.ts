@@ -4,6 +4,7 @@ import { isAuthenticated } from "../replit_integrations/auth/index.js";
 import { requireWorkspacePermission } from "../middleware/workspace-rbac.js";
 import { z } from "zod";
 import { SOC2Logger } from "../services/SOC2Logger.js";
+import { adminClient } from "../services/supabase.js";
 
 const router = Router();
 
@@ -122,7 +123,7 @@ router.post("/api/workspaces/:workspaceId/notifications/channels", isAuthenticat
       return res.status(400).json({ message: "provider and webhookUrl are required" });
     }
 
-    const { adminClient } = await import("../services/supabase");
+    // adminClient imported at top level
     
     const { data: channel, error } = await adminClient
       .from("notification_channels")
