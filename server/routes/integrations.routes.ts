@@ -249,7 +249,10 @@ router.post("/notification-channels", authenticateAddinRequest, async (req: any,
     res.status(201).json(channel);
   } catch (error: any) {
     console.error("[INTEGRATIONS API ERROR]", error.message);
-    res.status(500).json({ message: "Failed to create notification channel." });
+    res.status(500).json({ 
+      message: "Failed to create notification channel.",
+      error: error.message 
+    });
   }
 });
 

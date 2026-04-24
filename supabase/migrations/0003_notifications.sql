@@ -19,9 +19,9 @@ CREATE POLICY "Users can view channels for their client"
     FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM users
-            WHERE users.client_id = notification_channels.client_id
-            AND users.id = auth.uid()
+            SELECT 1 FROM profiles
+            WHERE profiles.client_id = notification_channels.client_id
+            AND profiles.id = auth.uid()
         )
         OR 
         (SELECT current_setting('request.jwt.claims', true)::json->>'role') = 'service_role'
@@ -32,10 +32,10 @@ CREATE POLICY "Admins can manage channels for their client"
     FOR ALL
     USING (
         EXISTS (
-            SELECT 1 FROM users
-            WHERE users.client_id = notification_channels.client_id
-            AND users.id = auth.uid()
-            AND users.role = 'admin'
+            SELECT 1 FROM profiles
+            WHERE profiles.client_id = notification_channels.client_id
+            AND profiles.id = auth.uid()
+            AND profiles.role = 'admin'
         )
         OR 
         (SELECT current_setting('request.jwt.claims', true)::json->>'role') = 'service_role'
