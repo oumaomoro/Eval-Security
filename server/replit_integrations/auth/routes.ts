@@ -118,6 +118,9 @@ export function registerAuthRoutes(app: Express): void {
           workspaceId: workspace.id,
           role: "owner"
         });
+        
+        // Link Client to Workspace (Phase 26 Harmonization)
+        await storage.updateClient(client.id, { workspaceId: workspace.id });
 
         // 4. Harden Local User with full Enterprise Context
         await authStorage.upsertUser({

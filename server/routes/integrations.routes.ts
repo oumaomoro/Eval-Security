@@ -234,7 +234,8 @@ router.post("/notification-channels", authenticateAddinRequest, async (req: any,
 
     const channel = await storage.createNotificationChannel({
       ...req.body,
-      workspaceId
+      workspaceId,
+      clientId: req.user.clientId
     });
 
     await SOC2Logger.logEvent(req, {

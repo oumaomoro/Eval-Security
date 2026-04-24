@@ -70,6 +70,7 @@ export interface IStorage {
   getClients(): Promise<Client[]>;
   getClient(id: number): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: number, updates: Partial<InsertClient>): Promise<Client>;
 
   // Contracts
   getContracts(filters?: { clientId?: number, status?: string, ids?: number[] }): Promise<(Contract & { client?: Client })[]>;
@@ -368,6 +369,27 @@ export class SupabaseRESTStorage implements IStorage {
           risk_threshold: client.riskThreshold || 70,
           compliance_focus: client.complianceFocus || "KDPA"
         })
+        .select("*")
+        .single()
+    );
+    return this.mapClient(data);
+  }
+
+  async updateClient(id: number, updates: Partial<InsertClient>): Promise<Client> {
+    const payload: any = {};
+    if (updates.companyName !== undefined) payload.company_name = updates.companyName;
+    if (updates.industry !== undefined) payload.industry = updates.industry;
+    if (updates.contactName !== undefined) payload.contact_name = updates.contactName;
+    if (updates.contactEmail !== undefined) payload.contact_email = updates.contactEmail;
+    if (updates.contactPhone !== undefined) payload.contact_phone = updates.contactPhone;
+    if (updates.annualBudget !== undefined) payload.annual_budget = updates.annualBudget;
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.workspaceId !== undefined) payload.workspace_id = updates.workspaceId;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("clients")
+        .update(payload)
+        .eq("id", id)
         .select("*")
         .single()
     );
