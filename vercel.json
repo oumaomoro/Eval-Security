@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/process-schedules",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ],
   "rewrites": [

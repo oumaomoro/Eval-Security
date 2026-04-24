@@ -1,4 +1,4 @@
-import { storage } from "../storage";
+import { storage } from "../storage.js";
 
 /**
  * SOVEREIGN NOTIFICATION SERVICE - Phase 26 Enterprise Gateway

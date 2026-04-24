@@ -1,4 +1,6 @@
 import { fileURLToPath } from 'url';
+import { adminClient } from '../server/services/supabase.js';
+
 
 const BASE_URL = process.env.VITE_API_URL || 'http://127.0.0.1:3001';
 
@@ -48,6 +50,16 @@ async function verifyAllEndpoints() {
     if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status} ${await regRes.text()}`);
     console.log("✅ Registration (POST /api/auth/register)");
     
+    // Bypass email confirmation for test user
+    console.log(`[Stage 1.1] Bypassing email verification for ${email}...`);
+    const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers();
+    if (listError) throw listError;
+    const newUser = users.find(u => u.email === email);
+    if (newUser) {
+      await adminClient.auth.admin.updateUserById(newUser.id, { email_confirm: true });
+      console.log(`✅ User email confirmed via Admin Gateway`);
+    }
+    
     const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: buildHeaders(),
@@ -65,7 +77,7 @@ async function verifyAllEndpoints() {
         headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
-        }
+        } as Record<string, string>
     };
     if (sessionCookie) fetchOpts.headers['Cookie'] = sessionCookie;
     if (csrfToken) fetchOpts.headers['x-csrf-token'] = csrfToken;

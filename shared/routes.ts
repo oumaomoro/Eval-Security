@@ -28,7 +28,7 @@ import {
   auditLogs,
   users,
   notificationChannels,
-} from './schema';
+} from "./schema.js";
 
 // === SHARED ERROR SCHEMAS ===
 export const errorSchemas = {

@@ -1,6 +1,6 @@
 import { AIGateway } from "./AIGateway.js";
-import { storage } from "../storage";
-import { type Clause } from "@shared/schema";
+import { storage } from "../storage.js";
+import { type Clause } from "../../shared/schema.js";
 
 export class Redliner {
   static async generateRedline(contractId: number, originalText: string, riskDescription: string): Promise<string> {

@@ -1,4 +1,4 @@
-import { Contract, Risk } from "@shared/schema";
+import { Contract, Risk } from "../../shared/schema.js";
 
 /**
  * Enterprise ROI Service

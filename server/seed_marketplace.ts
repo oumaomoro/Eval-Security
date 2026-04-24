@@ -1,5 +1,5 @@
-import { storage } from "./storage";
-import { storageContext } from "./services/storageContext";
+import { storage } from "./storage.js";
+import { storageContext } from "./services/storageContext.js";
 
 /**
  * SEED MARKETPLACE DATA

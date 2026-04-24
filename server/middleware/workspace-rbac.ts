@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { adminClient as supabase } from '../services/supabase';
-import { WorkspaceRole } from '@shared/schema';
+import { adminClient as supabase } from "../services/supabase.js";
+import { WorkspaceRole } from "../../shared/schema.js";
 
 /**
  * Workspace RBAC Middleware

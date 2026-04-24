@@ -1,5 +1,5 @@
-import { storage } from "../storage";
-import { type Contract } from "@shared/schema";
+import { storage } from "../storage.js";
+import { type Contract } from "../../shared/schema.js";
 
 export class RedlineEngine {
   /**

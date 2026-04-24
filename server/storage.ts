@@ -1,9 +1,9 @@
 import { randomUUID, createHash } from "crypto";
 import bcrypt from "bcryptjs";
-import { ROIService } from "./services/ROIService";
-import { AuditService } from "./services/AuditService";
-import { adminClient } from "./services/supabase";
-import { storageContext } from "./services/storageContext";
+import { ROIService } from "./services/ROIService.js";
+import { AuditService } from "./services/AuditService.js";
+import { adminClient } from "./services/supabase.js";
+import { storageContext } from "./services/storageContext.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   RemediationTask, InsertRemediationTask,
@@ -13,7 +13,7 @@ import type {
   Subscription, InsertSubscription,
   MarketplaceListing, InsertMarketplaceListing,
   MarketplacePurchase, InsertMarketplacePurchase
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 export interface UsageEvent {
   id: number;
@@ -54,7 +54,7 @@ import {
   type InsertClause, type InsertContractClause, type InsertWorkspaceMember,
   type InsertPlaybook, type PlaybookRule, type InsertPlaybookRule,
   type InsurancePolicy as InsuranceItem, type Subscription as UserSubscription
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 /**
  * SOVEREIGN REST STORAGE ENGINE - PRODUCTION HARDENED V3 (SOVEREIGN MODE PREMIUMLY RESTORED)

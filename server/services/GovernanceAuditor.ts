@@ -1,5 +1,5 @@
 import { AIGateway } from "./AIGateway.js";
-import { storage } from "../storage";
+import { storage } from "../storage.js";
 import memoize from "memoizee";
 
 const cachedAuditAnalysis = memoize(

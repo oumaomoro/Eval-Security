@@ -1,7 +1,7 @@
-import { storage } from "../storage";
-import { type InsertAuditLog } from "@shared/schema";
+import { storage } from "../storage.js";
+import { type InsertAuditLog } from "../../shared/schema.js";
 import { Request } from "express";
-import { NotificationService } from "./NotificationService";
+import { NotificationService } from "./NotificationService.js";
 
 /**
  * SOC-2 Compliance Audit Logger

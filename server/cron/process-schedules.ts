@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { storage } from "../storage";
+import { storage } from "../storage.js";
 import { Resend } from "resend";
-import { SOC2Logger } from "../services/SOC2Logger";
+import { SOC2Logger } from "../services/SOC2Logger.js";
 
 const router = Router();
 

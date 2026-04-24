@@ -1,11 +1,11 @@
 import { type Express, type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import { adminClient as supabase, createUserClient } from "../../services/supabase";
-import { authStorage } from "./storage";
-import { storageContext } from "../../services/storageContext";
+import { adminClient as supabase, createUserClient } from "../../services/supabase.js";
+import { authStorage } from "./storage.js";
+import { storageContext } from "../../services/storageContext.js";
 import { storage } from "../../storage.js";
-import { pool } from "../../db";
+import { pool } from "../../db.js";
 
 const PostgresStore = connectPg(session);
 
@@ -18,11 +18,17 @@ const PostgresStore = connectPg(session);
 export async function setupAuth(app: Express) {
   // 1. Initialize Persistent Session Store (Phase 32 Auth Repair)
   // Required for WebAuthn/Passkey challenges which cannot be stateless.
-  const sessionStore = new PostgresStore({
-    pool: pool!,
-    tableName: "sessions",
-    createTableIfMissing: true
-  });
+  let sessionStore;
+  if (pool) {
+    sessionStore = new PostgresStore({
+      pool: pool,
+      tableName: "sessions",
+      createTableIfMissing: true
+    });
+  } else {
+    console.warn("⚠️  [AUTH] Database pool unavailable. Falling back to MemoryStore (Sessions will not persist across restarts).");
+    sessionStore = new session.MemoryStore();
+  }
 
   app.use(session({
     store: sessionStore,

@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { isAuthenticated } from "../replit_integrations/auth";
-import { storage } from "../storage";
+import { isAuthenticated } from "../replit_integrations/auth/index.js";
+import { storage } from "../storage.js";
 import crypto from "crypto";
-import { SOC2Logger } from "../services/SOC2Logger";
-import { stripe } from "../services/stripe";
+import { SOC2Logger } from "../services/SOC2Logger.js";
+import { stripe } from "../services/stripe.js";
 import type Stripe from "stripe";
 
 const billingRouter = Router();

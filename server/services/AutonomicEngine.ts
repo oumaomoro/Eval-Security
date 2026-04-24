@@ -1,6 +1,6 @@
-import { storage } from "../storage";
-import { adminClient as supabase } from "./supabase";
-import { type InsertInfrastructureLog } from "@shared/schema";
+import { storage } from "../storage.js";
+import { adminClient as supabase } from "./supabase.js";
+import { type InsertInfrastructureLog } from "../../shared/schema.js";
 
 /**
  * Autonomic Engine V2.1

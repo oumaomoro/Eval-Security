@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { GovernanceAuditor } from "../services/GovernanceAuditor";
-import { isAuthenticated } from "../replit_integrations/auth";
+import { GovernanceAuditor } from "../services/GovernanceAuditor.js";
+import { isAuthenticated } from "../replit_integrations/auth/index.js";
 import memoize from "memoizee";
 
-import { SOC2Logger } from "../services/SOC2Logger";
+import { SOC2Logger } from "../services/SOC2Logger.js";
 
 const router = Router();
 

@@ -1,5 +1,5 @@
-import { adminClient as supabase } from "./supabase";
-import { InsertAuditLog } from "@shared/schema";
+import { adminClient as supabase } from "./supabase.js";
+import { InsertAuditLog } from "../../shared/schema.js";
 
 /**
  * Phase 17: Hardened Audit Service (Chain of Custody)

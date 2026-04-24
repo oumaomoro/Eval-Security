@@ -1,5 +1,5 @@
-import { supabase, adminClient } from "../../services/supabase";
-import { type User, type UpsertUser } from "@shared/models/auth";
+import { supabase, adminClient } from "../../services/supabase.js";
+import { type User, type UpsertUser } from "../../../shared/models/auth.js";
 
 /**
  * SOVEREIGN AUTH STORAGE (REST)

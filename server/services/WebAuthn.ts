@@ -13,7 +13,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
-import { storage } from '../storage';
+import { storage } from "../storage.js";
 
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
 const RP_NAME = 'Costloci Enterprise';

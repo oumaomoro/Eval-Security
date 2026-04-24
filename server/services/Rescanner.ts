@@ -1,5 +1,5 @@
-import { storage } from "../storage";
-import { NotifierService } from "./Notifier";
+import { storage } from "../storage.js";
+import { NotifierService } from "./Notifier.js";
 
 /**
  * Enterprise Autonomic Rescanner

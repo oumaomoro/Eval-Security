@@ -14,7 +14,7 @@ import { resolve } from 'path';
  */
 
 const getEnvKey = (keyName: string): string => {
-  if (process.env[keyName]) return process.env[keyName]!;
+  if (process.env[keyName]) return process.env[keyName]!.trim().replace(/\r/g, '');
   
   const envPath = resolve(process.cwd(), ".env");
   if (existsSync(envPath)) {

@@ -1,16 +1,16 @@
 import type { Express } from "express";
-import { supabase, adminClient } from "../../services/supabase";
-import { storage } from "../../storage";
-import { authStorage } from "./storage";
-import { WebAuthnService } from "../../services/WebAuthn";
+import { supabase, adminClient } from "../../services/supabase.js";
+import { storage } from "../../storage.js";
+import { authStorage } from "./storage.js";
+import { WebAuthnService } from "../../services/WebAuthn.js";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
-import { cookieHandler } from "../../middleware/cookie-handler";
-import { SOC2Logger } from "../../services/SOC2Logger";
-import { EmailService } from "../../services/EmailService";
+import { cookieHandler } from "../../middleware/cookie-handler.js";
+import { SOC2Logger } from "../../services/SOC2Logger.js";
+import { EmailService } from "../../services/EmailService.js";
 import { z } from "zod";
-import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from "../../../shared/auth-schemas";
+import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from "../../../shared/auth-schemas.js";
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 

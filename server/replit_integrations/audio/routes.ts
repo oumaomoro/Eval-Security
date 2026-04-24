@@ -1,9 +1,9 @@
 import { type Express, type Request, type Response } from "express";
 import express from "express";
-import { chatStorage } from "../chat/storage";
-import { openai, speechToText, ensureCompatibleFormat } from "./client";
-import { isAuthenticated } from "../auth";
-import { SOC2Logger } from "../../services/SOC2Logger";
+import { chatStorage } from "../chat/storage.js";
+import { openai, speechToText, ensureCompatibleFormat } from "./client.js";
+import { isAuthenticated } from "../auth/index.js";
+import { SOC2Logger } from "../../services/SOC2Logger.js";
 
 // Body parser with 50MB limit for audio payloads
 const audioBodyParser = express.json({ limit: "50mb" });

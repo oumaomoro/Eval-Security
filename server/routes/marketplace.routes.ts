@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { storage } from "../storage";
-import { isAuthenticated } from "../replit_integrations/auth";
-import { storageContext } from "../services/storageContext";
-import { SOC2Logger } from "../services/SOC2Logger";
+import { storage } from "../storage.js";
+import { isAuthenticated } from "../replit_integrations/auth/index.js";
+import { storageContext } from "../services/storageContext.js";
+import { SOC2Logger } from "../services/SOC2Logger.js";
 import { randomUUID } from "crypto";
 
 const router = Router();

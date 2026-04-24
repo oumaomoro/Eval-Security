@@ -3,8 +3,8 @@ import type { Express } from "express";
 import type { Server } from "http";
 
 import { storage } from "./storage.js";
-import { api } from "@shared/routes";
-import { insertReportScheduleSchema } from "@shared/schema";
+import { api } from "../shared/routes.js";
+import { insertReportScheduleSchema } from "../shared/schema.js";
 import { z } from "zod";
 import { jsPDF } from "jspdf";
 import OpenAI from "openai";
@@ -23,16 +23,16 @@ import marketplaceRouter from "./routes/marketplace.routes.js";
 import insuranceRouter from "./routes/insurance.routes.js";
 import apiV1Router from "./routes/api_v1.js";
 import cronRouter from "./cron/process-schedules.js";
-import { telemetryMiddleware } from "./middleware/telemetry";
+import { telemetryMiddleware } from "./middleware/telemetry.js";
 
 import multer from "multer";
 import pdf from "pdf-parse";
 import memoize from "memoizee";
-import { requireRole } from "./middleware/rbac";
-import { requireWorkspacePermission } from "./middleware/workspace-rbac";
-import { PlaybookService } from "./services/PlaybookService";
+import { requireRole } from "./middleware/rbac.js";
+import { requireWorkspacePermission } from "./middleware/workspace-rbac.js";
+import { PlaybookService } from "./services/PlaybookService.js";
 import { storageContext } from "./services/storageContext.js";
-import { SOC2Logger } from "./services/SOC2Logger";
+import { SOC2Logger } from "./services/SOC2Logger.js";
 
 import { AIGateway } from "./services/AIGateway.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
@@ -40,7 +40,7 @@ import { AutonomicEngine } from "./services/AutonomicEngine.js";
 // Export the centralized openai router instance
 const openai = AIGateway.openai;
 
-import { apiLimiter, authLimiter, uploadLimiter } from "./middleware/rate-limiter";
+import { apiLimiter, authLimiter, uploadLimiter } from "./middleware/rate-limiter.js";
 
 // Use memory storage — files are streamed directly to Supabase Storage.
 // NEVER use disk storage on Vercel: the ephemeral filesystem is wiped on every cold start.
@@ -64,7 +64,7 @@ const cachedCompletion = memoize(
   { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
 );
 
-import { workspaceContextMiddleware } from "./middleware/workspace-context-middleware";
+import { workspaceContextMiddleware } from "./middleware/workspace-context-middleware.js";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   console.log("[ROUTES] Starting registration...");

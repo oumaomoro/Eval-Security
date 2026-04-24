@@ -1,6 +1,6 @@
-import { storage } from "../storage";
-import { AIGateway } from "./AIGateway";
-import type { Contract, SavingsOpportunity } from "@shared/schema";
+import { storage } from "../storage.js";
+import { AIGateway } from "./AIGateway.js";
+import type { Contract, SavingsOpportunity } from "../../shared/schema.js";
 
 /**
  * BENCHMARKING SERVICE - PRODUCTION GRADE

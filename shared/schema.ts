@@ -3,10 +3,10 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-export * from "./models/auth";
-export * from "./models/chat";
+export * from "./models/auth.js";
+export * from "./models/chat.js";
 
-import { users } from "./models/auth";
+import { users } from "./models/auth.js";
 export const workspaceRoleEnum = pgEnum('workspace_role', ['owner', 'admin', 'editor', 'viewer']);
 
 // === TABLE DEFINITIONS ===

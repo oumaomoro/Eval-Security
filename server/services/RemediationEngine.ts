@@ -1,6 +1,6 @@
-import { storage } from "../storage";
-import { type Contract } from "@shared/schema";
-import { AIGateway } from "./AIGateway";
+import { storage } from "../storage.js";
+import { type Contract } from "../../shared/schema.js";
+import { AIGateway } from "./AIGateway.js";
 
 export class RemediationEngine {
   /**

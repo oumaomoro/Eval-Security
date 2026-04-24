@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { storage } from "../storage";
-import { isAuthenticated } from "../replit_integrations/auth";
-import { AutonomicRescanner } from "../services/Rescanner";
-import { SOC2Logger } from "../services/SOC2Logger";
-import { storageContext } from "../services/storageContext";
+import { storage } from "../storage.js";
+import { isAuthenticated } from "../replit_integrations/auth/index.js";
+import { AutonomicRescanner } from "../services/Rescanner.js";
+import { SOC2Logger } from "../services/SOC2Logger.js";
+import { storageContext } from "../services/storageContext.js";
 
 const router = Router();
 
@@ -88,7 +88,7 @@ router.post("/regulatory-alerts/trigger-rescan", isAuthenticated, async (req: an
   }
 });
 
-import { StrategyService } from "../services/StrategyService";
+import { StrategyService } from "../services/StrategyService.js";
 
 // List generated reports
 router.get("/reports", isAuthenticated, async (req: any, res) => {
@@ -187,6 +187,12 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res: any) => {
         { subject: "Data Residency", A: 70, fullMark: 100 },
         { subject: "Liability", A: 95, fullMark: 100 },
         { subject: "SLA Caps", A: 60, fullMark: 100 },
+      ],
+      trendAnalysis: [
+        { date: "Jan", score: 68 },
+        { date: "Feb", score: 72 },
+        { date: "Mar", score: 75 },
+        { date: "Apr", score: 78 }
       ]
     });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import { storageContext } from "../services/storageContext";
-import { adminClient } from "../services/supabase";
+import { storageContext } from "../services/storageContext.js";
+import { adminClient } from "../services/supabase.js";
 
 export function workspaceContextMiddleware(req: Request, res: Response, next: NextFunction) {
   // Extract workspace ID from header (preferred for API) or query/body

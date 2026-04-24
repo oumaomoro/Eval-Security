@@ -1,7 +1,7 @@
 import { AIGateway } from "./AIGateway.js";
-import { storage } from "../storage";
-import { ROIService } from "./ROIService";
-import { type Contract, type Risk, type Clause } from "@shared/schema";
+import { storage } from "../storage.js";
+import { ROIService } from "./ROIService.js";
+import { type Contract, type Risk, type Clause } from "../../shared/schema.js";
 
 export class PlaybookService {
   /**

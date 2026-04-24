@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { storage } from "../storage";
+import { storage } from "../storage.js";
 import { createHash } from "crypto";
 
 /**

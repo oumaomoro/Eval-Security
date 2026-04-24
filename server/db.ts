@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import * as schema from "@shared/schema";
+import * as schema from "../shared/schema.js";
 
 const { Pool } = pg;
 
@@ -20,12 +20,13 @@ export function getDb() {
       return null;
     }
 
-    const sslConfig = (process.env.DATABASE_URL.includes("supabase.co") || process.env.DATABASE_URL.includes("supabase.com"))
+    const dbUrl = process.env.DATABASE_URL.trim().replace(/\r/g, '');
+    const sslConfig = (dbUrl.includes("supabase.co") || dbUrl.includes("supabase.com"))
       ? { ssl: { rejectUnauthorized: false } }
       : {};
 
     _pool = new Pool({
-      connectionString: process.env.DATABASE_URL.trim(),
+      connectionString: dbUrl,
       ...sslConfig,
       max: 5,
       idleTimeoutMillis: 30000,

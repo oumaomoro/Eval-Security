@@ -206,4 +206,50 @@ router.post("/integrations/word/publish", authenticateAddinRequest, async (req: 
   }
 });
 
+/**
+ * GET /api/integrations/notification-channels
+ * Returns active notification channels (Slack, Webhooks) for the current workspace.
+ */
+router.get("/notification-channels", authenticateAddinRequest, async (req: any, res) => {
+  try {
+    const workspaceId = req.user.workspaceId || (await storage.getUserWorkspaces(req.user.id))[0]?.id;
+    if (!workspaceId) return res.status(400).json({ message: "No active workspace context." });
+    
+    const channels = await storage.getNotificationChannels(workspaceId);
+    res.json(channels);
+  } catch (error: any) {
+    console.error("[INTEGRATIONS API ERROR]", error.message);
+    res.status(500).json({ message: "Failed to fetch notification channels." });
+  }
+});
+
+/**
+ * POST /api/integrations/notification-channels
+ * Provisions a new notification channel for the enterprise.
+ */
+router.post("/notification-channels", authenticateAddinRequest, async (req: any, res) => {
+  try {
+    const workspaceId = req.user.workspaceId || (await storage.getUserWorkspaces(req.user.id))[0]?.id;
+    if (!workspaceId) return res.status(400).json({ message: "No active workspace context." });
+
+    const channel = await storage.createNotificationChannel({
+      ...req.body,
+      workspaceId
+    });
+
+    await SOC2Logger.logEvent(req, {
+      userId: req.user.id,
+      action: "NOTIFICATION_CHANNEL_CREATED",
+      resourceType: "NotificationChannel",
+      resourceId: String(channel.id),
+      details: `New ${channel.provider} webhook provisioned for workspace ${workspaceId}`
+    });
+
+    res.status(201).json(channel);
+  } catch (error: any) {
+    console.error("[INTEGRATIONS API ERROR]", error.message);
+    res.status(500).json({ message: "Failed to create notification channel." });
+  }
+});
+
 export default router;

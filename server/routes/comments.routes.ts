@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { storage } from "../storage";
-import { isAuthenticated } from "../replit_integrations/auth";
-import { api } from "@shared/routes";
+import { storage } from "../storage.js";
+import { isAuthenticated } from "../replit_integrations/auth/index.js";
+import { api } from "../../shared/routes.js";
 import { z } from "zod";
 
-import { SOC2Logger } from "../services/SOC2Logger";
+import { SOC2Logger } from "../services/SOC2Logger.js";
 
 const router = Router();
 

@@ -1,6 +1,6 @@
-import { storage } from "../storage";
-import { type Contract, type PlaybookRule } from "@shared/schema";
-import { RedlineEngine } from "./RedlineEngine";
+import { storage } from "../storage.js";
+import { type Contract, type PlaybookRule } from "../../shared/schema.js";
+import { RedlineEngine } from "./RedlineEngine.js";
 
 export class RulesEngine {
   /**

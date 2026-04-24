@@ -90,7 +90,6 @@ if (-not (Test-Path "dist\public")) {
   Fail "dist\public not found. Run without --SkipBuild first."
 }
 
-$env:CLOUDFLARE_API_TOKEN = if ($env:CLOUDFLARE_API_TOKEN) { $env:CLOUDFLARE_API_TOKEN } else { throw "CLOUDFLARE_API_TOKEN is not set in environment." }
 npx wrangler pages deploy dist\public --project-name=costloci-frontend --branch=main --commit-dirty=true
 if ($LASTEXITCODE -ne 0) {
   Fail "Cloudflare deployment failed."

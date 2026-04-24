@@ -1,4 +1,4 @@
-import { storage } from "../storage";
+import { storage } from "../storage.js";
 import { jsPDF } from "jspdf";
 import AdmZip from "adm-zip";
 import { stringify } from "csv-stringify/sync";

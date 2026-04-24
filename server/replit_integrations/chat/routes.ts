@@ -1,8 +1,8 @@
 import { type Express, type Request, type Response } from "express";
 import { AIGateway } from "../../services/AIGateway.js";
-import { chatStorage } from "./storage";
-import { isAuthenticated } from "../auth";
-import { SOC2Logger } from "../../services/SOC2Logger";
+import { chatStorage } from "./storage.js";
+import { isAuthenticated } from "../auth/index.js";
+import { SOC2Logger } from "../../services/SOC2Logger.js";
 
 export function registerChatRoutes(app: Express): void {
   // Get all conversations

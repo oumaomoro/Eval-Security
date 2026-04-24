@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { storage } from "../storage";
-import { apiKeyAuth } from "../middleware/api-key-auth";
-import { AIGateway } from "../services/AIGateway";
+import { storage } from "../storage.js";
+import { apiKeyAuth } from "../middleware/api-key-auth.js";
+import { AIGateway } from "../services/AIGateway.js";
 import { z } from "zod";
 
 const router = Router();
