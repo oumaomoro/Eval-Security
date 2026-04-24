@@ -128,6 +128,7 @@ router.post("/api/workspaces/:workspaceId/notifications/channels", isAuthenticat
       .from("notification_channels")
       .insert([{
         workspace_id: workspaceId,
+        client_id: req.user.clientId,
         provider,
         webhook_url: webhookUrl,
         events: events || [],
@@ -150,7 +151,10 @@ router.post("/api/workspaces/:workspaceId/notifications/channels", isAuthenticat
     res.status(201).json(channel);
   } catch (err: any) {
     console.error("[SLACK INTEGRATION ERROR]", err.message);
-    res.status(500).json({ message: "Failed to configure notification channel" });
+    res.status(500).json({ 
+      message: "Failed to configure notification channel",
+      error: err.message
+    });
   }
 });
 
