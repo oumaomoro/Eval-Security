@@ -90,8 +90,12 @@ app.use("/api", (req: any, res: any, next: any) => {
   // 2. Initial Auth routes (Register/Login) to support API-only certification
   const authHeader = req.headers.authorization || req.headers.Authorization;
   const isAuthRoute = req.path === "/auth/register" || req.path === "/auth/login";
+  const isWebhookRoute = req.path === "/integrations/signnow/webhook" || 
+                         req.path === "/billing/paypal-webhook" ||
+                         req.path === "/billing/paystack-webhook" ||
+                         req.path === "/billing/stripe-webhook";
   
-  if ((typeof authHeader === 'string' && authHeader.startsWith("Bearer ")) || isAuthRoute) {
+  if ((typeof authHeader === 'string' && authHeader.startsWith("Bearer ")) || isAuthRoute || isWebhookRoute) {
     return next();
   }
   return doubleCsrfProtection(req, res, next);

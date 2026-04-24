@@ -109,7 +109,10 @@ async function verifyAllEndpoints() {
     const dpoRes = await fetch(`${BASE_URL}/api/dpo/metrics`, fetchOpts);
     if (!dpoRes.ok) throw new Error(`DPO Metrics failed: ${dpoRes.status} ${await dpoRes.text()}`);
     const metricsData = await dpoRes.json();
-    if (!metricsData.trendAnalysis) throw new Error("Missing correct telemetry shape on DPO metrics object");
+    if (!metricsData.trendAnalysis) {
+      console.error("❌ FAILED STAGE 3: Received Metrics Data:", JSON.stringify(metricsData, null, 2));
+      throw new Error("Missing correct telemetry shape on DPO metrics object");
+    }
     console.log("✅ DPO Dashboard Metrics (GET /api/dpo/metrics)");
 
     // ----------------------------------------------------
