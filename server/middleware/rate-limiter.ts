@@ -44,3 +44,33 @@ export const uploadLimiter = rateLimit({
     message: "Maximum document upload limits reached. Please wait before submitting more contracts."
   }
 });
+
+/**
+ * AI Intelligence Limiter (Phase 32)
+ * Protects expensive LLM resources from exhaustion.
+ */
+export const intelligenceLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 Hour
+  max: process.env.NODE_ENV === "development" ? 100 : 30, // 30 AI calls per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Intelligence Quota Exceeded",
+    message: "You have reached your hourly AI processing limit. High-density analysis is throttled to ensure availability."
+  }
+});
+
+/**
+ * Cron/Background Task Limiter
+ * Ensures system jobs aren't triggered externally too frequently.
+ */
+export const cronLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 Minute
+  max: 5, // Only 5 triggers per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+     error: "System Overload",
+     message: "Background processing queue is currently saturated."
+  }
+});

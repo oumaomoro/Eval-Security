@@ -2,8 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertRisk } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { getApiUrl } from "@/lib/api-config";
-
+import { fetchApi } from "@/lib/api-client";
 import { useWorkspace } from "@/hooks/use-workspace";
 
 export function useRisks(filters?: { contractId?: string }) {
@@ -16,9 +15,7 @@ export function useRisks(filters?: { contractId?: string }) {
         ? `${api.risks.list.path}?contractId=${filters.contractId}`
         : api.risks.list.path;
       
-      const res = await fetch(getApiUrl(url), { 
-        credentials: "include",
-      });
+      const res = await fetchApi(url);
       if (!res.ok) throw new Error("Failed to fetch risks");
       return api.risks.list.responses[200].parse(await res.json());
     },
@@ -31,11 +28,9 @@ export function useCreateRisk() {
 
   return useMutation({
     mutationFn: async (data: InsertRisk) => {
-      const res = await fetch(api.risks.create.path, {
+      const res = await fetchApi(api.risks.create.path, {
         method: api.risks.create.method,
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create risk");
       return api.risks.create.responses[201].parse(await res.json());
@@ -52,14 +47,11 @@ export function useMitigateRisk() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, status, strategy }: { id: number; status: string; strategy?: string }) => {      const url = buildUrl(api.risks.mitigate.path, { id });
-      const res = await fetch(getApiUrl(url), {
+    mutationFn: async ({ id, status, strategy }: { id: number; status: string; strategy?: string }) => {
+      const url = buildUrl(api.risks.mitigate.path, { id });
+      const res = await fetchApi(url, {
         method: api.risks.mitigate.method,
-        headers: { 
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ status, strategy }),
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to mitigate risk");
       return api.risks.mitigate.responses[200].parse(await res.json());

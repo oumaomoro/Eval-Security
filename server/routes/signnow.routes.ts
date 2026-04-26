@@ -16,7 +16,7 @@ const router = Router();
  * Creates an embedded signing session for a specific contract.
  * Uses the original uploaded PDF.
  */
-router.post("/api/signnow/embedded", isAuthenticated, async (req: any, res) => {
+router.post("/signnow/embedded", isAuthenticated, async (req: any, res) => {
   try {
     const { contractId, signerEmail } = req.body;
     if (!contractId || !signerEmail) {
@@ -74,7 +74,7 @@ router.post("/api/signnow/embedded", isAuthenticated, async (req: any, res) => {
  * POST /api/integrations/signnow/webhook
  * Webhook listener for SignNow signature events.
  */
-router.post("/api/integrations/signnow/webhook", async (req: any, res) => {
+router.post("/integrations/signnow/webhook", async (req: any, res) => {
   try {
     const payload = req.body;
     console.log(`[SignNow Webhook] Received event:`, JSON.stringify(payload));

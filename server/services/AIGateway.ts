@@ -15,7 +15,7 @@ export class AIGateway {
   private static anthropicClient: Anthropic | null = null;
 
   private static readonly OPENAI_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing";
-  private static readonly DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "sk-eff1aa8acef3479188a99e14e646a650";
+  private static readonly DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "missing";
   private static readonly ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "missing";
   
   private static readonly OPENAI_BASE = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
@@ -77,6 +77,20 @@ export class AIGateway {
    * Resilient completion endpoint with Multi-Provider Fallback & Semantic Caching
    */
   static async createCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): Promise<string> {
+    // Enforce Professional & Ethical Standards Globally
+    const hasSystemMessage = params.messages.some((m: any) => m.role === 'system');
+    if (!hasSystemMessage) {
+      params.messages.unshift({
+        role: "system",
+        content: "You are a specialized AI system for CyberOptimize. Your responses MUST be highly accurate, strictly professional, and adhere to the highest ethical and cybersecurity compliance standards without bias or hallucination."
+      } as any);
+    } else {
+      const sysMsgIndex = params.messages.findIndex((m: any) => m.role === 'system');
+      if (sysMsgIndex !== -1) {
+        (params.messages[sysMsgIndex] as any).content += "\n\nCRITICAL DIRECTIVE: Your responses MUST be highly accurate, strictly professional, and adhere to the highest ethical and cybersecurity compliance standards without bias or hallucination.";
+      }
+    }
+
     const promptText = params.messages.map(m => `${m.role}:${m.content}`).join("|");
     const promptHash = createHash("sha256").update(promptText).digest("hex");
 
@@ -349,6 +363,94 @@ Return ONLY the newly written clause text without quotes or explanations.`;
     } catch (error) {
       console.error("[AIGATEWAY] Clause Redlining Failed:", error);
       return originalClause; // Fallback to original text if AI fails
+    }
+  }
+
+  /**
+   * Comprehensive Clause Comparison Intelligence
+   * Analyzes deviation between contract text and standard library text.
+   */
+  static async compareClauseIntelligence(contractText: string, libraryText: string, category: string): Promise<any> {
+    const prompt = `You are an expert legal AI specializing in cybersecurity contract auditing.
+Compare the following Contract Text against the Standard Library Text for the category: ${category}.
+
+[Contract Text]
+${contractText}
+
+[Standard Library Text]
+${libraryText}
+
+Analyze the deviation and provide a structured JSON response:
+{
+  "isPresent": boolean,
+  "similarityScore": number (0-100),
+  "deviationSeverity": "none" | "minor" | "moderate" | "major" | "critical",
+  "riskImplications": "string describing risks of current language",
+  "missingProvisions": ["string array of missing points"],
+  "suggestedImprovements": "string recommending specific changes",
+  "complianceImpact": "string describing impact on standards like KDPA/GDPR"
+}
+Return ONLY the JSON.`;
+
+    try {
+      const response = await this.createCompletion({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      });
+      return JSON.parse(response);
+    } catch (error: any) {
+      console.error("[AIGATEWAY] Clause Comparison Failed:", error.message);
+      return { 
+        error: "Comparison failed",
+        deviationSeverity: "unknown"
+      };
+    }
+  }
+
+  /**
+   * Parameter-Driven AI Clause Generation
+   * Drafts a custom clause based on multi-standard compliance and risk profile.
+   */
+  static async generateClauseIntelligence(params: {
+    category: string;
+    standards: string[];
+    requirements: string;
+    risks: string[];
+    tone: string;
+  }): Promise<any> {
+    const prompt = `You are an elite legal AI drafter. Create a professional, legally enforceable ${params.category} clause.
+Requirements:
+- Standards: ${params.standards.join(", ")}
+- Specific Needs: ${params.requirements}
+- Risks to Mitigate: ${params.risks.join(", ")}
+- Tone: ${params.tone} (e.g., vendor-favorable, client-favorable, balanced)
+
+Provide a structured JSON response:
+{
+  "clauseText": "Full text of the drafted clause",
+  "keyProvisions": ["list of main protections included"],
+  "risksMitigated": ["list of risks addressed"],
+  "implementationNotes": "instructions for legal teams",
+  "optionalVariations": [
+    { "tone": "string", "text": "variation text" }
+  ]
+}
+Return ONLY the JSON.`;
+
+    try {
+      const response = await this.createCompletion({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      });
+      return JSON.parse(response);
+    } catch (error: any) {
+      console.error("[AIGATEWAY] Clause Generation Failed:", error.message);
+      return { 
+        error: "Generation failed",
+        clauseText: "Drafting failed due to an upstream engine error."
+      };
     }
   }
 

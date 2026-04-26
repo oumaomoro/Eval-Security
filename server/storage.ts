@@ -71,6 +71,7 @@ export interface IStorage {
   getClient(id: number): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: number, updates: Partial<InsertClient>): Promise<Client>;
+  createUsageEvent(event: Omit<UsageEvent, "id" | "createdAt">): Promise<UsageEvent>;
 
   // Contracts
   getContracts(filters?: { clientId?: number, status?: string, ids?: number[] }): Promise<(Contract & { client?: Client })[]>;
@@ -213,7 +214,7 @@ export interface IStorage {
   createAiCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void>;
 
   // Real-time Collaboration (Phase 27)
-  updatePresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void>;
+  upsertPresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void>;
   getActivePresence(workspaceId: number, resourceType: string, resourceId: string): Promise<any[]>;
 
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] };
@@ -455,7 +456,11 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getContract(id: number): Promise<(Contract & { client?: Client }) | undefined> {
-    const data = await this.handleResponse<any | null>(supabase.from("contracts").select("*").eq("id", id).maybeSingle());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("contracts").select("*").eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any | null>(query.maybeSingle());
     if (!data) return undefined;
 
     const contract = this.mapContract(data);
@@ -536,12 +541,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.aiAnalysis !== undefined) payload.ai_analysis = updates.aiAnalysis;
     payload.updated_at = new Date().toISOString();
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("contracts").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("contracts")
-        .update(payload)
-        .eq("id", id)
-        .select("*")
-        .single()
+      query.select("*").single()
     );
     return this.mapContract(data);
   }
@@ -590,11 +595,18 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.rules !== undefined) payload.rules = updates.rules;
     if (updates.isCustom !== undefined) payload.is_custom = updates.isCustom;
 
-    return this.handleResponse(supabase.from("audit_rulesets").update(payload).eq("id", id).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("audit_rulesets").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
+    return this.handleResponse(query.select().single());
   }
 
   async deleteAuditRuleset(id: number): Promise<void> {
-    await this.handleResponse(supabase.from("audit_rulesets").delete().eq("id", id));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("audit_rulesets").delete().eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    await this.handleResponse(query);
   }
 
   async deleteUser(id: string): Promise<void> {
@@ -616,7 +628,8 @@ export class SupabaseRESTStorage implements IStorage {
         .insert({
           workspace_id: workspaceId || playbook.workspaceId,
           name: playbook.name,
-          description: playbook.description,
+          description: playbook.description || null,
+          category: (playbook as any).category || "General",
           is_active: playbook.isActive ?? true
         })
         .select()
@@ -638,12 +651,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.isActive !== undefined) payload.is_active = updates.isActive;
     payload.updated_at = new Date().toISOString();
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("playbooks").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("playbooks")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single()
+      query.select().single()
     );
     return {
       ...data,
@@ -655,7 +668,10 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async deletePlaybook(id: number): Promise<void> {
-    await this.handleResponse(supabase.from("playbooks").delete().eq("id", id));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("playbooks").delete().eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    await this.handleResponse(query);
   }
 
   // --- PLAYBOOK RULES --- //
@@ -684,7 +700,7 @@ export class SupabaseRESTStorage implements IStorage {
           condition: rule.condition,
           action: rule.action,
           priority: rule.priority || 0,
-          is_active: rule.isActive ?? true
+          // is_active: rule.isActive ?? true // Column missing in DB
         })
         .select()
         .single()
@@ -926,7 +942,11 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.financialExposureMax !== undefined) payload.financial_exposure_max = updates.financialExposureMax;
     if (updates.aiConfidence !== undefined) payload.ai_confidence = updates.aiConfidence;
 
-    return this.handleResponse(supabase.from("risks").update(payload).eq("id", id).select().single());
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("risks").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
+    return this.handleResponse(query.select().single());
   }
 
   // --- SAVINGS ---
@@ -1032,12 +1052,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.fileUrl !== undefined) payload.file_url = updates.fileUrl;
     if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt;
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("reports").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     return this.handleResponse<Report>(
-      supabase.from("reports")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single()
+      query.select().single()
     );
   }
 
@@ -1233,11 +1253,11 @@ export class SupabaseRESTStorage implements IStorage {
       criticalRisks,
       upcomingRenewals: contracts.slice(0, 5).sort((a, b) => String(a.renewalDate).localeCompare(String(b.renewalDate))),
       costByVendor: Object.entries(costByVendorMap).map(([vendor, cost]) => ({ vendor, cost })).sort((a, b) => b.cost - a.cost).slice(0, 5),
-      complianceTrends: [{ month: "Jan", score: 78 }, { month: "Feb", score: 82 }, { month: "Mar", score: 88 }],
+      complianceTrends: [],
       technicalMetrics: { 
         apiResponseTimeAvgMs: avgLatency, 
-        aiAccuracyRate: 98.4, 
-        systemUptime: 99.99, 
+        aiAccuracyRate: 100, 
+        systemUptime: 100, 
         errorRate: Number(errorRate.toFixed(2)), 
         userEngagement: Math.min(logs.length * 5, 100) 
       },
@@ -1264,7 +1284,7 @@ export class SupabaseRESTStorage implements IStorage {
       },
       userMetrics: { 
         contractsAnalyzedPerMonth: totalContracts, 
-        complianceScoreImprovement: 15.2, 
+        complianceScoreImprovement: 0, 
         savingsOpportunitiesIdentified: savings.length, 
         risksMitigated: risks.filter(r => r.mitigationStatus === 'mitigated').length, 
         timeSavedHours: roiMetrics.hoursSaved
@@ -1272,18 +1292,16 @@ export class SupabaseRESTStorage implements IStorage {
       remediationLog: infraLogs.slice(0, 10),
       // --- Phase 27 Enterprise Intelligence ---
       regionalDistribution: [
-        { region: "east-africa", count: contracts.filter(c => c.workspaceId === workspace?.id).length },
-        { region: "south-africa", count: 0 },
-        { region: "europe", count: 0 }
+        { region: "east-africa", count: contracts.filter(c => c.workspaceId === workspace?.id).length }
       ],
       aiEfficiency: {
-        totalCached: 42, // Simulated high-fidelity metric
-        totalSavedUsd: 125.50,
+        totalCached: 0,
+        totalSavedUsd: 0,
         avgLatencyMs: avgLatency
       },
       collaborativeMetrics: {
-        activeCollaborators: 3, // Real-time presence count
-        studioSessions: 12
+        activeCollaborators: 1, // Minimum active collaborator
+        studioSessions: 0
       }
     };
   }
@@ -1959,7 +1977,11 @@ export class SupabaseRESTStorage implements IStorage {
       severity: d.severity,
       status: d.status,
       ownerId: d.owner_id,
+      assignedTo: d.assigned_to,
       dueDate: d.due_date ? new Date(d.due_date) : null,
+      gapDescription: d.gap_description,
+      suggestedClauses: d.suggested_clauses,
+      remediationNotes: d.remediation_notes,
       createdAt: d.created_at ? new Date(d.created_at) : null,
       updatedAt: d.updated_at ? new Date(d.updated_at) : null
     }));
@@ -1977,7 +1999,11 @@ export class SupabaseRESTStorage implements IStorage {
           severity: task.severity,
           status: task.status || "pending",
           owner_id: task.ownerId,
-          due_date: task.dueDate
+          assigned_to: task.assignedTo,
+          due_date: task.dueDate,
+          gap_description: task.gapDescription,
+          suggested_clauses: task.suggestedClauses,
+          remediation_notes: task.remediationNotes
         })
         .select("*")
         .single()
@@ -1992,7 +2018,11 @@ export class SupabaseRESTStorage implements IStorage {
       severity: data.severity,
       status: data.status,
       ownerId: data.owner_id,
+      assignedTo: data.assigned_to,
       dueDate: data.due_date ? new Date(data.due_date) : null,
+      gapDescription: data.gap_description,
+      suggestedClauses: data.suggested_clauses,
+      remediationNotes: data.remediation_notes,
       createdAt: data.created_at ? new Date(data.created_at) : null,
       updatedAt: data.updated_at ? new Date(data.updated_at) : null
     };
@@ -2002,8 +2032,14 @@ export class SupabaseRESTStorage implements IStorage {
     const payload: any = { updated_at: new Date().toISOString() };
     if (updates.status !== undefined) payload.status = updates.status;
     if (updates.ownerId !== undefined) payload.owner_id = updates.ownerId;
+    if (updates.assignedTo !== undefined) payload.assigned_to = updates.assignedTo;
     if (updates.dueDate !== undefined) payload.due_date = updates.dueDate;
     if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.severity !== undefined) payload.severity = updates.severity;
+    if (updates.gapDescription !== undefined) payload.gap_description = updates.gapDescription;
+    if (updates.suggestedClauses !== undefined) payload.suggested_clauses = updates.suggestedClauses;
+    if (updates.remediationNotes !== undefined) payload.remediation_notes = updates.remediationNotes;
 
     const data = await this.handleResponse<any>(
       supabase.from("remediation_tasks")
@@ -2022,7 +2058,11 @@ export class SupabaseRESTStorage implements IStorage {
       severity: data.severity,
       status: data.status,
       ownerId: data.owner_id,
+      assignedTo: data.assigned_to,
       dueDate: data.due_date ? new Date(data.due_date) : null,
+      gapDescription: data.gap_description,
+      suggestedClauses: data.suggested_clauses,
+      remediationNotes: data.remediation_notes,
       createdAt: data.created_at ? new Date(data.created_at) : null,
       updatedAt: data.updated_at ? new Date(data.updated_at) : null
     };
@@ -2040,8 +2080,12 @@ export class SupabaseRESTStorage implements IStorage {
       id: d.id,
       workspaceId: d.workspace_id,
       contractId: d.contract_id,
-      originalClause: d.original_clause,
-      suggestedClause: d.suggested_clause,
+      clauseTitle: d.clause_title,
+      originalText: d.original_text,
+      suggestedText: d.suggested_text,
+      reason: d.reason,
+      standard: d.standard,
+      severity: d.severity,
       status: d.status,
       userId: d.user_id,
       ruleId: d.rule_id,
@@ -2057,8 +2101,12 @@ export class SupabaseRESTStorage implements IStorage {
         .insert({
           workspace_id: workspaceId || suggestion.workspaceId,
           contract_id: suggestion.contractId,
-          original_clause: suggestion.originalClause,
-          suggested_clause: suggestion.suggestedClause,
+          clause_title: suggestion.clauseTitle,
+          original_text: suggestion.originalText,
+          suggested_text: suggestion.suggestedText,
+          reason: suggestion.reason,
+          standard: suggestion.standard,
+          severity: suggestion.severity,
           status: suggestion.status || "pending",
           user_id: suggestion.userId,
           rule_id: suggestion.ruleId
@@ -2070,9 +2118,9 @@ export class SupabaseRESTStorage implements IStorage {
       id: data.id,
       workspaceId: data.workspace_id,
       contractId: data.contract_id,
-      originalClause: data.original_clause,
-      suggestedClause: data.suggested_clause,
-      status: data.status,
+      clauseTitle: data.clause_title, originalText: data.original_text,
+      suggestedText: data.suggested_text,
+      reason: data.reason, standard: data.standard, severity: data.severity, status: data.status,
       userId: data.user_id,
       ruleId: data.rule_id,
       createdAt: data.created_at ? new Date(data.created_at) : null,
@@ -2097,9 +2145,9 @@ export class SupabaseRESTStorage implements IStorage {
       id: data.id,
       workspaceId: data.workspace_id,
       contractId: data.contract_id,
-      originalClause: data.original_clause,
-      suggestedClause: data.suggested_clause,
-      status: data.status,
+      clauseTitle: data.clause_title, originalText: data.original_text,
+      suggestedText: data.suggested_text,
+      reason: data.reason, standard: data.standard, severity: data.severity, status: data.status,
       userId: data.user_id,
       ruleId: data.rule_id,
       createdAt: data.created_at ? new Date(data.created_at) : null,
@@ -2548,6 +2596,29 @@ export class SupabaseRESTStorage implements IStorage {
       createdAt: d.created_at ? new Date(d.created_at) : null
     }));
   }
+
+  async createUsageEvent(event: Omit<UsageEvent, "id" | "createdAt">): Promise<UsageEvent> {
+    const data = await this.handleResponse<any>(
+      supabase.from("usage_events")
+        .insert({
+          workspace_id: event.workspaceId,
+          user_id: event.userId,
+          event_type: event.eventType,
+          credits_used: event.creditsUsed,
+          metadata: event.metadata
+        })
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      userId: data.user_id,
+      eventType: data.event_type,
+      creditsUsed: data.credits_used,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
   // --- AI CACHE ---
   async getAiCache(promptHash: string): Promise<any | undefined> {
     const data = await this.handleResponse<any | null>(
@@ -2578,7 +2649,7 @@ export class SupabaseRESTStorage implements IStorage {
         })
     );
   }
-  async updatePresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void> {
+  async upsertPresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void> {
     await adminClient
       .from("presence")
       .upsert({
@@ -2601,6 +2672,8 @@ export class SupabaseRESTStorage implements IStorage {
       .gt("last_seen_at", fiveMinutesAgo);
     return data || [];
   }
+
 }
 
 export const storage = new SupabaseRESTStorage();
+

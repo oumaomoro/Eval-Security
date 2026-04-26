@@ -9,7 +9,8 @@ import {
   ShieldCheck, 
   Filter,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from "lucide-react";
 import { 
   useReports, 
@@ -146,38 +147,78 @@ export default function Reports() {
       
       <div className="space-y-6">
         {/* Intelligence Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/50 shadow-sm border-border/50">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="bg-[#0f172a]/80 backdrop-blur-xl border-blue-500/20 shadow-[0_0_50px_rgba(59,130,246,0.1)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+              <ShieldCheck className="w-16 h-16 text-blue-500" />
+            </div>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-500" /> Active Schedules
+              <CardTitle className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+                Active Schedules
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{schedules?.filter(s => s.isActive).length || 0}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">Automated reporting pipelines engaged.</p>
+              <div className="text-3xl font-black text-white tracking-tighter italic">
+                {schedules?.filter(s => s.isActive).length || 0}
+                <span className="text-blue-500/50 text-sm ml-1 not-italic font-medium">PIPELINES</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-wider">Automated intelligence engaged.</p>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 shadow-sm border-border/50">
+
+          <Card className="bg-[#0f172a]/80 backdrop-blur-xl border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.1)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+              <FileText className="w-16 h-16 text-emerald-500" />
+            </div>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <FileText className="w-3.5 h-3.5 text-emerald-500" /> Total Exports
+              <CardTitle className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                Evidence Exported
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reports?.length || 0}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">Documents in sovereign repository.</p>
+              <div className="text-3xl font-black text-white tracking-tighter italic">
+                {reports?.length || 0}
+                <span className="text-emerald-500/50 text-sm ml-1 not-italic font-medium">DOCS</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-wider">Verified sovereign repository.</p>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 shadow-sm border-border/50">
+
+          <Card className="bg-[#0f172a]/80 backdrop-blur-xl border-amber-500/20 shadow-[0_0_50px_rgba(245,158,11,0.1)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+              <Clock className="w-16 h-16 text-amber-500" />
+            </div>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-amber-500" /> Last Audit
+              <CardTitle className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                Last Audit Run
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reports?.[0]?.createdAt ? format(new Date(reports[0].createdAt as string | Date), "MMM d, yyyy") : "N/A"}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">Latest jurisdictional verification run.</p>
+              <div className="text-3xl font-black text-white tracking-tighter italic">
+                {reports?.[0]?.createdAt ? format(new Date(reports[0].createdAt as string | Date), "MMM d") : "NEVER"}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-wider">Jurisdictional verification sync.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#0f172a]/80 backdrop-blur-xl border-primary/20 shadow-[0_0_50px_rgba(6,182,212,0.15)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+              <Zap className="w-16 h-16 text-primary" />
+            </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-[10px] font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                Optimization ROI
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-black text-white tracking-tighter italic">
+                ${reports?.reduce((sum, r) => sum + ((r.content as any)?.identifiedSavings || 0), 0).toLocaleString() || "0"}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-wider">Identified annual cost savings.</p>
             </CardContent>
           </Card>
         </div>

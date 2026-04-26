@@ -14,15 +14,30 @@ export function useClauses() {
 
 export function useGenerateClause() {
   return useMutation({
-    mutationFn: async (data: { category: string; requirements: string; jurisdiction?: string }) => {
-      const res = await fetch(api.clauses.generate.path, {
-        method: api.clauses.generate.method,
+    mutationFn: async (data: { category: string; requirements: string; standards?: string[]; risks?: string[]; tone?: string }) => {
+      const res = await fetch("/api/intelligence/generate-clause", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to generate clause");
-      return api.clauses.generate.responses[200].parse(await res.json());
+      return await res.json();
+    },
+  });
+}
+
+export function useCompareClauses() {
+  return useMutation({
+    mutationFn: async (data: { contractClauseId?: number; libraryClauseId: number }) => {
+      const res = await fetch("/api/intelligence/compare-clauses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to compare clauses");
+      return await res.json();
     },
   });
 }

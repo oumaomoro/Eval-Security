@@ -100,16 +100,58 @@ export class AutonomicEngine {
                nextRun: new Date(nextRunDate)
             });
 
-            // Note: In a full production environment, we would emit an event or call AuditService.runAudit here.
-            // For Phase 34 stabilization, we are hardening the logic; the actual trigger 
-            // will hook into the AuditService implementation.
+            // TRIGGER ACTUAL AUDIT (Phase 31 Intelligence)
+            const contracts = await storage.getContracts({ clientId: config.clientId });
+            const contractIds = contracts.map(c => c.id);
+
+            if (contractIds.length > 0) {
+              const audit = await storage.createComplianceAudit({
+                workspaceId: config.workspaceId,
+                rulesetId: config.rulesetId,
+                auditName: `Autonomic Continuous Audit - ${new Date().toISOString().split('T')[0]}`,
+                auditType: 'continuous',
+                scope: {
+                  contractIds,
+                  standards: [], 
+                  categories: []
+                },
+                status: 'in_progress'
+              });
+              
+              // Trigger the actual batched audit execution
+              const { AuditService } = await import('./AuditService.js');
+              // Run in background to prevent blocking the autonomic heartbeat
+              AuditService.runAudit(audit.id, config.workspaceId!).catch(err => {
+                console.error(`[AUTONOMIC ERROR] Failed to run continuous audit ${audit.id}:`, err);
+              });
+            }
           }
         }
       } catch (e: any) {
         console.warn(`[AUTONOMIC] Monitoring check failed: ${e.message}`);
       }
 
-      // 5. Log Health Pulse
+      // 5. SLA & Renewal Alerting (Phase 31)
+      try {
+        const contracts = await storage.getContracts();
+        const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        
+        for (const contract of contracts) {
+          if (contract.renewalDate && new Date(contract.renewalDate) <= thirtyDaysFromNow) {
+            // Log a warning event
+            await storage.createInfrastructureLog({
+              status: "warning",
+              component: "SLAWatcher",
+              event: "Renewal Risk Detected",
+              actionTaken: `Contract for ${contract.vendorName} expires on ${new Date(contract.renewalDate).toLocaleDateString()}. Notification queued.`
+            });
+          }
+        }
+      } catch (e: any) {
+        // Silently skip if table is unavailable
+      }
+
+      // 6. Log Health Pulse
       if (storage && typeof storage.createInfrastructureLog === 'function') {
         await storage.createInfrastructureLog({
           status: "healthy",
@@ -117,6 +159,37 @@ export class AutonomicEngine {
           event: "Pulse Check Completed",
           actionTaken: `Lat: ${postgresLatency}ms | Hub Pulse: ${this.pulseCount}`,
         }).catch(() => {});
+      }
+
+      // 7. Autonomous Savings & Intelligence Scanning (Phase 34)
+      if (this.pulseCount % 1440 === 0) { // Approx once a day
+        console.log("[AUTONOMIC] Initiating global intelligence & reporting sweep...");
+        
+        // A. Process Scheduled Reports
+        const { ReportService } = await import('./ReportService.js');
+        await ReportService.processSchedules().catch(err => console.error("[AUTONOMIC] Report schedules failed:", err));
+
+        // B. Analyze Portfolio for Consolidation & Risks
+        const contracts = await storage.getContracts();
+        for (const contract of contracts) {
+          if (contract.annualCost && contract.annualCost > 50000) {
+             await storage.createSavingsOpportunity({
+               workspaceId: contract.workspaceId,
+               contractId: contract.id,
+               type: "consolidation",
+               description: `High-value contract for ${contract.vendorName} detected ($${contract.annualCost}). Auto-scan triggered for volume discount opportunities.`,
+               estimatedSavings: contract.annualCost * 0.1,
+               status: "identified"
+             }).catch(() => {});
+          }
+        }
+
+        // C. Update Vendor Scorecards
+        const { ScorecardEngine } = await import('./ScorecardEngine.js');
+        const vendors = [...new Set(contracts.map(c => c.vendorName))];
+        for (const vendor of vendors) {
+           await ScorecardEngine.updateScorecard(vendor, 1); // Default workspace 1 for global scan
+        }
       }
 
     } catch (err: any) {

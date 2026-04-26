@@ -282,13 +282,23 @@ export function registerAuthRoutes(app: Express): void {
 
   app.get("/api/auth/google", async (req: any, res) => {
     try {
-      const redirectBase = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
-      console.log(`[AUTH-DIAG] Google SSO Init: email=${req.query.email}, redirectBase=${redirectBase}`);
+      // The API base — used so Supabase delivers the PKCE code directly to
+      // the backend, which can set HttpOnly cookies and redirect the browser.
+      const apiBase = process.env.API_URL ||
+        process.env.BACKEND_URL ||
+        `${req.protocol}://${req.get('host')}`;
+
+      const callbackUrl = `${apiBase}/api/auth/callback`;
+      console.log(`[AUTH-DIAG] Google SSO Init. Callback URL: ${callbackUrl}`);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${redirectBase}/auth/callback`,
+          redirectTo: callbackUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         }
       });
 
@@ -329,40 +339,55 @@ export function registerAuthRoutes(app: Express): void {
     res.json({ message: "Logout successful" });
   });
 
-  // Auth Callback (SSO)
+  // Auth Callback (SSO) — backend handler
+  // Supabase redirects here with ?code= after Google auth.
+  // We exchange the code for a session, set the HttpOnly cookie,
+  // then redirect the browser to the frontend dashboard.
   app.get("/api/auth/callback", async (req: any, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || '';
     try {
       const { code } = req.query;
-      if (!code) return res.redirect(`${process.env.FRONTEND_URL || ''}/login?error=no_code`);
+      if (!code) {
+        console.error("[AUTH-DIAG] SSO Callback: no code parameter received.");
+        return res.redirect(`${frontendUrl}/auth?error=no_code`);
+      }
 
+      // Use the anon supabase client (already imported) for PKCE code exchange.
+      // Supabase manages the PKCE verifier internally server-side — no need to
+      // store/retrieve it ourselves between requests.
       const { data, error } = await supabase.auth.exchangeCodeForSession(code as string);
       if (error) throw error;
 
-      if (data.session) {
-        // Sync identity and provision if first time
-        let user = await authStorage.getUser(data.user.id).catch(() => null);
-        if (!user || !user.clientId) {
-          user = await healUserIdentity(data.user, user);
-        }
-
-        // Set secure cookie
-        cookieHandler.setSessionCookie(res, data.session.access_token);
-        
-        if (req.session) {
-          req.session.supabase_token = data.session.access_token;
-        }
-
-        await SOC2Logger.logEvent(req, {
-          userId: data.user.id,
-          action: "SSO_LOGIN_SUCCESS",
-          details: `Google SSO login successful for ${data.user.email}`
-        });
+      if (!data.session) {
+        console.error("[AUTH-DIAG] SSO Callback: code exchange returned no session.");
+        return res.redirect(`${frontendUrl}/auth?error=no_session`);
       }
 
-      res.redirect(`${process.env.FRONTEND_URL || ''}/dashboard`);
+      // Provision or sync local identity (handles first-time Google users)
+      let user = await authStorage.getUser(data.user.id).catch(() => null);
+      if (!user || !user.clientId) {
+        user = await healUserIdentity(data.user, user);
+      }
+
+      // Persist session token in HttpOnly cookie
+      cookieHandler.setSessionCookie(res, data.session.access_token);
+
+      // Also persist in express-session for WebAuthn flows
+      if (req.session) {
+        req.session.supabase_token = data.session.access_token;
+      }
+
+      await SOC2Logger.logEvent(req, {
+        userId: data.user.id,
+        action: "SSO_LOGIN_SUCCESS",
+        details: `Google SSO login successful for ${data.user.email}`
+      });
+
+      // Redirect browser to the frontend application root
+      return res.redirect(`${frontendUrl}/`);
     } catch (err: any) {
       console.error("[AUTH-DIAG] SSO Callback Error:", err.message);
-      res.redirect(`${process.env.FRONTEND_URL || ''}/login?error=sso_failed`);
+      res.redirect(`${frontendUrl}/auth?error=sso_failed`);
     }
   });
 
@@ -533,15 +558,25 @@ export function registerAuthRoutes(app: Express): void {
   });
 }
 
+// Concurrency lock for identity healing to prevent race conditions during rapid refreshes
+const healingInProgress = new Map<string, Promise<any>>();
+
 /**
  * SOVEREIGN IDENTITY HEALING: Autocorrects provisioning failures
  */
 async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
   const userId = authUser.id;
   const email = authUser.email;
-  console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
 
-  try {
+  if (healingInProgress.has(userId)) {
+    console.log(`[IDENTITY-RESILLIENCE] Healing already in progress for ${email}. Waiting...`);
+    return healingInProgress.get(userId);
+  }
+
+  const healingPromise = (async () => {
+    console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
+
+    try {
     // 1. Recover metadata
     const userMeta = authUser.user_metadata || {};
     let firstName = authUser.firstName || userMeta.first_name || "";
@@ -618,5 +653,11 @@ async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
   } catch (err: any) {
     console.error(`[IDENTITY-RESILLIENCE] Healing CRITICAL FAILURE:`, err.message);
     return localUser; // Fallback to raw user to avoid blocking access
+  } finally {
+    healingInProgress.delete(userId);
   }
+})();
+
+  healingInProgress.set(userId, healingPromise);
+  return healingPromise;
 }

@@ -231,6 +231,38 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
 });
 
 // ─── REMEDIATION SUGGESTIONS ───────────────────────────────────────────────
+// POST /api/remediation-suggestions
+router.post("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
+  try {
+    const { contractId, title, suggestedClause, findingId, severity } = req.body;
+    
+    if (!title || !suggestedClause) {
+      return res.status(400).json({ message: "Title and suggested clause are required." });
+    }
+
+    const suggestion = await storage.createRemediationSuggestion({
+      workspaceId: storageContext.getStore()?.workspaceId,
+      contractId: contractId || null,
+      clauseTitle: title,
+      originalText: title, // Using title as placeholder for original text in manual suggestions
+      suggestedText: suggestedClause,
+      status: "pending",
+    });
+
+    await SOC2Logger.logEvent(req, {
+      action: "REMEDIATION_SUGGESTION_CREATED",
+      userId: req.user.id,
+      resourceType: "RemediationSuggestion",
+      resourceId: String(suggestion.id),
+      details: `New manual remediation suggestion created: ${title}`
+    });
+
+    res.status(201).json(suggestion);
+  } catch (error: any) {
+    console.error("[REMEDIATION SUGGESTION POST]", error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // GET /api/remediation-suggestions?contractId=X
 router.get("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
   try {

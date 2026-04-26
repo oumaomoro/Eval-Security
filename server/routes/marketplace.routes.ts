@@ -4,6 +4,7 @@ import { isAuthenticated } from "../replit_integrations/auth/index.js";
 import { storageContext } from "../services/storageContext.js";
 import { SOC2Logger } from "../services/SOC2Logger.js";
 import { randomUUID } from "crypto";
+import { MarketplaceService } from "../services/MarketplaceService.js";
 
 const router = Router();
 
@@ -116,6 +117,35 @@ router.post("/marketplace/purchase", isAuthenticated, async (req: any, res) => {
     res.status(500).json({ message: "Checkout failed: " + error.message });
   }
 });
+
+/**
+ * GET /api/marketplace/benchmark/:contractId
+ * AI-driven benchmarking against verified marketplace clauses.
+ */
+router.get("/marketplace/benchmark/:contractId", isAuthenticated, async (req: any, res) => {
+  try {
+    const contractId = parseInt(req.params.contractId);
+    const benchmark = await MarketplaceService.benchmarkAgainstMarketplace(contractId);
+    res.json(benchmark);
+  } catch (error: any) {
+    res.status(500).json({ message: "Marketplace benchmarking failed." });
+  }
+});
+
+/**
+ * GET /api/marketplace/insurance-suggestion/:contractId
+ * Suggests cyber insurance coverage limits based on financial exposure.
+ */
+router.get("/marketplace/insurance-suggestion/:contractId", isAuthenticated, async (req: any, res) => {
+  try {
+    const contractId = parseInt(req.params.contractId);
+    const suggestion = await MarketplaceService.suggestInsurance(contractId);
+    res.json(suggestion);
+  } catch (error: any) {
+    res.status(500).json({ message: "Insurance suggestion failed." });
+  }
+});
+
 
 /**
  * POST /api/marketplace/webhook

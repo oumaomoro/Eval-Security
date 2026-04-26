@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertReport, type InsertReportSchedule } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { getApiUrl } from "@/lib/api-config";
+import { fetchApi } from "@/lib/api-client";
 import { useWorkspace } from "@/hooks/use-workspace";
 
 export function useReports() {
@@ -11,9 +11,7 @@ export function useReports() {
   return useQuery({
     queryKey: [api.reports.list.path, activeWorkspaceId],
     queryFn: async () => {
-      const res = await fetch(getApiUrl(api.reports.list.path), { 
-        credentials: "include",
-      });
+      const res = await fetchApi(api.reports.list.path);
       if (!res.ok) throw new Error("Failed to fetch reports");
       return api.reports.list.responses[200].parse(await res.json());
     },
@@ -26,11 +24,9 @@ export function useGenerateReport() {
 
   return useMutation({
     mutationFn: async (data: { title: string; type: string; regulatoryBody?: string }) => {
-      const res = await fetch(getApiUrl(api.reports.generate.path), {
+      const res = await fetchApi(api.reports.generate.path, {
         method: api.reports.generate.method,
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to generate report");
       return api.reports.generate.responses[201].parse(await res.json());
@@ -48,9 +44,7 @@ export function useReportSchedules() {
   return useQuery({
     queryKey: [api.reports.schedules.list.path, activeWorkspaceId],
     queryFn: async () => {
-      const res = await fetch(getApiUrl(api.reports.schedules.list.path), { 
-        credentials: "include",
-      });
+      const res = await fetchApi(api.reports.schedules.list.path);
       if (!res.ok) throw new Error("Failed to fetch schedules");
       return api.reports.schedules.list.responses[200].parse(await res.json());
     },
@@ -63,11 +57,9 @@ export function useCreateReportSchedule() {
 
   return useMutation({
     mutationFn: async (data: InsertReportSchedule) => {
-      const res = await fetch(getApiUrl(api.reports.schedules.create.path), {
+      const res = await fetchApi(api.reports.schedules.create.path, {
         method: api.reports.schedules.create.method,
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create schedule");
       return api.reports.schedules.create.responses[201].parse(await res.json());
@@ -86,9 +78,8 @@ export function useDeleteReportSchedule() {
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.reports.schedules.delete.path, { id });
-      const res = await fetch(getApiUrl(url), {
+      const res = await fetchApi(url, {
         method: api.reports.schedules.delete.method,
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to delete schedule");
     },

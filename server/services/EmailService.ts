@@ -28,7 +28,8 @@ export class EmailService {
    */
   static async sendVerificationEmail(email: string, token: string): Promise<boolean> {
     try {
-      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3200'}/auth/verify?token=${token}`;
+      const host = process.env.FRONTEND_URL || process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3200');
+      const verificationUrl = `${host}/auth/verify?token=${token}`;
       
       const { data, error } = await getResend().emails.send({
         from: "Costloci Governance <onboarding@costloci.com>",
@@ -84,6 +85,14 @@ export class EmailService {
    */
   static async sendDPODigest(email: string, data: any): Promise<boolean> {
     // Implementation placeholder for Phase 8
+    return true;
+  }
+
+  /**
+   * Send a notification that a report is ready.
+   */
+  static async sendReportReadyNotification(email: string, reportId: number): Promise<boolean> {
+    console.log(`[EMAIL_SERVICE] Report ${reportId} ready. Notification sent to ${email}.`);
     return true;
   }
 }

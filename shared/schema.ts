@@ -317,8 +317,12 @@ export const remediationSuggestions = pgTable("remediation_suggestions", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
   workspaceId: integer("workspace_id").references(() => workspaces.id),
   contractId: integer("contract_id").references(() => contracts.id).notNull(),
-  originalClause: text("original_clause").notNull(),
-  suggestedClause: text("suggested_clause").notNull(),
+  clauseTitle: text("clause_title").notNull(),
+  originalText: text("original_text"),
+  suggestedText: text("suggested_text").notNull(),
+  reason: text("reason"),
+  standard: text("standard"),
+  severity: text("severity").default("medium"),
   status: text("status").notNull().default("pending"),
   userId: uuid("user_id").references(() => users.id),
   ruleId: integer("rule_id"), 
@@ -356,6 +360,15 @@ export const playbookRules = pgTable("playbook_rules", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+
+export const insertPlaybookSchema = createInsertSchema(playbooks).omit({ id: true, createdAt: true, updatedAt: true });
+export type Playbook = typeof playbooks.$inferSelect;
+export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
+
+export const insertPlaybookRuleSchema = createInsertSchema(playbookRules).omit({ id: true, createdAt: true });
+export type PlaybookRule = typeof playbookRules.$inferSelect;
+export type InsertPlaybookRule = z.infer<typeof insertPlaybookRuleSchema>;
 
 export const userPlaybooks = pgTable("user_playbooks", {
   userId: uuid("user_id").references(() => users.id).notNull(),
@@ -468,7 +481,11 @@ export const remediationTasks = pgTable("remediation_tasks", {
   severity: text("severity").notNull(), 
   status: text("status").notNull().default("pending"), 
   ownerId: uuid("owner_id").references(() => users.id),
+  assignedTo: text("assigned_to"),
   dueDate: timestamp("due_date"),
+  gapDescription: text("gap_description"),
+  suggestedClauses: text("suggested_clauses"),
+  remediationNotes: text("remediation_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -681,13 +698,7 @@ export const insertRemediationSuggestionSchema = createInsertSchema(remediationS
 export type RemediationSuggestion = typeof remediationSuggestions.$inferSelect;
 export type InsertRemediationSuggestion = z.infer<typeof insertRemediationSuggestionSchema>;
 
-export const insertPlaybookSchema = createInsertSchema(playbooks).omit({ id: true, createdAt: true, updatedAt: true });
-export type Playbook = typeof playbooks.$inferSelect;
-export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
 
-export const insertPlaybookRuleSchema = createInsertSchema(playbookRules).omit({ id: true, createdAt: true });
-export type PlaybookRule = typeof playbookRules.$inferSelect;
-export type InsertPlaybookRule = z.infer<typeof insertPlaybookRuleSchema>;
 
 export const insertUserPlaybookSchema = createInsertSchema(userPlaybooks).omit({ assignedAt: true });
 export type UserPlaybook = typeof userPlaybooks.$inferSelect;

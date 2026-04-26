@@ -9,8 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 interface RedlineProps {
   id: string;
   contractId: number;
-  originalClause: string;
-  suggestedClause: string;
+  clauseTitle: string;
+  originalText: string;
+  suggestedText: string;
   status: "pending" | "accepted" | "rejected";
   ruleId?: number | null;
 }
@@ -38,7 +39,7 @@ export function RedlineSuggestion({ suggestion }: { suggestion: RedlineProps }) 
             <CardTitle className="text-sm text-green-400">Accepted Redline</CardTitle>
          </CardHeader>
          <CardContent className="py-2 text-sm text-slate-300">
-           {suggestion.suggestedClause}
+           {suggestion.suggestedText}
          </CardContent>
        </Card>
      );
@@ -54,16 +55,16 @@ export function RedlineSuggestion({ suggestion }: { suggestion: RedlineProps }) 
       </CardHeader>
       
       <CardContent className="pt-4 pb-2 space-y-3">
-        {suggestion.originalClause && suggestion.originalClause !== "[Section Missing or Deficient]" && (
+        {suggestion.originalText && suggestion.originalText !== "[Section Missing or Deficient]" && (
            <div className="bg-red-950/20 border border-red-900/50 rounded p-2 text-xs text-red-200">
              <span className="font-semibold text-red-400 block mb-1 hover:line-through">Original Detected Text:</span>
-             {suggestion.originalClause}
+             {suggestion.originalText}
            </div>
         )}
         
         <div className="bg-cyan-950/20 border border-cyan-900/50 rounded p-3 text-sm text-cyan-50">
            <span className="font-semibold text-cyan-400 block mb-1">Suggested Redline Addition:</span>
-           {suggestion.suggestedClause}
+           {suggestion.suggestedText}
         </div>
       </CardContent>
 

@@ -160,7 +160,8 @@ export class RulesEngine {
             contractId: contract.id,
             title: `[Automated] ${rule.name}`,
             severity: action.severity || "medium",
-            description: action.message || `Triggered by rule ${rule.name}`
+            description: action.message || `Triggered by rule ${rule.name}`,
+            gapDescription: `Triggered by Playbook Rule: ${rule.name} (${rule.condition.field} ${rule.condition.operator} ${rule.condition.value})`
           });
           break;
 

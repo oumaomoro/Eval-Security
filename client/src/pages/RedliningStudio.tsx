@@ -35,6 +35,33 @@ export default function RedliningStudio() {
   const [redlinedResult, setRedlinedResult] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [riskReduction, setRiskReduction] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveResult = async () => {
+    if (!redlinedResult) return;
+    
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/remediation-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clauseTitle: "Neural Studio Redline: " + standardClause.slice(0, 30) + "...",
+          originalText: originalClause,
+          suggestedText: redlinedResult,
+          severity: "medium"
+        })
+      });
+      
+      if (!res.ok) throw new Error("Failed to save redline");
+      
+      toast({ title: "Redline Persisted", description: "Suggestion has been saved to the remediation engine." });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Persistence Error", description: err.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleRedline = async () => {
     if (!originalClause || !standardClause) {
@@ -253,8 +280,14 @@ export default function RedliningStudio() {
                     }}>
                       <Copy className="w-4 h-4 text-slate-400" />
                     </Button>
-                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-slate-800 bg-slate-950/50 hover:bg-slate-800">
-                      <Save className="w-4 h-4 text-slate-400" />
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      disabled={!redlinedResult || isSaving}
+                      onClick={handleSaveResult}
+                      className="h-10 w-10 rounded-xl border-slate-800 bg-slate-950/50 hover:bg-slate-800"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-400" />}
                     </Button>
                   </div>
                 </div>

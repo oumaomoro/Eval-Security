@@ -15,11 +15,11 @@ foreach ($var in $RequiredVars) {
 
 # 2. Check Database Schema Integrity (Via local check or external ping)
 Write-Host "--- VALIDATING RLS READINESS ---" -ForegroundColor Cyan
-$HealthUrl = "http://localhost:3001/api/health"
+$HealthUrl = "http://localhost:3200/api/health"
 try {
     $response = Invoke-RestMethod -Uri $HealthUrl -Method Get -ErrorAction Stop
-    if ($response.status -eq "optimal") {
-        Write-Host "[PASS] API Core Healthy (Status: Optimal)" -ForegroundColor Green
+    if ($response.status -eq "operational") {
+        Write-Host "[PASS] API Core Healthy (Status: Operational)" -ForegroundColor Green
     } elseif ($response.status -eq "degraded") {
         Write-Host "[WARN] API Reporting Degraded Mode (Schema Mismatch detected)" -ForegroundColor Yellow
         Write-Host "Missing Columns: $($response.missingTables -join ', ')" -ForegroundColor Gray
@@ -32,7 +32,7 @@ try {
 
 # 3. Check for Orphaned Uploads (Cron Route)
 Write-Host "--- TESTING CRON ENDPOINT ---" -ForegroundColor Cyan
-$CronUrl = "http://localhost:3000/api/cron/cleanup-uploads"
+$CronUrl = "http://localhost:3200/api/cron/cleanup-uploads"
 # (Requires CRON_SECRET)
 
 Write-Host "--- TYPE SAFETY CHECK ---" -ForegroundColor Cyan

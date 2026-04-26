@@ -4,7 +4,7 @@
  */
 
 const SIGNNOW_API_BASE = 'https://api.signnow.com';
-const SIGNNOW_TOKEN = process.env.SIGNNOW_API_KEY || '1ee4d1313f0940c9523a5add9f3ecd8a96b8cb6084cbb69048d1a80c2f6e3b9b';
+const SIGNNOW_TOKEN = process.env.SIGNNOW_API_KEY;
 
 export class SignnowService {
   /**

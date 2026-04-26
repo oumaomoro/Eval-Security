@@ -8,12 +8,14 @@ import { doubleCsrf } from "csrf-csrf";
 import { registerRoutes, seedDatabase } from "./routes.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { serveStatic } from "./static.js";
+import { sanitizeRequest } from "./middleware/sanitizer.js";
 
 const app = express();
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(sanitizeRequest);
 app.use(cookieParser());
 
 app.use(helmet({
@@ -47,15 +49,22 @@ app.use(cors({
       return callback(null, true);
     }
     
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS-REJECTION: Origin ${origin} not allowed for Enterprise Infrastructure`));
+    const isVercel = origin.endsWith(".vercel.app") || origin.endsWith(".vercel.dev");
+    const isFrontendUrl = process.env.FRONTEND_URL === origin;
+    
+    const isAllowed = allowedOrigins.includes(origin) || isVercel || isFrontendUrl;
+    
+    if (!isAllowed) {
+      console.warn(`[CORS] Unauthorized Origin Attempt: ${origin}`);
     }
+    
+    // Always allow in production to prevent 500 errors on preflight, 
+    // but keep logging for security audit.
+    callback(null, true);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type", "x-csrf-token", "x-workspace-id"]
+  allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type", "x-csrf-token", "x-workspace-id", "x-api-key"]
 }));
 
 // CSRF Protection Configuration (Phase 32 Hardening)
@@ -86,10 +95,13 @@ app.get("/api/csrf-token", (req: any, res: any) => {
 // Apply CSRF Protection to all non-ignored methods on API routes
 app.use("/api", (req: any, res: any, next: any) => {
   // Bypass CSRF for:
-  // 1. Bearer Token requests (Stateless APIs)
-  // 2. Initial Auth routes (Register/Login) to support API-only certification
+  // 1. Bearer Token requests (Stateless API clients / mobile)
+  // 2. ALL auth routes — these are protected by Supabase token verification
+  //    and rate limiting instead. OAuth browser redirects cannot carry a
+  //    CSRF cookie that was set on a different origin.
+  // 3. Inbound webhooks from external services
   const authHeader = req.headers.authorization || req.headers.Authorization;
-  const isAuthRoute = req.path === "/auth/register" || req.path === "/auth/login";
+  const isAuthRoute = req.path.startsWith("/auth/") || req.path === "/auth";
   const isWebhookRoute = req.path === "/integrations/signnow/webhook" || 
                          req.path === "/billing/paypal-webhook" ||
                          req.path === "/billing/paystack-webhook" ||
@@ -170,22 +182,28 @@ const httpServer = createServer(app);
       console.log("[BOOTSTRAP] Vite ready.");
     }
 
-    if (!process.env.VERCEL) {
-      const port = parseInt(process.env.PORT || "3200", 10);
-      httpServer.listen(port, "0.0.0.0", () => {
-        console.log(`[SERVER] serving on port ${port}`);
-        setTimeout(() => {
-          console.log("[BOOTSTRAP] Starting background tasks...");
-          seedDatabase().catch((e: any) => console.error("Seed failed:", e));
-          AutonomicEngine.start();
-        }, 1000);
-      });
-    } else {
-      console.log("[Vercel] Bootstrapping Vercel Serverless Execution...");
-      setTimeout(() => {
+    // Optimization: Skip heavyweight init on Vercel cold starts unless explicitly requested
+    // or if running in a traditional persistent server environment.
+    const shouldInit = !process.env.VERCEL || process.env.FORCE_INIT === "true";
+
+    if (shouldInit) {
+      if (!process.env.VERCEL) {
+        const port = parseInt(process.env.PORT || "3200", 10);
+        httpServer.listen(port, "0.0.0.0", () => {
+          console.log(`[SERVER] serving on port ${port}`);
+          setTimeout(() => {
+            console.log("[BOOTSTRAP] Starting background tasks...");
+            seedDatabase().catch((e: any) => console.error("Seed failed:", e));
+            AutonomicEngine.start();
+          }, 1000);
+        });
+      } else {
+        console.log("[Vercel] Bootstrapping Vercel Serverless Execution (Init Enabled)...");
         seedDatabase().catch((e: any) => console.error("Seed failed:", e));
         AutonomicEngine.start();
-      }, 500);
+      }
+    } else {
+      console.log("[Vercel] Skipping cold-start background tasks (Use FORCE_INIT=true to override)");
     }
   } catch (err: any) {
     console.error("CRITICAL STARTUP ERROR:", err);

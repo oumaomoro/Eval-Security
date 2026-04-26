@@ -23,6 +23,12 @@ import marketplaceRouter from "./routes/marketplace.routes.js";
 import insuranceRouter from "./routes/insurance.routes.js";
 import apiV1Router from "./routes/api_v1.js";
 import cronRouter from "./cron/process-schedules.js";
+import monitoringRouter from "./routes/monitoring.routes.js";
+import monitoringCronRouter from "./cron/process-monitoring.js";
+import reportsRouter from "./routes/reports.routes.js";
+import vendorsRouter from "./routes/vendors.routes.js";
+import collaborationRouter from "./routes/collaboration.routes.js";
+import playbooksRouter from "./routes/playbooks.routes.js";
 import { telemetryMiddleware } from "./middleware/telemetry.js";
 
 import multer from "multer";
@@ -35,12 +41,14 @@ import { storageContext } from "./services/storageContext.js";
 import { SOC2Logger } from "./services/SOC2Logger.js";
 
 import { AIGateway } from "./services/AIGateway.js";
+import { cachedCompletion } from "./services/openai.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
+import { CollaborationService } from "./services/CollaborationService.js";
 
 // Export the centralized openai router instance
 const openai = AIGateway.openai;
 
-import { apiLimiter, authLimiter, uploadLimiter } from "./middleware/rate-limiter.js";
+import { apiLimiter, authLimiter, uploadLimiter, intelligenceLimiter, cronLimiter } from "./middleware/rate-limiter.js";
 
 // Use memory storage — files are streamed directly to Supabase Storage.
 // NEVER use disk storage on Vercel: the ephemeral filesystem is wiped on every cold start.
@@ -58,17 +66,17 @@ const upload = multer({
   }
 });
 
-// Cache AI responses 60 min to reduce latency and cost
-const cachedCompletion = memoize(
-  (params: any) => AIGateway.createCompletion(params),
-  { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
-);
+// AI completion caching is handled via server/services/openai.ts
+
 
 import { workspaceContextMiddleware } from "./middleware/workspace-context-middleware.js";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
-  console.log("[ROUTES] Starting registration...");
   console.log(`[ROUTES] API Key Rotate Path: ${api.auth.apiKey.rotate.path}`);
+
+  // Phase 33: Real-time Collaboration Studio
+  CollaborationService.init(httpServer);
+  console.log("[COLLAB] Real-time engine online.");
 
   // Real-time Telemetry Monitor - Hardened entry-point
   app.use(telemetryMiddleware);
@@ -78,6 +86,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use('/api/auth/', authLimiter);
   app.use('/api/contracts/upload', uploadLimiter);
   app.use('/api/insurance/upload', uploadLimiter);
+  app.use('/api/intelligence/', intelligenceLimiter);
+  app.use('/api/cron/', cronLimiter);
 
   // Multi-tenant Workspace Context
   app.use(workspaceContextMiddleware);
@@ -100,11 +110,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use("/api", integrationsRouter);
   app.use("/api", signnowRouter);
   app.use("/api", marketplaceRouter);
+  app.use("/api", monitoringRouter);
+  app.use("/api", reportsRouter);
+  app.use("/api", vendorsRouter);
+  app.use("/api", collaborationRouter);
   app.use("/api", insuranceRouter);
+  app.use("/api", playbooksRouter);
   app.use("/api/v1", apiV1Router);
   
-  // Enterprise Scheduled Cron Endpoint
+  // Enterprise Scheduled Cron Endpoints
   app.use("/api/cron", cronRouter);
+  app.use("/api/cron", monitoringCronRouter);
 
 
   // Rate limiting for mutations (Legacy fallback safely removed since global limiters are applied)
@@ -308,40 +324,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       if (!checkContractLimit(req, res)) return;
 
-      // Buffer is available directly from multer memoryStorage — no disk I/O needed
-      const pdfData = await pdf(req.file.buffer);
-
-      const extractedText = pdfData.text.substring(0, 15000);
-
-      let analysis: any = {};
-      try {
-        const response = await cachedCompletion({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: `You are a Legal AI Auditor specializing in MEA (KDPA/POPIA/CBK) regulations.
-Analyze the contract text and return JSON with exactly these fields:
-{ "vendorName": string, "productService": string, "category": string, "annualCost": number, "riskScore": number, "riskFlags": string[], "complianceGrade": string }`,
-            },
-            { role: "user", content: `Contract Text:\n${extractedText}` },
-          ],
-          response_format: { type: "json_object" },
-        });
-        analysis = JSON.parse(response || "{}");
-      } catch (aiError: any) {
-        console.warn("[UPLOAD FALLBACK] AI extraction failed, parsing generic metadata:", aiError.message);
-        analysis = {
-          vendorName: "Pending AI Review",
-          productService: "Unknown Service",
-          category: "General",
-          annualCost: 0,
-          riskScore: 50,
-          riskFlags: ["AI analysis unavailable or timed out"],
-          complianceGrade: "Unrated",
-        };
-      }
-
       // Extract clientId and workspaceId from the authenticated request context
       const clientId = req.user?.clientId;
       const store = storageContext.getStore();
@@ -357,42 +339,100 @@ Analyze the contract text and return JSON with exactly these fields:
       const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
       const storagePath = `contracts/${clientId}/${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       
-      try {
-        const { error: storageError } = await supabaseAdmin.storage
-          .from("contracts")
-          .upload(storagePath, req.file.buffer, {
-            contentType: req.file.mimetype || "application/pdf",
-            upsert: false,
-          });
+      const { error: storageError } = await supabaseAdmin.storage
+        .from("contracts")
+        .upload(storagePath, req.file.buffer, {
+          contentType: req.file.mimetype || "application/pdf",
+          upsert: false,
+        });
 
-        if (storageError) {
-          throw new Error(`Failed to upload sovereign persistence pack: ${storageError.message}`);
-        }
+      if (storageError) {
+        throw new Error(`Failed to upload sovereign persistence pack: ${storageError.message}`);
+      }
 
-        const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
-        const fileUrl = publicUrlData.publicUrl;
+      const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
+      const fileUrl = publicUrlData.publicUrl;
 
-        // Now create the database record with the URL
+      // 1. Create the database record immediately as 'pending'
+      const contract = await storage.createContract({
+        workspaceId,
+        clientId,
+        vendorName: "Pending AI Review",
+        productService: "Pending Analysis",
+        category: "Pending Analysis",
+        annualCost: 0,
+        status: "pending",
+        fileUrl,
+        aiAnalysis: {
+          riskScore: 50,
+          riskFlags: [],
+          summary: `Pending compliance analysis`,
+        },
+      }, req.user?.id);
+
+      // 2. Return 201 immediately to prevent serverless function timeouts
+      res.status(201).json({
+        url: contract.fileUrl || "#",
+        filename: req.file.originalname,
+        contractId: contract.id,
+        status: "pending"
+      });
+
+      // 3. Background Async Processing (The Document Queue)
+      (async () => {
         try {
-          const contract = await storage.createContract({
-            workspaceId,
-            clientId,
+          // Keep a reference to the request user ID
+          const userId = req.user?.id || "SYSTEM";
+
+          // Buffer is available directly from multer memoryStorage
+          const pdfData = await pdf(req.file.buffer);
+          const extractedText = pdfData.text.substring(0, 15000);
+
+          let analysis: any = {};
+          try {
+            const response = await cachedCompletion({
+              model: "gpt-4o",
+              messages: [
+                {
+                  role: "system",
+                  content: `You are a Legal AI Auditor specializing in MEA (KDPA/POPIA/CBK) regulations.
+Analyze the contract text and return JSON with exactly these fields:
+{ "vendorName": string, "productService": string, "category": string, "annualCost": number, "riskScore": number, "riskFlags": string[], "complianceGrade": string }`,
+                },
+                { role: "user", content: `Contract Text:\n${extractedText}` },
+              ],
+              response_format: { type: "json_object" },
+            });
+            analysis = JSON.parse(response || "{}");
+          } catch (aiError: any) {
+            console.warn("[UPLOAD FALLBACK] AI extraction failed:", aiError.message);
+            analysis = {
+              vendorName: "Unknown Vendor (AI Failed)",
+              productService: "Unknown Service",
+              category: "General",
+              annualCost: 0,
+              riskScore: 50,
+              riskFlags: ["AI analysis unavailable or timed out"],
+              complianceGrade: "Unrated",
+            };
+          }
+
+          // Update the contract with extracted metadata
+          await storage.updateContract(contract.id, {
             vendorName: analysis.vendorName || "Unknown Vendor",
             productService: analysis.productService || "Enterprise Service",
             category: analysis.category || "General Provider",
             annualCost: analysis.annualCost || 0,
-            status: analysis.vendorName === "Pending AI Review" ? "pending" : "active",
-            fileUrl, // ── Supabase Storage URL (persistent)
+            status: "active",
             aiAnalysis: {
               riskScore: analysis.riskScore,
               riskFlags: analysis.riskFlags || [],
               summary: `Compliance Grade: ${analysis.complianceGrade}`,
-            },
-          }, req.user?.id);
+            }
+          });
 
-          // ... rest of the logic continues inside this try block ...
           // Auto-persist extracted risks into risk register
-          if (analysis.riskFlags?.length && contract.status === "active") {
+          if (analysis.riskFlags?.length) {
             for (const flag of analysis.riskFlags) {
               await storage.createRisk({
                 workspaceId,
@@ -411,18 +451,18 @@ Analyze the contract text and return JSON with exactly these fields:
 
           // Automated Governance Threshold Enforcement (Phase 11)
           const client = await storage.getClient(clientId);
-          if (client && analysis.riskScore > (client.riskThreshold || 70) && contract.status === "active") {
+          if (client && analysis.riskScore > (client.riskThreshold || 70)) {
             await storage.createInfrastructureLog({
               workspaceId,
               status: "detected",
               component: "GovernanceGuardrail",
               event: "Risk Threshold Exceeded",
-              actionTaken: `Automated Warning: Contract for ${contract.vendorName} (Risk: ${analysis.riskScore}) exceeds client threshold of ${client.riskThreshold}.`,
+              actionTaken: `Automated Warning: Contract for ${analysis.vendorName} (Risk: ${analysis.riskScore}) exceeds client threshold of ${client.riskThreshold}.`,
             });
             
-            await SOC2Logger.logEvent(req, {
+            await SOC2Logger.logEvent({ user: { id: userId, clientId } } as any, {
                 action: "GOVERNANCE_VIOLATION",
-                userId: req.user?.id || "SYSTEM",
+                userId: userId,
                 resourceType: "Contract",
                 resourceId: String(contract.id),
                 details: `Risk Score ${analysis.riskScore} exceeds established corporate guardrail (${client.riskThreshold}).`,
@@ -432,53 +472,48 @@ Analyze the contract text and return JSON with exactly these fields:
             const { NotificationService: ns } = await import("./services/NotificationService.js");
             await ns.broadcastEvent(workspaceId, "risk.critical", {
                 title: "Governance Alert: Risk Threshold Exceeded",
-                message: `Contract for ${contract.vendorName} flagged with Risk Score ${analysis.riskScore}, exceeding your policy of ${client.riskThreshold}.`,
+                message: `Contract for ${analysis.vendorName} flagged with Risk Score ${analysis.riskScore}, exceeding your policy of ${client.riskThreshold}.`,
                 link: `${process.env.FRONTEND_URL}/contracts/${contract.id}`,
                 severity: "critical"
             });
           }
 
-          await SOC2Logger.logEvent(req, {
+          await SOC2Logger.logEvent({ user: { id: userId, clientId } } as any, {
             action: "CONTRACT_UPLOADED",
-            userId: req.user?.id || "SYSTEM",
+            userId: userId,
             resourceType: "Contract",
             resourceId: String(contract.id),
-            details: `Ingested: ${req.file.originalname} → ${contract.vendorName}`,
+            details: `Ingested: ${req.file.originalname} → ${analysis.vendorName}`,
           });
 
           // BROADCAST: Notify Slack/Teams (Phase 26)
           const { NotificationService } = await import("./services/NotificationService.js");
           await NotificationService.broadcastEvent(workspaceId, "contract.uploaded", {
               title: "New Contract Ingested",
-              message: `A new contract for ${contract.vendorName} has been processed and analyzed.`,
+              message: `A new contract for ${analysis.vendorName} has been processed and analyzed.`,
               link: `${process.env.FRONTEND_URL}/contracts/${contract.id}`,
               severity: "info"
           });
 
           // TRIGGER REDLINES & PLAYBOOK RULES ENGINE
-          const { RulesEngine } = await import("./services/RulesEngine");
-          await RulesEngine.evaluateContract(contract.id, workspaceId).catch(err => {
+          const { RulesEngine } = await import("./services/RulesEngine.js");
+          await RulesEngine.evaluateContract(contract.id, workspaceId).catch((err: any) => {
               console.error("[RulesEngine] Autonomous execution failed, but not failing request:", err.message);
           });
 
-          return res.status(201).json({
-            url: contract.fileUrl || "#",
-            filename: req.file.originalname,
-            contractId: contract.id,
-            analysis,
-          });
-
-        } catch (dbError: any) {
-          // AUTONOMIC CLEANUP: If DB write fails, delete the orphaned storage object
-          console.error("[UPLOAD RECOVERY] DB insertion failed, purging orphaned storage:", dbError.message);
-          await supabaseAdmin.storage.from("contracts").remove([storagePath]);
-          throw dbError;
+        } catch (backgroundError) {
+           console.error("[BACKGROUND QUEUE ERROR] Failed to process document:", backgroundError);
+           await storage.updateContract(contract.id, {
+             status: "flagged",
+             aiAnalysis: {
+               riskScore: 100,
+               riskFlags: ["System fault during asynchronous AI extraction"],
+               summary: "Error"
+             }
+           });
         }
+      })();
 
-      } catch (uploadErr: any) {
-        console.error("[UPLOAD CRITICAL]", uploadErr.message);
-        throw uploadErr;
-      }
     } catch (err: any) {
       console.error("[UPLOAD ERROR]", err.message);
       res.status(500).json({ message: "File ingestion failed: " + err.message });
@@ -971,334 +1006,15 @@ Analyze the contract text and return JSON with exactly these fields:
   });
 
   // ─── CLAUSES ────────────────────────────────────────────────────────────────
+  // Note: Clause generation and comparison have been migrated to server/routes/intelligence.routes.ts.
 
-  app.get(api.clauses.list.path, isAuthenticated, async (_req, res) => {
-    try { res.json(await storage.getClauseLibrary()); }
-    catch { res.status(500).json({ message: "Failed to fetch clauses" }); }
-  });
-
-  app.post(api.clauses.generate.path, isAuthenticated, async (req, res) => {
-    try {
-      const { category, requirements, jurisdiction = "KDPA" } = api.clauses.generate.input.parse(req.body);
-      const response = await cachedCompletion({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: `Generate an enterprise ${category} clause for ${jurisdiction} jurisdiction. Use formal legal language. Return JSON: { clauseText, explanation }` },
-          { role: "user", content: `Requirements: ${requirements}` },
-        ],
-        response_format: { type: "json_object" },
-      });
-      const result = JSON.parse(response || "{}");
-      res.json({
-        clauseText: result.clauseText || `Standard ${category} clause for ${jurisdiction} compliance.`,
-        explanation: result.explanation || `Generated per ${jurisdiction} regulatory requirements.`,
-      });
-    } catch { res.status(500).json({ message: "Clause generation failed" }); }
-  });
 
   // ─── REPORTS ────────────────────────────────────────────────────────────────
+  // Note: All /api/reports routes have been migrated to server/routes/reports.routes.ts for enterprise scalability.
 
-  app.get(api.reports.list.path, isAuthenticated, async (_req, res) => {
-    try { res.json(await storage.getReports()); }
-    catch { res.status(500).json({ message: "Failed to fetch reports" }); }
-  });
-
-  app.post(api.reports.create.path, isAuthenticated, async (req: any, res) => {
-    try {
-      const data = api.reports.create.input.parse(req.body);
-      const report = await storage.createReport({
-        ...data,
-        userId: req.user?.id,
-        generatedBy: `${req.user?.firstName} ${req.user?.lastName}`.trim() || "System",
-      });
-      res.status(201).json(report);
-    } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
-      res.status(500).json({ message: "Failed to create report" });
-    }
-  });
-
-  app.post("/api/reports/evidence-pack", isAuthenticated, requireRole(['admin']), async (req: any, res) => {
-    try {
-      const { standard = "KDPA/CBK" } = req.body;
-      const report = await storage.createReport({
-        title: `Economic Intelligence Pack (${standard})`,
-        type: "evidence_pack",
-        regulatoryBody: standard,
-        status: "pending",
-        userId: req.user?.id,
-        generatedBy: `${req.user?.firstName || "System"}`,
-        format: "pdf",
-      });
-
-      // Async generation to avoid blocking the main thread
-      (async () => {
-        try {
-          const [contracts, risks, audits, logs] = await Promise.all([
-            storage.getContracts({ clientId: req.user?.clientId }),
-            storage.getRisks(),
-            storage.getComplianceAudits(),
-            storage.getAuditLogs(req.user?.clientId)
-          ]);
-
-          const doc = new jsPDF();
-          doc.setFontSize(22);
-          doc.text("Costloci: Sovereign Evidence Pack", 20, 20);
-          doc.setFontSize(10);
-          doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
-          doc.text(`Organization ID: ${req.user?.clientId || 'N/A'}`, 20, 35);
-          
-          doc.line(20, 40, 190, 40);
-          
-          doc.setFontSize(14);
-          doc.text("1. Executive Resilience Summary", 20, 50);
-          doc.setFontSize(10);
-          doc.text(`Total Managed Contracts: ${contracts.length}`, 25, 60);
-          doc.text(`Identified Risk Vectors: ${risks.length}`, 25, 65);
-          doc.text(`Mitigated Risks (Audit-Ready): ${risks.filter(r => r.mitigationStatus === 'mitigated').length}`, 25, 70);
-          doc.text(`Completed Compliance Audits: ${audits.length}`, 25, 75);
-
-          doc.setFontSize(14);
-          doc.text("2. Sovereign Integrity Log", 20, 90);
-          let y = 100;
-          logs.slice(0, 10).forEach(log => {
-             doc.text(`[${new Date(log.timestamp || "").toLocaleDateString()}] ${log.action}: ${log.resourceType} #${log.resourceId}`, 25, y);
-             y += 7;
-          });
-
-          const pdfBase64 = doc.output('datauristring');
-          
-          const totalPotentialSavings = contracts.reduce((sum, c) => sum + (c.annualCost || 0) * 0.15, 0); // Logic matched and simplified
-          
-          await storage.updateReport(report.id, {
-            status: "generated",
-            aiAnalysis: {
-                strategic_brief: "Platform maintained 100% jurisdictional residency during this period. All high-severity risks flagged by autonomic rescanner have been successfully mitigated.",
-                total_portfolio_risk: risks.length,
-                remediation_confidence: 98.4,
-                contracts_summarized: contracts.length,
-                savings_potential: totalPotentialSavings
-            },
-            completedAt: new Date(),
-          });
-
-          // Log the evidence generation in the persistent audit ledger
-          await storage.createAuditLog({
-            userId: req.user?.id || "SYSTEM",
-            clientId: req.user?.clientId,
-            action: "REPORT_GENERATED",
-            resourceType: "report",
-            resourceId: String(report.id),
-            details: "Generated board-ready Sovereign Evidence Pack (PDF)",
-          });
-
-        } catch (e: any) {
-          console.error("[REPORT GEN ERROR]", e);
-          await storage.updateReport(report.id, { status: "failed" });
-        }
-      })();
-
-      res.status(201).json(report);
-    } catch (err) {
-      res.status(500).json({ message: "Evidence pack generation failed" });
-    }
-  });
-
-  app.post(api.reports.generate.path, isAuthenticated, async (req: any, res) => {
-    try {
-      const { title, type, regulatoryBody } = api.reports.generate.input.parse(req.body);
-
-      const report = await storage.createReport({
-        title,
-        type,
-        regulatoryBody,
-        status: "pending",
-        userId: req.user?.id,
-        generatedBy: `${req.user?.firstName || "System"}`,
-        format: "pdf",
-      });
-
-      // Full async AI report generation
-      (async () => {
-        try {
-          const [contracts, risks, audits] = await Promise.all([
-            storage.getContracts({ clientId: req.user?.clientId }),
-            storage.getRisks(),
-            storage.getComplianceAudits(),
-          ]);
-
-          const response = await cachedCompletion({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "system",
-                content: `Generate a board-ready ${regulatoryBody || "Enterprise"} compliance report. Return JSON: { strategic_brief, total_portfolio_risk, contracts_summarized, savings_potential, remediation_confidence }`,
-              },
-              {
-                role: "user",
-                content: `Contracts: ${contracts.length}, Risks: ${risks.length}, Audits: ${audits.length}, Type: ${type}`,
-              },
-            ],
-            response_format: { type: "json_object" },
-          });
-
-          const analysis = JSON.parse(response || "{}");
-          await storage.updateReport(report.id, {
-            status: "generated",
-            aiAnalysis: analysis,
-            completedAt: new Date(),
-          });
-        } catch (e: any) {
-          console.error("[REPORT ENGINE ERROR]", e.message);
-          await storage.updateReport(report.id, { status: "failed" });
-        }
-      })();
-
-      res.status(201).json(report);
-    } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
-      res.status(500).json({ message: "Report generation failed" });
-    }
-  });
-
-  app.get("/api/reports/schedules", isAuthenticated, async (_req, res) => {
-    try { res.json(await storage.getReportSchedules()); }
-    catch { res.status(500).json({ message: "Failed to fetch schedules" }); }
-  });
-
-  app.post("/api/reports/schedules", isAuthenticated, async (req, res) => {
-    try {
-      const data = insertReportScheduleSchema.parse(req.body);
-      const schedule = await storage.createReportSchedule(data);
-      res.status(201).json(schedule);
-    } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
-      res.status(500).json({ message: "Schedule creation failed" });
-    }
-  });
-
-  app.patch("/api/reports/schedules/:id", isAuthenticated, async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const schedule = await storage.updateReportSchedule(id, req.body);
-      res.json(schedule);
-    } catch { res.status(500).json({ message: "Schedule update failed" }); }
-  });
-
-  app.delete("/api/reports/schedules/:id", isAuthenticated, async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      await storage.deleteReportSchedule(id);
-      res.status(204).end();
-    } catch { res.status(500).json({ message: "Schedule deletion failed" }); }
-  });
-
-  app.get(api.reports.export.path, isAuthenticated, async (req, res) => {
-    try {
-      const report = await storage.getReports().then((r) => r.find((rp) => rp.id === Number(req.params.id)));
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.text("Costloci — Regulatory Evidence Pack", 20, 20);
-      doc.setFontSize(12);
-      doc.text(`Report: ${report?.title || "Enterprise Report"}`, 20, 36);
-      doc.text(`Status: ${report?.status || "Generated"}`, 20, 46);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 56);
-      doc.text("Sovereign Intelligence Platform — KDPA/POPIA/CBK Aligned", 20, 80);
-      const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="report-${req.params.id}.pdf"`);
-      res.send(pdfBuffer);
-    } catch { res.status(500).json({ message: "Export failed" }); }
-  });
 
   // ─── VENDORS ────────────────────────────────────────────────────────────────
-
-  app.get(api.vendors.scorecards.list.path, isAuthenticated, async (req: any, res) => {
-    try {
-      res.json(await storage.getVendorScorecards(req.query.vendorName as string | undefined));
-    } catch { res.status(500).json({ message: "Failed to fetch scorecards" }); }
-  });
-
-  app.post(api.vendors.scorecards.create.path, isAuthenticated, async (req, res) => {
-    try {
-      const data = api.vendors.scorecards.create.input.parse(req.body);
-      const scorecard = await storage.createVendorScorecard(data);
-      res.status(201).json(scorecard);
-    } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
-      res.status(500).json({ message: "Failed to create scorecard" });
-    }
-  });
-
-  app.get(api.vendors.benchmarks.path, isAuthenticated, async (req: any, res) => {
-    try {
-      const benchmarks = await storage.getPeerBenchmarks(req.user?.clientId);
-      res.json(benchmarks);
-    } catch (err) {
-      res.status(500).json({ message: "Failed to generate benchmarks" });
-    }
-  });
-
-  app.get("/api/vendors/benchmarks/advanced", isAuthenticated, async (_req, res) => {
-    try {
-      const allContracts = await storage.getContracts();
-      const byCategory: Record<string, { costs: number[]; risks: number[] }> = {};
-      
-      for (const c of allContracts) {
-        if (!byCategory[c.category]) byCategory[c.category] = { costs: [], risks: [] };
-        if (c.annualCost) byCategory[c.category].costs.push(c.annualCost);
-        // Extract risk from AI analysis or metadata
-        const risk = c.aiAnalysis?.riskScore || (c.status === 'expired' ? 90 : 20);
-        byCategory[c.category].risks.push(risk);
-      }
-
-      const advancedBenchmarks = Object.entries(byCategory).map(([category, data]) => {
-        const avgCost = data.costs.reduce((a, b) => a + b, 0) / Math.max(data.costs.length, 1);
-        const avgRisk = data.risks.reduce((a, b) => a + b, 0) / Math.max(data.risks.length, 1);
-        
-        return {
-          category,
-          marketAvgCost: avgCost,
-          marketAvgRisk: avgRisk,
-          marketSize: data.risks.length,
-          confidenceIndex: data.risks.length > 3 ? "High" : "Low",
-          status: avgRisk < 30 ? "Market Lead" : "Compliance Laggard",
-          jurisdictionalAlignment: "KDPA/POPIA Consolidate"
-        };
-      });
-
-      res.json(advancedBenchmarks);
-    } catch { res.status(500).json({ message: "Advanced benchmarks failed" }); }
-  });
-
-  app.get("/api/vendors/optimization-report", isAuthenticated, requireRole(['admin']), async (_req, res) => {
-    try {
-      const allContracts = await storage.getContracts();
-      // Use the advanced benchmarking logic (simulated or imported)
-      const categories = [...new Set(allContracts.map(c => c.category))];
-      
-      const optimizations = [];
-      for (const category of categories) {
-        const catContracts = allContracts.filter(c => c.category === category);
-        const avg = catContracts.reduce((a, b) => a + (b.annualCost || 0), 0) / catContracts.length;
-        
-        for (const contract of catContracts) {
-          if (contract.annualCost && contract.annualCost > avg * 1.2) {
-             optimizations.push({
-               vendorName: contract.vendorName,
-               category: contract.category,
-               currentCost: contract.annualCost,
-               marketAverage: avg,
-               projectedSavings: contract.annualCost - avg,
-               status: "High ROI Target",
-               strategy: "Consolidation or Volume Discount"
-             });
-          }
-        }
-      }
-      res.json(optimizations);
-    } catch { res.status(500).json({ message: "Optimization report failed" }); }
-  });
+  // Note: All /api/vendors routes have been migrated to server/routes/vendors.routes.ts for enterprise scalability.
 
   // ─── PLAYBOOKS RULES ENGINE (Phase X) ──────────────────────────────────────
   app.get("/api/playbooks", isAuthenticated, async (req: any, res) => {

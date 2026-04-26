@@ -1,6 +1,7 @@
 import { storage } from "../storage.js";
 import { type Contract } from "../../shared/schema.js";
 import { AIGateway } from "./AIGateway.js";
+import { CollaborationService } from "./CollaborationService.js";
 
 export class RemediationEngine {
   /**
@@ -34,6 +35,8 @@ export class RemediationEngine {
           findingId: finding.id,
           title: `[HEAL] ${finding.requirement || "Compliance Gap"}`,
           description: finding.description,
+          gapDescription: finding.evidence || finding.description,
+          suggestedClauses: finding.recommendation || "",
           severity: finding.severity || "medium",
           status: "pending"
         }).catch(err => console.error(`[REMEDIATION] Task creation failed for finding ${finding.id}:`, err.message));
@@ -121,6 +124,15 @@ export class RemediationEngine {
       }
       
       console.log(`[REMEDIATION] Contract #${contractId} has been successfully healed.`);
+
+      // Notify the team via the Collaboration Studio (Phase 33)
+      CollaborationService.broadcastToWorkspace(contract.workspaceId || (contract as any).workspace_id, {
+        type: "NEW_ACTIVITY",
+        user: "AUTONOMIC_ENGINE",
+        action: "remediated contract",
+        details: `Successfully applied compliance fixes to ${contract.vendorName}`,
+        contractId: contract.id
+      });
 
       return {
         id: contractId,

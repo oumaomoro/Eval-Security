@@ -19,8 +19,9 @@ export class RedlineEngine {
       await storage.createRemediationSuggestion({
         workspaceId,
         contractId,
-        originalClause: "Missing Mandatory Provision", // In sophisticated iterations, AIGateway provides the exact excerpt
-        suggestedClause: clause.standardLanguage,
+        clauseTitle: clause.clauseName || "Library Recommendation",
+        originalText: "Missing Mandatory Provision", // In sophisticated iterations, AIGateway provides the exact excerpt
+        suggestedText: clause.standardLanguage,
         status: "pending",
         ruleId: triggeredByRuleId,
       });
@@ -38,8 +39,9 @@ export class RedlineEngine {
       await storage.createRemediationSuggestion({
         workspaceId,
         contractId,
-        originalClause: "[Section Missing or Deficient]",
-        suggestedClause: genericMessage,
+        clauseTitle: "Remediation Recommendation",
+        originalText: "[Section Missing or Deficient]",
+        suggestedText: genericMessage,
         status: "pending",
         ruleId: triggeredByRuleId,
       });

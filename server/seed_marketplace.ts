@@ -15,6 +15,21 @@ export async function seedMarketplace() {
     return;
   }
 
+  // Ensure System User exists for Marketplace attribution (Phase 34 Resilience)
+  const systemUserId = "00000000-0000-0000-0000-000000000000";
+  const systemUser = await storage.getUser(systemUserId);
+  if (!systemUser) {
+    console.log("[SEED] Creating System Identity for Marketplace...");
+    await storage.createUser({
+      id: systemUserId,
+      email: "system@cyberoptimize.ai",
+      firstName: "CyberOptimize",
+      lastName: "System",
+      role: "admin",
+      subscriptionTier: "enterprise"
+    });
+  }
+
   const seedListings = [
     {
       title: "Enterprise Cybersecurity Liability Addendum (2024 Edition)",

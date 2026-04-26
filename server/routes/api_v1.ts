@@ -96,7 +96,7 @@ router.post("/collaboration/presence", apiKeyAuth, async (req: any, res) => {
       resourceId: z.string()
     }).parse(req.body);
 
-    await storage.updatePresence({
+    await storage.upsertPresence({
       workspaceId: req.workspaceId,
       userId: req.user.id,
       resourceType,

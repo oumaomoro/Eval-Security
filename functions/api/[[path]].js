@@ -24,12 +24,18 @@ export async function onRequest(context) {
   headers.set('X-Forwarded-Host', url.host);
   headers.set('X-Proxy-Source', 'Cloudflare-Pages-Function');
   
-  const backendRequest = new Request(targetUrl, {
+  const backendRequestInit = {
     method: request.method,
     headers,
-    body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
     redirect: 'follow',
-  });
+  };
+
+  if (!['GET', 'HEAD'].includes(request.method) && request.body) {
+    backendRequestInit.body = request.body;
+    backendRequestInit.duplex = 'half'; // Essential for stream bodies in Cloudflare fetch
+  }
+
+  const backendRequest = new Request(targetUrl, backendRequestInit);
 
   try {
     const response = await fetch(backendRequest);
