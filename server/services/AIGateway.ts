@@ -82,7 +82,7 @@ export class AIGateway {
     if (!hasSystemMessage) {
       params.messages.unshift({
         role: "system",
-        content: "You are a specialized AI system for CyberOptimize. Your responses MUST be highly accurate, strictly professional, and adhere to the highest ethical and cybersecurity compliance standards without bias or hallucination."
+        content: "You are a specialized AI system for Costloci. Your responses MUST be highly accurate, strictly professional, and adhere to the highest ethical and cybersecurity compliance standards without bias or hallucination."
       } as any);
     } else {
       const sysMsgIndex = params.messages.findIndex((m: any) => m.role === 'system');
