@@ -227,7 +227,7 @@ export default function LandingPage() {
              <ul className="space-y-4 mb-6">
                 <li className="flex items-start gap-3 text-slate-500">
                   <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span className="text-xs font-bold leading-relaxed">123 Sovereign Way<br/>Cyber City, CC 10010</span>
+                  <span className="text-xs font-bold leading-relaxed">Nairobi, Kenya<br/>10100</span>
                 </li>
              </ul>
              <div className="flex items-center gap-4">
