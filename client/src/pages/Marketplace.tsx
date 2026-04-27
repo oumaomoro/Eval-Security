@@ -171,8 +171,7 @@ export default function Marketplace() {
                          <p className="text-xs text-slate-400 font-medium line-clamp-3">{listing.description || "Premium pre-vetted legal clause for cybersecurity compliance."}</p>
                          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                             <div>
-                               <p className="text-[9px] font-black text-slate-500 font-semibold">Global Payout</p>
-                               <p className="text-white font-black text-xs">PayPal & Paystack Protected</p>
+                               <p className="text-white font-black text-xs">Paystack & PayPal Sovereign Protection</p>
                             </div>
                             <ShieldCheck className="w-5 h-5 text-emerald-500" />
                          </div>

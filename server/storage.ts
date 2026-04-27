@@ -9,8 +9,6 @@ import type {
   RemediationTask, InsertRemediationTask,
   VendorBenchmark, InsertVendorBenchmark,
   ContinuousMonitoring, InsertContinuousMonitoring,
-  InsurancePolicy, InsertInsurancePolicy,
-  Subscription, InsertSubscription,
   MarketplaceListing, InsertMarketplaceListing,
   MarketplacePurchase, InsertMarketplacePurchase
 } from "../shared/schema.js";
@@ -53,7 +51,9 @@ import {
   type InsertRemediationSuggestion, type InsertRegulatoryAlert,
   type InsertClause, type InsertContractClause, type InsertWorkspaceMember,
   type InsertPlaybook, type PlaybookRule, type InsertPlaybookRule,
-  type InsurancePolicy as InsuranceItem, type Subscription as UserSubscription
+  type InsurancePolicy, type Subscription,
+  type InsertInsurancePolicy, type InsertSubscription,
+  type ContractVersion, type InsertContractVersion
 } from "../shared/schema.js";
 
 /**
@@ -77,7 +77,9 @@ export interface IStorage {
   getContracts(filters?: { clientId?: number, status?: string, ids?: number[] }): Promise<(Contract & { client?: Client })[]>;
   getContract(id: number): Promise<(Contract & { client?: Client }) | undefined>;
   createContract(contract: InsertContract, userId?: string): Promise<Contract>;
-  updateContract(id: number, updates: Partial<InsertContract> & { aiAnalysis?: any }): Promise<Contract>;
+  updateContract(id: number, updates: Partial<InsertContract> & { intelligenceAnalysis?: any }): Promise<Contract>;
+  getContractVersions(contractId: number): Promise<ContractVersion[]>;
+  createContractVersion(version: InsertContractVersion): Promise<ContractVersion>;
 
   // Compliance
   getAuditRulesets(): Promise<AuditRuleset[]>;
@@ -167,6 +169,7 @@ export interface IStorage {
   updatePlaybook(id: number, updates: Partial<Playbook>): Promise<Playbook>;
   deletePlaybook(id: number): Promise<void>;
   getPlaybookRules(playbookId: number): Promise<PlaybookRule[]>;
+  getRulesForPlaybooks(playbookIds: number[]): Promise<PlaybookRule[]>;
   createPlaybookRule(rule: InsertPlaybookRule): Promise<PlaybookRule>;
   updatePlaybookRule(id: number, updates: Partial<PlaybookRule>): Promise<PlaybookRule>;
   deletePlaybookRule(id: number): Promise<void>;
@@ -209,9 +212,9 @@ export interface IStorage {
   createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy>;
   updateInsurancePolicy(id: number, updates: Partial<InsurancePolicy>): Promise<InsurancePolicy>;
 
-  // AI Cache
-  getAiCache(promptHash: string): Promise<any | undefined>;
-  createAiCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void>;
+  // Intelligence Cache
+  getIntelligenceCache(promptHash: string): Promise<any | undefined>;
+  createIntelligenceCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void>;
 
   // Real-time Collaboration (Phase 27)
   upsertPresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void>;
@@ -268,7 +271,7 @@ export class SupabaseRESTStorage implements IStorage {
       paymentFrequency: d.payment_frequency,
       fileUrl: d.file_url,
       status: d.status,
-      aiAnalysis: d.ai_analysis,
+      intelligenceAnalysis: d.ai_analysis,
       createdAt: d.created_at ? new Date(d.created_at) : undefined,
       updatedAt: d.updated_at ? new Date(d.updated_at) : undefined,
       client: d.client ? this.mapClient(d.client) : undefined
@@ -495,11 +498,23 @@ export class SupabaseRESTStorage implements IStorage {
           payment_frequency: contract.paymentFrequency,
           file_url: contract.fileUrl,
           status: contract.status || "active",
-          ai_analysis: contract.aiAnalysis
+          ai_analysis: contract.intelligenceAnalysis
         })
         .select("*")
         .single()
     );
+    const contractData = this.mapContract(data);
+
+    // Phase 4: Auto-initialize Version 1 if file exists
+    if (contractData.fileUrl) {
+      await this.createContractVersion({
+        contractId: contractData.id,
+        versionNumber: 1,
+        fileUrl: contractData.fileUrl,
+        changesSummary: "Initial version uploaded.",
+        createdBy: userId as any
+      }).catch(err => console.error("[STORAGE] Version 1 initialization failed:", err.message));
+    }
 
     if (userId) {
       await this.incrementUserContractCount(userId).catch(err => 
@@ -507,7 +522,7 @@ export class SupabaseRESTStorage implements IStorage {
       );
     }
 
-    return this.mapContract(data);
+    return contractData;
   }
 
   private async incrementUserContractCount(userId: string): Promise<void> {
@@ -522,7 +537,7 @@ export class SupabaseRESTStorage implements IStorage {
     );
   }
 
-  async updateContract(id: number, updates: Partial<InsertContract> & { aiAnalysis?: any }): Promise<Contract> {
+  async updateContract(id: number, updates: Partial<InsertContract> & { intelligenceAnalysis?: any }): Promise<Contract> {
     const payload: any = {};
     if (updates.clientId !== undefined) payload.client_id = updates.clientId;
     if (updates.vendorName !== undefined) payload.vendor_name = updates.vendorName;
@@ -538,7 +553,7 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.paymentFrequency !== undefined) payload.payment_frequency = updates.paymentFrequency;
     if (updates.fileUrl !== undefined) payload.file_url = updates.fileUrl;
     if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.aiAnalysis !== undefined) payload.ai_analysis = updates.aiAnalysis;
+    if (updates.intelligenceAnalysis !== undefined) payload.ai_analysis = updates.intelligenceAnalysis;
     payload.updated_at = new Date().toISOString();
 
     const workspaceId = storageContext.getStore()?.workspaceId;
@@ -679,16 +694,28 @@ export class SupabaseRESTStorage implements IStorage {
     const data = await this.handleResponse<any[]>(
       supabase.from("playbook_rules").select("*").eq("playbook_id", playbookId).order("priority", { ascending: false })
     );
-    return (data || []).map(d => ({
-       id: d.id,
-       playbookId: d.playbook_id,
-       name: d.name,
-       condition: d.condition,
-       action: d.action,
-       priority: d.priority,
-       isActive: d.is_active,
-       createdAt: d.created_at ? new Date(d.created_at) : new Date()
-    }));
+    return (data || []).map(d => this.mapPlaybookRule(d));
+  }
+
+  async getRulesForPlaybooks(playbookIds: number[]): Promise<PlaybookRule[]> {
+    if (playbookIds.length === 0) return [];
+    const data = await this.handleResponse<any[]>(
+      supabase.from("playbook_rules").select("*").in("playbook_id", playbookIds).order("priority", { ascending: false })
+    );
+    return (data || []).map(d => this.mapPlaybookRule(d));
+  }
+
+  private mapPlaybookRule(d: any): PlaybookRule {
+    return {
+      id: d.id,
+      playbookId: d.playbook_id,
+      name: d.name,
+      condition: d.condition,
+      action: d.action,
+      priority: d.priority,
+      isActive: d.is_active,
+      createdAt: d.created_at ? new Date(d.created_at) : new Date()
+    };
   }
 
   async createPlaybookRule(rule: InsertPlaybookRule): Promise<PlaybookRule> {
@@ -870,7 +897,7 @@ export class SupabaseRESTStorage implements IStorage {
       mitigationStrategies: d.mitigation_strategies,
       financialExposureMin: d.financial_exposure_min,
       financialExposureMax: d.financial_exposure_max,
-      aiConfidence: d.ai_confidence,
+      intelligenceConfidence: d.ai_confidence,
       createdAt: d.created_at ? new Date(d.created_at) : null
     };
   }
@@ -940,7 +967,7 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.mitigationStrategies !== undefined) payload.mitigation_strategies = updates.mitigationStrategies;
     if (updates.financialExposureMin !== undefined) payload.financial_exposure_min = updates.financialExposureMin;
     if (updates.financialExposureMax !== undefined) payload.financial_exposure_max = updates.financialExposureMax;
-    if (updates.aiConfidence !== undefined) payload.ai_confidence = updates.aiConfidence;
+    if (updates.intelligenceConfidence !== undefined) payload.ai_confidence = updates.intelligenceConfidence;
 
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("risks").update(payload).eq("id", id);
@@ -1010,7 +1037,7 @@ export class SupabaseRESTStorage implements IStorage {
       type: d.type,
       regulatoryBody: d.regulatory_body,
       status: d.status,
-      aiAnalysis: d.ai_analysis,
+      intelligenceAnalysis: d.ai_analysis,
       content: d.content,
       format: d.format,
       fileUrl: d.file_url,
@@ -1032,7 +1059,7 @@ export class SupabaseRESTStorage implements IStorage {
           type: report.type,
           regulatory_body: report.regulatoryBody,
           status: report.status || "pending",
-          ai_analysis: report.aiAnalysis,
+          ai_analysis: report.intelligenceAnalysis,
           content: report.content,
           format: report.format || "pdf",
           file_url: report.fileUrl,
@@ -1047,7 +1074,7 @@ export class SupabaseRESTStorage implements IStorage {
   async updateReport(id: number, updates: Partial<Report>): Promise<Report> {
     const payload: any = {};
     if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.aiAnalysis !== undefined) payload.ai_analysis = updates.aiAnalysis;
+    if (updates.intelligenceAnalysis !== undefined) payload.ai_analysis = updates.intelligenceAnalysis;
     if (updates.content !== undefined) payload.content = updates.content;
     if (updates.fileUrl !== undefined) payload.file_url = updates.fileUrl;
     if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt;
@@ -1256,7 +1283,7 @@ export class SupabaseRESTStorage implements IStorage {
       complianceTrends: [],
       technicalMetrics: { 
         apiResponseTimeAvgMs: avgLatency, 
-        aiAccuracyRate: 100, 
+        intelligenceAccuracyRate: 100, 
         systemUptime: 100, 
         errorRate: Number(errorRate.toFixed(2)), 
         userEngagement: Math.min(logs.length * 5, 100) 
@@ -1294,7 +1321,7 @@ export class SupabaseRESTStorage implements IStorage {
       regionalDistribution: [
         { region: "east-africa", count: contracts.filter(c => c.workspaceId === workspace?.id).length }
       ],
-      aiEfficiency: {
+      intelligenceEfficiency: {
         totalCached: 0,
         totalSavedUsd: 0,
         avgLatencyMs: avgLatency
@@ -2292,7 +2319,7 @@ export class SupabaseRESTStorage implements IStorage {
           endorsements: policy.endorsements,
           notification_requirements: policy.notificationRequirements,
           claim_risk_score: policy.claimRiskScore,
-          ai_analysis_summary: policy.aiAnalysisSummary
+          ai_analysis_summary: policy.intelligenceAnalysisSummary
         })
         .select()
         .single()
@@ -2320,7 +2347,7 @@ export class SupabaseRESTStorage implements IStorage {
       endorsements: d.endorsements,
       notificationRequirements: d.notification_requirements,
       claimRiskScore: d.claim_risk_score,
-      aiAnalysisSummary: d.ai_analysis_summary,
+      intelligenceAnalysisSummary: d.ai_analysis_summary,
       createdAt: d.created_at ? new Date(d.created_at) : null,
       updatedAt: d.updated_at ? new Date(d.updated_at) : null
     };
@@ -2330,7 +2357,7 @@ export class SupabaseRESTStorage implements IStorage {
     const payload: any = { updated_at: new Date().toISOString() };
     if (updates.status !== undefined) payload.status = updates.status;
     if (updates.claimRiskScore !== undefined) payload.claim_risk_score = updates.claimRiskScore;
-    if (updates.aiAnalysisSummary !== undefined) payload.ai_analysis_summary = updates.aiAnalysisSummary;
+    if (updates.intelligenceAnalysisSummary !== undefined) payload.ai_analysis_summary = updates.intelligenceAnalysisSummary;
 
     const data = await this.handleResponse<any>(
       supabase.from("insurance_policies")
@@ -2619,8 +2646,8 @@ export class SupabaseRESTStorage implements IStorage {
       createdAt: data.created_at ? new Date(data.created_at) : null
     };
   }
-  // --- AI CACHE ---
-  async getAiCache(promptHash: string): Promise<any | undefined> {
+  // --- INTELLIGENCE CACHE ---
+  async getIntelligenceCache(promptHash: string): Promise<any | undefined> {
     const data = await this.handleResponse<any | null>(
       supabase.from("ai_cache")
         .select("*")
@@ -2638,7 +2665,7 @@ export class SupabaseRESTStorage implements IStorage {
     return undefined;
   }
 
-  async createAiCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void> {
+  async createIntelligenceCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void> {
     await this.handleResponse(
       adminClient.from("ai_cache")
         .insert({
@@ -2672,6 +2699,51 @@ export class SupabaseRESTStorage implements IStorage {
       .gt("last_seen_at", fiveMinutesAgo);
     return data || [];
   }
+  async getContractVersions(contractId: number): Promise<ContractVersion[]> {
+    const data = await this.handleResponse<any[]>(
+      supabase.from("contract_versions")
+        .select("*")
+        .eq("contract_id", contractId)
+        .order("version_number", { ascending: false })
+    );
+    return (data || []).map(v => ({
+      id: v.id,
+      contractId: v.contract_id,
+      versionNumber: v.version_number,
+      fileUrl: v.file_url,
+      changesSummary: v.changes_summary,
+      createdBy: v.created_by,
+      createdAt: v.created_at ? new Date(v.created_at) : null
+    }));
+  }
+
+  async createContractVersion(version: InsertContractVersion): Promise<ContractVersion> {
+    const data = await this.handleResponse<any>(
+      supabase.from("contract_versions")
+        .insert({
+          contract_id: version.contractId,
+          version_number: version.versionNumber,
+          file_url: version.fileUrl,
+          changes_summary: version.changesSummary,
+          created_by: version.createdBy
+        })
+        .select("*")
+        .single()
+    );
+    return {
+      id: data.id,
+      contractId: data.contract_id,
+      versionNumber: data.version_number,
+      fileUrl: data.file_url,
+      changesSummary: data.changes_summary,
+      createdBy: data.created_by,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  // Compatibility aliases for legacy AI Gateway code
+  async getAiCache(promptHash: string) { return this.getIntelligenceCache(promptHash); }
+  async createAiCache(cache: any) { return this.createIntelligenceCache(cache); }
 
 }
 

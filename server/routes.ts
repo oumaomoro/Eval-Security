@@ -40,13 +40,13 @@ import { PlaybookService } from "./services/PlaybookService.js";
 import { storageContext } from "./services/storageContext.js";
 import { SOC2Logger } from "./services/SOC2Logger.js";
 
-import { AIGateway } from "./services/AIGateway.js";
+import { IntelligenceGateway } from "./services/IntelligenceGateway.js";
 import { cachedCompletion } from "./services/openai.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { CollaborationService } from "./services/CollaborationService.js";
 
 // Export the centralized openai router instance
-const openai = AIGateway.openai;
+const openai = IntelligenceGateway.openai;
 
 import { apiLimiter, authLimiter, uploadLimiter, intelligenceLimiter, cronLimiter } from "./middleware/rate-limiter.js";
 
@@ -363,7 +363,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         annualCost: 0,
         status: "pending",
         fileUrl,
-        aiAnalysis: {
+        intelligenceAnalysis: {
           riskScore: 50,
           riskFlags: [],
           summary: `Pending compliance analysis`,
@@ -424,7 +424,7 @@ Analyze the contract text and return JSON with exactly these fields:
             category: analysis.category || "General Provider",
             annualCost: analysis.annualCost || 0,
             status: "active",
-            aiAnalysis: {
+            intelligenceAnalysis: {
               riskScore: analysis.riskScore,
               riskFlags: analysis.riskFlags || [],
               summary: `Compliance Grade: ${analysis.complianceGrade}`,
@@ -501,11 +501,23 @@ Analyze the contract text and return JSON with exactly these fields:
               console.error("[RulesEngine] Autonomous execution failed, but not failing request:", err.message);
           });
 
+          // TRIGGER RISK ENGINE ANALYSIS (Phase 3: Risk & Optimization)
+          const { RiskEngine } = await import("./services/RiskEngine.js");
+          await RiskEngine.identifyRisks(contract.id).catch((err: any) => {
+              console.error("[RiskEngine] Autonomous analysis failed:", err.message);
+          });
+
+          // TRIGGER SAVINGS DETECTION (Phase 3: Risk & Optimization)
+          const { BenchmarkingService } = await import("./services/BenchmarkingService.js");
+          await BenchmarkingService.analyzeForSavings(contract.id).catch((err: any) => {
+              console.error("[BenchmarkingService] Savings analysis failed:", err.message);
+          });
+
         } catch (backgroundError) {
            console.error("[BACKGROUND QUEUE ERROR] Failed to process document:", backgroundError);
            await storage.updateContract(contract.id, {
              status: "flagged",
-             aiAnalysis: {
+             intelligenceAnalysis: {
                riskScore: 100,
                riskFlags: ["System fault during asynchronous AI extraction"],
                summary: "Error"
@@ -564,7 +576,7 @@ Analyze the contract text and return JSON with exactly these fields:
       let analysisSource = "ai";
 
       try {
-        const responseText = await AIGateway.createCompletion({
+        const responseText = await IntelligenceGateway.createCompletion({
           model: "gpt-4o",
           messages: [
             { role: "system", content: "Perform a deep KDPA/POPIA compliance analysis for this vendor contract. Return JSON with fields: riskScore, complianceGrade, riskFlags, summary, kdpaCompliant." },
@@ -588,7 +600,19 @@ Analyze the contract text and return JSON with exactly these fields:
         };
       }
 
-      const updated = await storage.updateContract(id, { aiAnalysis: analysis });
+      const updated = await storage.updateContract(id, { intelligenceAnalysis: analysis });
+      
+      // TRIGGER RISK ENGINE ANALYSIS (Phase 3: Risk & Optimization)
+      const { RiskEngine } = await import("./services/RiskEngine.js");
+      await RiskEngine.identifyRisks(id).catch((err: any) => {
+          console.error("[RiskEngine] Autonomous analysis failed:", err.message);
+      });
+
+      // TRIGGER SAVINGS DETECTION (Phase 3: Risk & Optimization)
+      const { BenchmarkingService } = await import("./services/BenchmarkingService.js");
+      await BenchmarkingService.analyzeForSavings(id).catch((err: any) => {
+          console.error("[BenchmarkingService] Savings analysis failed:", err.message);
+      });
       
       await SOC2Logger.logEvent(req, {
         action: "CONTRACT_ANALYZE_TRIGGERED",
@@ -610,7 +634,7 @@ Analyze the contract text and return JSON with exactly these fields:
   app.post(api.contracts.remediate.path, isAuthenticated, async (req: any, res) => {
     try {
       const { riskId, originalText } = api.contracts.remediate.input.parse(req.body);
-      const responseText = await AIGateway.createCompletion({
+      const responseText = await IntelligenceGateway.createCompletion({
         model: "gpt-4o",
         messages: [
           { role: "system", content: "You are a legal redlining expert. Rewrite the given clause to be compliant with KDPA 2019 and POPIA. Return JSON: { suggestedText, explanation }" },
@@ -802,7 +826,7 @@ Analyze the contract text and return JSON with exactly these fields:
       (async () => {
         try {
           const contracts = await storage.getContracts({ ids: scope.contractIds });
-          const contractText = contracts.map(c => `[ID: ${c.id}, Vendor: ${c.vendorName}] ${c.aiAnalysis?.summary || ""}`).join("\n");
+          const contractText = contracts.map(c => `[ID: ${c.id}, Vendor: ${c.vendorName}] ${c.intelligenceAnalysis?.summary || ""}`).join("\n");
           const findings: any[] = [];
           const allRulesets = await storage.getAuditRulesets();
           for (const standard of scope.standards) {
@@ -811,7 +835,7 @@ Analyze the contract text and return JSON with exactly these fields:
               const rulePrompt = ruleset.rules.map(r => `Rule ${r.id}: ${r.requirement}`).join("\n");
               
               // Real Jurisdictional Assessment via DeepSeek (No simulations)
-              const response = await AIGateway.createCompletion({
+              const response = await IntelligenceGateway.createCompletion({
                 model: "deepseek-chat",
                 messages: [
                   { 
@@ -1298,7 +1322,7 @@ Analyze the contract text and return JSON with exactly these fields:
 
       console.log(`[ADDIN] Triggering high-fidelity scan for Word document snippet...`);
 
-      const response = await AIGateway.createCompletion({
+      const response = await IntelligenceGateway.createCompletion({
         model: "gpt-4o",
         messages: [
           { 

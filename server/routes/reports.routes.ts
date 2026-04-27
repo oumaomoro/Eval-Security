@@ -96,6 +96,35 @@ router.delete("/reports/schedules/:id", isAuthenticated, async (req, res) => {
 });
 
 /**
+ * GET /api/reports/:id/export
+ * Serves the generated PDF report.
+ */
+router.get("/reports/:id/export", isAuthenticated, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const report = await storage.updateReport(id, {}); // Just to verify it exists and is in workspace
+    
+    if (!report || report.status !== 'completed' || !report.fileUrl) {
+      return res.status(404).json({ message: "Report artifact not ready or not found." });
+    }
+
+    // Since we store as data URI for sovereign simplicity, we convert back for the download
+    const dataUri = report.fileUrl;
+    const base64Data = dataUri.split(';base64,').pop();
+    if (!base64Data) throw new Error("Invalid report artifact format.");
+    
+    const pdfBuffer = Buffer.from(base64Data, 'base64');
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Costloci-Report-${id}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    console.error("[REPORT EXPORT ERROR]", error.message);
+    res.status(500).json({ message: "Failed to export report artifact." });
+  }
+});
+
+/**
  * Helper function for async PDF generation
  */
 async function generateReportAsync(reportId: number, workspaceId: number, req: any) {

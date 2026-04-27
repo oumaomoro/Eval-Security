@@ -13,6 +13,18 @@ import { sanitizeRequest } from "./middleware/sanitizer.js";
 const app = express();
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
 
+function validateEnv() {
+  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY', 'CRON_SECRET'];
+  const missing = required.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`❌ Missing required env variables: ${missing.join(", ")}`);
+    if (process.env.NODE_ENV === "production") {
+      process.exit(1);
+    }
+  }
+}
+validateEnv();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(sanitizeRequest);
@@ -49,18 +61,16 @@ app.use(cors({
       return callback(null, true);
     }
     
-    const isVercel = origin.endsWith(".vercel.app") || origin.endsWith(".vercel.dev");
-    const isFrontendUrl = process.env.FRONTEND_URL === origin;
+    const isAllowed = allowedOrigins.includes(origin) || 
+                     (origin.endsWith(".vercel.app") || origin.endsWith(".vercel.dev")) ||
+                     origin === process.env.FRONTEND_URL;
     
-    const isAllowed = allowedOrigins.includes(origin) || isVercel || isFrontendUrl;
-    
-    if (!isAllowed) {
-      console.warn(`[CORS] Unauthorized Origin Attempt: ${origin}`);
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Rejected Origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
-    
-    // Always allow in production to prevent 500 errors on preflight, 
-    // but keep logging for security audit.
-    callback(null, true);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -116,7 +126,12 @@ app.use("/api", (req: any, res: any, next: any) => {
 // ── PHASE 27: PREFLIGHT OPTIMIZATION ─────────
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    const origin = req.headers.origin;
+    if (origin && (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app") || origin === process.env.FRONTEND_URL)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (process.env.NODE_ENV !== "production") {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.header('Access-Control-Allow-Headers', 'content-type, authorization, x-requested-with, x-p25-status, Authorization, Content-Type, x-csrf-token');
     res.header('Access-Control-Allow-Credentials', 'true');

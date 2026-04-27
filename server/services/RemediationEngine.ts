@@ -1,6 +1,6 @@
 import { storage } from "../storage.js";
 import { type Contract } from "../../shared/schema.js";
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 import { CollaborationService } from "./CollaborationService.js";
 
 export class RemediationEngine {
@@ -58,7 +58,7 @@ export class RemediationEngine {
         The response must be a valid JSON object.`;
 
       const userPrompt = `
-        Contract Summary: ${contract.aiAnalysis?.summary || "Standard Service Agreement"}
+        Contract Summary: ${contract.intelligenceAnalysis?.summary || "Standard Service Agreement"}
         Non-Compliant Areas: ${JSON.stringify(nonCompliant)}
         Gold Standard Clauses to Include: ${JSON.stringify(relevantClauses)}
 
@@ -76,7 +76,7 @@ export class RemediationEngine {
           ]
         }`;
 
-      const responseText = await AIGateway.createCompletion({
+      const responseText = await IntelligenceGateway.createCompletion({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
@@ -94,7 +94,7 @@ export class RemediationEngine {
 
       // 5. Persist to storage (High-level summary)
       const updatedAnalysis = {
-        ...contract.aiAnalysis,
+        ...contract.intelligenceAnalysis,
         remediationStatus: 'completed' as const,
         remediationAddendum: addendumContent,
         legalAlignmentScore: alignmentScore,

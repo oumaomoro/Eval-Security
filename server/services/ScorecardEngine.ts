@@ -43,8 +43,8 @@ export class ScorecardEngine {
     }, 0);
     const riskScore = Math.max(0, 100 - riskDeductions);
 
-    // Security Score: Based on AI analysis flags (simplified)
-    const securityScore = 85; // Placeholder for deep AI flag analysis
+    // Security Score: Based on Intelligence analysis flags (simplified)
+    const securityScore = 85; // Placeholder for deep Intelligence flag analysis
 
     // SLA Performance: (simplified)
     const slaPerformance = 95; 

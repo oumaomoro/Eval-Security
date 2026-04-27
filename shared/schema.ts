@@ -68,8 +68,8 @@ export const contracts = pgTable("contracts", {
   fileUrl: text("file_url"),
   status: text("status").default("active"), // active, expired, reviewing
 
-  // Structured AI analysis results
-  aiAnalysis: jsonb("ai_analysis").$type<{
+  // Structured intelligence analysis results
+  intelligenceAnalysis: jsonb("ai_analysis").$type<{
     extractedDates?: Record<string, string>;
     slaMetrics?: Record<string, string>;
     dataPrivacy?: Record<string, string>;
@@ -124,7 +124,7 @@ export const insurancePolicies = pgTable("insurance_policies", {
     mandatoryAuthorities?: string[];
   }>(),
   claimRiskScore: integer("claim_risk_score").default(0),
-  aiAnalysisSummary: text("ai_analysis_summary"),
+  intelligenceAnalysisSummary: text("ai_analysis_summary"),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -220,7 +220,7 @@ export const risks = pgTable("risks", {
   // Advanced Forensic Fields
   financialExposureMin: doublePrecision("financial_exposure_min"),
   financialExposureMax: doublePrecision("financial_exposure_max"),
-  aiConfidence: integer("ai_confidence"),
+  intelligenceConfidence: integer("ai_confidence"),
 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -257,7 +257,7 @@ export const reports = pgTable("reports", {
   type: text("type").notNull(),
   regulatoryBody: text("regulatory_body"),
   status: text("status").notNull().default("pending"),
-  aiAnalysis: jsonb("ai_analysis").$type<{
+  intelligenceAnalysis: jsonb("ai_analysis").$type<{
     strategic_brief?: string;
     total_portfolio_risk?: number;
     contracts_summarized?: number;
@@ -279,6 +279,7 @@ export const reportSchedules = pgTable("report_schedules", {
   type: text("type").notNull(), // compliance, risk_assessment, etc.
   frequency: text("frequency").notNull(), // daily, weekly, monthly, quarterly
   regulatoryBodies: jsonb("regulatory_bodies").$type<string[]>(),
+  recipientEmail: text("recipient_email"),
   nextRun: timestamp("next_run"),
   lastRun: timestamp("last_run"),
   isActive: boolean("is_active").default(true),
@@ -407,6 +408,16 @@ export const contractComparisons = pgTable("contract_comparisons", {
   clauseAnalysis: jsonb("clause_analysis").$type<any>(),
   missingClauses: jsonb("missing_clauses").$type<string[]>(),
   keyRecommendations: jsonb("key_recommendations").$type<string[]>(),
+  createdAt: timestamp("createdAt").defaultNow(),
+});
+
+export const contractVersions = pgTable("contract_versions", {
+  id: serial("id").primaryKey(),
+  contractId: integer("contract_id").references(() => contracts.id).notNull(),
+  versionNumber: integer("version_number").notNull(),
+  fileUrl: text("file_url").notNull(),
+  changesSummary: text("changes_summary"),
+  createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -449,7 +460,7 @@ export const presence = pgTable("presence", {
   lastSeenAt: timestamp("last_seen_at").defaultNow(),
 });
 
-export const aiCache = pgTable("ai_cache", {
+export const intelligenceCache = pgTable("ai_cache", {
   id: serial("id").primaryKey(),
   promptHash: text("prompt_hash").notNull().unique(),
   response: text("response").notNull(),
@@ -574,6 +585,7 @@ export const contractsRelations = relations(contracts, ({ one, many }) => ({
   comments: many(comments),
   comparisons: many(contractComparisons),
   clauses: many(clauses),
+  versions: many(contractVersions),
 }));
 
 export const insurancePoliciesRelations = relations(insurancePolicies, ({ one }) => ({
@@ -657,6 +669,10 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 export const insertContractComparisonSchema = createInsertSchema(contractComparisons).omit({ id: true, createdAt: true });
 export type ContractComparison = typeof contractComparisons.$inferSelect;
 export type InsertContractComparison = z.infer<typeof insertContractComparisonSchema>;
+
+export const insertContractVersionSchema = createInsertSchema(contractVersions).omit({ id: true, createdAt: true });
+export type ContractVersion = typeof contractVersions.$inferSelect;
+export type InsertContractVersion = z.infer<typeof insertContractVersionSchema>;
 
 export const insertInfrastructureLogSchema = createInsertSchema(infrastructureLogs).omit({
   id: true,

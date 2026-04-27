@@ -1,5 +1,5 @@
 import { type Express, type Request, type Response } from "express";
-import { AIGateway } from "../../services/AIGateway.js";
+import { IntelligenceGateway } from "../../services/IntelligenceGateway.js";
 import { chatStorage } from "./storage.js";
 import { isAuthenticated } from "../auth/index.js";
 import { SOC2Logger } from "../../services/SOC2Logger.js";
@@ -87,7 +87,7 @@ export function registerChatRoutes(app: Express): void {
       res.setHeader("Connection", "keep-alive");
 
       // Stream response from OpenAI (Resilient Path)
-      const stream = await AIGateway.createStreamingCompletion({
+      const stream = await IntelligenceGateway.createStreamingCompletion({
         model: "gpt-4o",
         messages: chatMessages,
         stream: true,

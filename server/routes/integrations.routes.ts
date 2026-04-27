@@ -15,7 +15,7 @@
 
 import { Router } from "express";
 import { storage } from "../storage.js";
-import { AIGateway } from "../services/AIGateway.js";
+import { IntelligenceGateway } from "../services/IntelligenceGateway.js";
 import { SOC2Logger } from "../services/SOC2Logger.js";
 import memoize from "memoizee";
 import { z } from "zod";
@@ -24,7 +24,7 @@ const router = Router();
 
 // Cache identical analysis prompts for 30 minutes to avoid redundant API calls
 const cachedWordAnalysis = memoize(
-  (params: any) => AIGateway.createCompletion(params),
+  (params: any) => IntelligenceGateway.createCompletion(params),
   {
     promise: true,
     maxAge: 1800000,

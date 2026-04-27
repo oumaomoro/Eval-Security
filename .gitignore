@@ -18,6 +18,7 @@ uploads/
 tmp_*
 *.txt
 *.log
+*.zip
 
 # Build and project specific
 cyberoptimize-local/

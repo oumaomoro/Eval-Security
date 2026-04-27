@@ -9,6 +9,7 @@ export function useClauses() {
       if (!res.ok) throw new Error("Failed to fetch clauses");
       return api.clauses.list.responses[200].parse(await res.json());
     },
+    staleTime: 3600000, // 1 hour caching
   });
 }
 
@@ -29,7 +30,7 @@ export function useGenerateClause() {
 
 export function useCompareClauses() {
   return useMutation({
-    mutationFn: async (data: { contractClauseId?: number; libraryClauseId: number }) => {
+    mutationFn: async (data: { contractClauseId?: number; libraryClauseId: number; contractText?: string }) => {
       const res = await fetch("/api/intelligence/compare-clauses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

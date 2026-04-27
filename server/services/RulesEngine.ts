@@ -5,20 +5,23 @@ import { RedlineEngine } from "./RedlineEngine.js";
 export class RulesEngine {
   /**
    * Applies all active playbook rules to a specific contract.
-   * Typically invoked synchronously right after AIGateway analysis completes.
+   * Typically invoked synchronously right after IntelligenceGateway analysis completes.
    */
   static async evaluateContract(contractId: number, workspaceId: number): Promise<void> {
     console.log(`[RulesEngine] Starting evaluation for contract ID ${contractId}`);
     
-    // 1. Fetch Contract & verify it has AI Analysis
-    const contract = await storage.getContract(contractId);
-    if (!contract || !contract.aiAnalysis) {
-      console.warn(`[RulesEngine] Contract ${contractId} has no AI analysis. Skipping rules evaluation.`);
+    // 1. Fetch Contract & Playbooks in parallel
+    const [contract, playbooks] = await Promise.all([
+      storage.getContract(contractId),
+      storage.getPlaybooks()
+    ]);
+
+    if (!contract || !contract.intelligenceAnalysis) {
+      console.warn(`[RulesEngine] Contract ${contractId} has no intelligence analysis. Skipping rules evaluation.`);
       return;
     }
     
-    // 2. Fetch Active Playbooks and Rules for the Workspace
-    const playbooks = await storage.getPlaybooks();
+    // 2. Filter Active Playbooks for the Workspace
     const activePlaybooks = playbooks.filter(pb => pb.isActive && pb.workspaceId === workspaceId);
     
     if (activePlaybooks.length === 0) {
@@ -26,32 +29,38 @@ export class RulesEngine {
       return;
     }
     
-    // Flatten all active rules
-    const allRules: PlaybookRule[] = [];
-    for (const playbook of activePlaybooks) {
-      const rules = await storage.getPlaybookRules(playbook.id);
-      allRules.push(...rules.filter(r => r.isActive));
-    }
+    // 3. Batch Fetch all active rules
+    const playbookIds = activePlaybooks.map(pb => pb.id);
+    const rules = await storage.getRulesForPlaybooks(playbookIds);
+    const allRules = rules.filter(r => r.isActive);
     
     // Sort rules by priority (highest first)
     allRules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
     
     console.log(`[RulesEngine] Loaded ${allRules.length} active rules for evaluation.`);
     
-    const contextMap = this.flattenObject(contract.aiAnalysis);
+    const contextMap = this.flattenObject(contract.intelligenceAnalysis);
+
+    const actionPromises: Promise<void>[] = [];
 
     for (const rule of allRules) {
       try {
         const isTriggered = this.evaluateCondition(rule.condition, contextMap);
         if (isTriggered) {
           console.log(`[RulesEngine] [✓] TRIGGERED: [${rule.name}] (Rule ID: ${rule.id})`);
-          await this.executeAction(rule, contract);
+          // Queue the action for concurrent execution
+          actionPromises.push(this.executeAction(rule, contract));
         } else {
           console.log(`[RulesEngine] [ ] Skipped: [${rule.name}] (Condition not met)`);
         }
       } catch (err: any) {
         console.error(`[RulesEngine] [!] Error evaluating rule [${rule.name}]:`, err.message);
       }
+    }
+
+    // Execute all triggered rule actions concurrently to eliminate database bottleneck
+    if (actionPromises.length > 0) {
+      await Promise.allSettled(actionPromises);
     }
 
     // 4. Temporal Risk Forecasting (Phase 27)
@@ -187,6 +196,16 @@ export class RulesEngine {
         default:
           console.warn(`[RulesEngine] Unknown action type: ${action.type}`);
       }
+
+      // Track rule execution in the audit log
+      await storage.createAuditLog({
+        action: "RULE_TRIGGERED",
+        userId: "SYSTEM",
+        clientId: contract.clientId,
+        resourceType: "contract",
+        resourceId: String(contract.id),
+        details: `Rule '${rule.name}' triggered action: ${action.type}`,
+      });
     } catch (err: any) {
       console.error(`[RulesEngine] Failed to execute action ${action.type} for rule ${rule.id}:`, err);
     }

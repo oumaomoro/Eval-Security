@@ -20,7 +20,7 @@ export class RedlineEngine {
         workspaceId,
         contractId,
         clauseTitle: clause.clauseName || "Library Recommendation",
-        originalText: "Missing Mandatory Provision", // In sophisticated iterations, AIGateway provides the exact excerpt
+        originalText: "Missing Mandatory Provision", // In sophisticated iterations, IntelligenceGateway provides the exact excerpt
         suggestedText: clause.standardLanguage,
         status: "pending",
         ruleId: triggeredByRuleId,

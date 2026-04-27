@@ -22,6 +22,9 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
+import { useContractVersions } from "@/hooks/use-contract-versions";
+import { History as HistoryIcon, Clock } from "lucide-react";
+import { format } from "date-fns";
 
 export default function ContractDetail() {
   const [match, params] = useRoute("/contracts/:id");
@@ -29,6 +32,7 @@ export default function ContractDetail() {
   const { user } = useAuth();
   const { data: contract, isLoading } = useContract(id);
   const { data: risks } = useRisks({ contractId: String(id) });
+  const { data: versions } = useContractVersions(id);
   const { mutate: analyze, isPending: isAnalyzing } = useAnalyzeContract();
   const { toast } = useToast();
 
@@ -196,12 +200,12 @@ export default function ContractDetail() {
           </TabsTrigger>
           <TabsTrigger value="analysis" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
             <Shield className="w-4 h-4" />
-            AI Analysis
+            Intelligence Analysis
           </TabsTrigger>
           <TabsTrigger value="intelligence" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
             <Brain className="w-4 h-4" />
             Intelligence
-            <Badge variant="secondary" className="ml-1 text-[10px] bg-cyan-500/20 text-cyan-500 border-cyan-500/20">AI</Badge>
+            <Badge variant="secondary" className="ml-1 text-[10px] bg-cyan-500/20 text-cyan-500 border-cyan-500/20">PRO</Badge>
           </TabsTrigger>
           <TabsTrigger value="redline" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
             <PenTool className="w-4 h-4" />
@@ -215,6 +219,10 @@ export default function ContractDetail() {
           <TabsTrigger value="comments" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
             <MessageSquare className="w-4 h-4" />
             Collaboration
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-card py-2.5 px-5 transition-all duration-300">
+            <HistoryIcon className="w-4 h-4" />
+            Version History
           </TabsTrigger>
         </TabsList>
 
@@ -261,7 +269,7 @@ export default function ContractDetail() {
                   className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
                 >
                   {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Bot className="w-4 h-4 mr-2" />}
-                  {isAnalyzing ? "Analyzing..." : "Run AI Analysis"}
+                  {isAnalyzing ? "Analyzing..." : "Run Intelligence Analysis"}
                 </Button>
               </div>
             </div>
@@ -269,19 +277,19 @@ export default function ContractDetail() {
         </TabsContent>
 
         <TabsContent value="analysis" className="animate-in fade-in slide-in-from-bottom-2">
-          {contract.aiAnalysis ? (
+          {contract.intelligenceAnalysis ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Analysis Cards */}
-              <AnalysisCard title="Key Dates Extracted" data={contract.aiAnalysis.extractedDates} />
-              <AnalysisCard title="SLA Metrics" data={contract.aiAnalysis.slaMetrics} />
-              <AnalysisCard title="Data Privacy Provisions" data={contract.aiAnalysis.dataPrivacy} />
-              <AnalysisCard title="Risk Flags" list={contract.aiAnalysis.riskFlags} />
+              <AnalysisCard title="Key Dates Extracted" data={contract.intelligenceAnalysis.extractedDates} />
+              <AnalysisCard title="SLA Metrics" data={contract.intelligenceAnalysis.slaMetrics} />
+              <AnalysisCard title="Data Privacy Provisions" data={contract.intelligenceAnalysis.dataPrivacy} />
+              <AnalysisCard title="Risk Flags" list={contract.intelligenceAnalysis.riskFlags} />
             </div>
           ) : (
             <div className="text-center py-20 bg-card border border-border rounded-2xl">
               <Bot className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-bold">No Analysis Yet</h3>
-              <p className="text-muted-foreground mb-6">Run our AI model to extract key insights.</p>
+              <p className="text-muted-foreground mb-6">Run our Intelligence model to extract key insights.</p>
               <Button onClick={() => analyze(id)} disabled={isAnalyzing}>
                 Run Analysis Now
               </Button>
@@ -339,7 +347,7 @@ export default function ContractDetail() {
                 <PenTool className="w-12 h-12 text-primary/50 mb-4" />
                 <h3 className="text-xl font-bold mb-2">Automated Rules Engine</h3>
                 <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                  Playbook rules will trigger AI-assisted redline remediation automatically when compliance deficiencies are found.
+                  Playbook rules will trigger Intelligence-assisted redline remediation automatically when compliance deficiencies are found.
                 </p>
                 <Button 
                   variant="outline" 
@@ -362,6 +370,50 @@ export default function ContractDetail() {
 
         <TabsContent value="comments" className="animate-in fade-in slide-in-from-bottom-2 max-w-2xl mx-auto">
           <CommentSidebar contractId={id} />
+        </TabsContent>
+
+        <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-2">
+          <Card className="bg-card border border-border rounded-2xl p-6">
+            <h3 className="font-bold flex items-center mb-6">
+               <HistoryIcon className="w-5 h-5 text-primary mr-2" />
+               Contract Version History
+            </h3>
+            
+            <div className="space-y-4">
+              {versions?.map((v: any) => (
+                <div key={v.id} className="p-4 rounded-xl bg-background border border-border flex justify-between items-center group hover:border-primary/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                      v{v.versionNumber}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-foreground">{v.changesSummary || `Version ${v.versionNumber}`}</h4>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        {v.createdAt ? format(new Date(v.createdAt), "MMM d, yyyy HH:mm") : "N/A"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      asChild
+                      className="text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      <a href={v.fileUrl} target="_blank" rel="noopener noreferrer">
+                        <FileText className="w-4 h-4 mr-2" />
+                        View Document
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {(!versions || versions.length === 0) && (
+                <p className="text-muted-foreground text-center py-8">No version history found.</p>
+              )}
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
 

@@ -56,7 +56,7 @@ export default function ExecutiveROI() {
                         value={`$${roi.direct_savings.toLocaleString()}`} 
                         icon={Target} 
                         trend="Active" 
-                        description="AI-identified savings opportunities"
+                        description="Intelligence-identified savings opportunities"
                         color="text-cyan-500"
                     />
                     <ImpactCard 
@@ -64,7 +64,7 @@ export default function ExecutiveROI() {
                         value={`${roi.hours_saved}h`} 
                         icon={Zap} 
                         trend="Liberated" 
-                        description="Legal hours saved through AI"
+                        description="Legal hours saved through Intelligence"
                         color="text-amber-500"
                     />
                     <ImpactCard 
@@ -180,7 +180,7 @@ export default function ExecutiveROI() {
                                 <CardTitle className="text-lg flex items-center gap-2 font-black uppercase tracking-tight italic">
                                     <Briefcase className="w-5 h-5 text-emerald-500" /> Intelligence Impact Ledger
                                 </CardTitle>
-                                <CardDescription>Direct correlation between AI redlines and budget preservation.</CardDescription>
+                                <CardDescription>Direct correlation between Intelligence redlines and budget preservation.</CardDescription>
                             </div>
                             <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-mono tracking-tighter">
                                 Real-time DB Sync Active

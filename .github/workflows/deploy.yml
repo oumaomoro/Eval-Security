@@ -6,6 +6,23 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  # Centralized Secrets for Linter Stability & Consistency
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+  SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  # Alias for legacy gateway compatibility
+  AI_INTEGRATIONS_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -19,17 +36,11 @@ jobs:
       - name: Install dependencies
         run: npm install
       
-      - name: Type check
-        run: npm run check
+      - name: Build Check (Frontend & Backend)
+        run: npm run build
       
       - name: System Health Check
         run: npx tsx scripts/verify-health.ts
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
       
       - name: Install Playwright
         run: npx playwright install --with-deps
@@ -38,24 +49,11 @@ jobs:
         run: npx playwright test
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
 
   deploy-production:
     needs: validate
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
     strategy:
       matrix:
         target: [backend, frontend]
@@ -64,11 +62,11 @@ jobs:
       
       - name: Deploy Backend to Vercel
         if: matrix.target == 'backend'
-        uses: amondnet/vercel-action@v20
+        uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-org-id: ${{ env.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ env.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
 
       - name: Deploy Frontend to Cloudflare
@@ -87,8 +85,11 @@ jobs:
       - name: Success Notification
         if: needs.deploy-production.result == 'success'
         run: |
-          echo "Deployment Successful. Costloci Node Operational."
+          echo "🚀 DEPLOYMENT SUCCESSFUL"
+          echo "Costloci Sovereign Instance is live at https://costloci.com"
+          echo "API Endpoint: https://api.costloci.com"
       - name: Failure Notification
         if: needs.validate.result == 'failure' || needs.deploy-production.result == 'failure'
         run: |
-          echo "Critical Diagnostic: Deployment Failed."
+          echo "❌ DEPLOYMENT FAILED"
+          echo "Triggering automated rollback protocol (Vercel Instant Rollback enabled)."

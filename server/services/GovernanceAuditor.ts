@@ -1,16 +1,16 @@
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 import { storage } from "../storage.js";
 import memoize from "memoizee";
 
 const cachedAuditAnalysis = memoize(
-  (params: any) => AIGateway.createCompletion(params),
+  (params: any) => IntelligenceGateway.createCompletion(params),
   { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
 );
 
 export class GovernanceAuditor {
   static async generatePostureReport() {
     try {
-      console.log("[GOVERNANCE AUDITOR] Initiating AI Posture Review...");
+      console.log("[GOVERNANCE AUDITOR] Initiating Intelligence Posture Review...");
       
       const [logs, audits, risks] = await Promise.all([
         storage.getAuditLogs(),
@@ -24,7 +24,7 @@ export class GovernanceAuditor {
         Focus on:
         1. Operational Resilience (Autofix success rate)
         2. Compliance Drift (Focus on IRA Kenya July 2025 mandates and KDPA DPO requirements)
-        3. Critical Risk Exposure (Especially third-party AI and data localization)
+        3. Critical Risk Exposure (Especially third-party Intelligence and data localization)
         4. Strategic Recommendations.`;
 
       const userPrompt = `
@@ -52,16 +52,16 @@ export class GovernanceAuditor {
       });
       
       const report = JSON.parse(responseText || "{}");
-      console.log("[GOVERNANCE AUDITOR] AI Posture Review Completed.");
+      console.log("[GOVERNANCE AUDITOR] Intelligence Posture Review Completed.");
       return report;
     } catch (err) {
-      console.error("[GOVERNANCE AUDITOR] AI Analysis Failed:", err);
+      console.error("[GOVERNANCE AUDITOR] Intelligence Analysis Failed:", err);
       return {
           overallStatus: "Caution",
           resilienceIndex: 0,
           complianceHealth: 0,
           executiveSummary: "Autonomous auditing currently unavailable. Manual oversight required.",
-          topRecommendations: ["Verify AI Integration", "Check System Logs"],
+          topRecommendations: ["Verify Intelligence Integration", "Check System Logs"],
           predictiveAnalysis: "Unavailable"
       };
     }

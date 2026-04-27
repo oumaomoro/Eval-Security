@@ -7,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Copy, Check, BookOpen, GitCompare, Zap } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, Sparkles, Copy, Check, BookOpen, GitCompare, Zap, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Clauses() {
   const { data: clauses, isLoading } = useClauses();
@@ -27,7 +29,7 @@ export default function Clauses() {
               <EmptyState 
                 icon={BookOpen} 
                 title="Library Empty" 
-                description="Your enterprise clause library is currently empty. Use the AI Clause Drafter on the right to generate compliance-ready legal language."
+                description="Your enterprise clause library is currently empty. Use the Smart Clause Drafter on the right to generate compliance-ready legal language."
               />
             </div>
           ) : (
@@ -53,7 +55,9 @@ export default function Clauses() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <CompareClauseDialog clause={clause} />
+                  <ErrorBoundary>
+                    <CompareClauseDialog clause={clause} />
+                  </ErrorBoundary>
                   <Button variant="ghost" size="sm" className="h-9 w-9 p-0 bg-slate-950/50 border border-slate-800 hover:bg-slate-800">
                     <Copy className="w-4 h-4 text-slate-400" />
                   </Button>
@@ -67,7 +71,9 @@ export default function Clauses() {
         </div>
 
         <div className="lg:col-span-1">
-          <AIGenerator />
+          <ErrorBoundary>
+            <IntelligenceGenerator />
+          </ErrorBoundary>
         </div>
       </div>
     </Layout>
@@ -79,9 +85,7 @@ function CompareClauseDialog({ clause }: { clause: any }) {
   const { mutate: compare, isPending, data: result } = useCompareClauses();
 
   const handleCompare = () => {
-    // Note: Since we don't have a contract context here, we just pass libraryId
-    // The API will compare the inputText against standardLanguage
-    compare({ libraryClauseId: clause.id }); // Logic adjusted in component to use local text if needed
+    compare({ libraryClauseId: clause.id, contractText: inputText });
   };
 
   return (
@@ -95,7 +99,7 @@ function CompareClauseDialog({ clause }: { clause: any }) {
       <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-slate-200">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black italic tracking-tighter uppercase">
-            Deviation <span className="text-primary">Analysis</span>
+            Clause <span className="text-primary">Comparison</span>
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-6 pt-4">
@@ -115,7 +119,7 @@ function CompareClauseDialog({ clause }: { clause: any }) {
             className="w-full bg-primary hover:bg-primary/90 text-slate-950 font-black uppercase h-12"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-            Analyze Deviation
+            Compare Clause
           </Button>
 
           {result && (
@@ -127,7 +131,8 @@ function CompareClauseDialog({ clause }: { clause: any }) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                    <div className={`w-2 h-2 rounded-full ${result.deviationSeverity === 'none' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                   <span className="text-xs font-black uppercase tracking-wider">Severity: {result.deviationSeverity}</span>
+                    <CardTitle className="text-sm font-black text-cyan-400">Intelligence Review</CardTitle>
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-400">Certainty: {result.similarityScore}%</span>
                 </div>
                 <Badge className="bg-primary/20 text-primary">{result.similarityScore}% Match</Badge>
               </div>
@@ -144,7 +149,7 @@ function CompareClauseDialog({ clause }: { clause: any }) {
   );
 }
 
-function AIGenerator() {
+function IntelligenceGenerator() {
   const [category, setCategory] = useState("");
   const [requirements, setRequirements] = useState("");
   const [jurisdiction, setJurisdiction] = useState("KDPA");
@@ -158,7 +163,7 @@ function AIGenerator() {
     <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6 sticky top-24">
       <div className="flex items-center gap-2 mb-6">
         <Sparkles className="w-5 h-5 text-primary" />
-        <h3 className="font-bold text-lg text-primary">AI Clause Drafter</h3>
+        <h3 className="font-bold text-lg text-primary">Smart Clause Drafter</h3>
       </div>
 
       <div className="space-y-4">
@@ -199,8 +204,7 @@ function AIGenerator() {
           disabled={isPending || !category || !requirements}
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20"
         >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-          Draft Clause
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Draft with Intelligence"}
         </Button>
       </div>
 

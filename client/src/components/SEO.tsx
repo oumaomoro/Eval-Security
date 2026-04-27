@@ -9,9 +9,9 @@ interface SEOProps {
 
 export function SEO({ title, description, url, image }: SEOProps) {
   useEffect(() => {
-    const baseTitle = "Costloci | Enterprise Intelligence";
+    const baseTitle = "Costloci | Enterprise Contract Intelligence";
     const fullTitle = title ? `${title} | ${baseTitle}` : baseTitle;
-    const desc = description || "AI-driven contract governance, forensic risk mapping, and autonomic compliance (KDPA, POPIA, GDPR) for MSPs and global enterprises.";
+    const desc = description || "Streamline cybersecurity contract management, compliance risk mapping, and automated regulatory auditing (KDPA, GDPR, ISO 27001) for MSPs and global enterprises.";
     const currentUrl = url || window.location.href;
     const ogImage = image || "https://costloci.com/og-image.jpg";
 

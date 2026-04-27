@@ -4,12 +4,12 @@ import { storage } from "../storage.js";
 import { createHash } from "crypto";
 
 /**
- * SOVEREIGN API GATEWAY: AI Resilience Layer
+ * SOVEREIGN INTELLIGENCE GATEWAY: Sovereign Intelligence Layer
  *
- * Implements a unified multi-provider fallback mechanism for all AI interactions.
- * Resilience Path: OpenAI (Primary) -> Anthropic (Secondary) -> Sovereign Fallback (Regional/Mock)
+ * Implements a unified multi-provider fallback mechanism for all intelligence interactions.
+ * Resilience Path: DeepSeek (Primary) -> OpenAI (Secondary) -> Anthropic (Expert) -> Local (Sovereign)
  */
-export class AIGateway {
+export class IntelligenceGateway {
   private static openaiClient: OpenAI | null = null;
   private static deepseekClient: OpenAI | null = null;
   private static anthropicClient: Anthropic | null = null;
@@ -17,10 +17,89 @@ export class AIGateway {
   private static readonly OPENAI_KEY = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "missing";
   private static readonly DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "missing";
   private static readonly ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "missing";
+  private static readonly HF_TOKEN = process.env.HF_TOKEN || "missing";
+  private static readonly HF_MODEL_ID = process.env.HF_MODEL_ID || "your-username/costloci-kdpa-llama3";
   
   private static readonly OPENAI_BASE = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   private static readonly DEEPSEEK_BASE = "https://api.deepseek.com";
-  private static readonly LOCAL_BASE = process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
+  private static readonly LOCAL_BASE = process.env.LOCAL_INTELLIGENCE_BASE_URL || process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
+
+  private static circuitBreaker: Record<string, { 
+    failures: number; 
+    state: 'CLOSED' | 'OPEN' | 'HALF_OPEN'; 
+    nextAttempt: number;
+    requestInProgress: boolean;
+  }> = {
+    deepseek: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
+    openai: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
+    anthropic: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
+    huggingface: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
+    ollama: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false }
+  };
+
+  private static readonly FAILURE_THRESHOLD = 3;
+  private static readonly OPEN_TIMEOUT = 60000;
+
+  private static isProviderAvailable(provider: string): boolean {
+    const cb = this.circuitBreaker[provider];
+    const now = Date.now();
+
+    if (cb.state === 'OPEN') {
+      if (now >= cb.nextAttempt) {
+        cb.state = 'HALF_OPEN';
+        cb.requestInProgress = true;
+        console.log(`[INTELLIGENCE-GATEWAY] Circuit Breaker for ${provider} entering HALF_OPEN. Testing recovery...`);
+        return true;
+      }
+      return false;
+    }
+
+    if (cb.state === 'HALF_OPEN' && cb.requestInProgress) {
+      // Only allow one request at a time in HALF_OPEN
+      return false;
+    }
+
+    return true;
+  }
+
+  private static async recordFailure(provider: string) {
+    const cb = this.circuitBreaker[provider];
+    cb.requestInProgress = false;
+    cb.failures += 1;
+    
+    // If we fail in HALF_OPEN, we immediately go back to OPEN and reset timer
+    if (cb.state === 'HALF_OPEN') {
+      cb.state = 'OPEN';
+      cb.nextAttempt = Date.now() + this.OPEN_TIMEOUT;
+      console.warn(`[INTELLIGENCE-GATEWAY] Recovery test failed for ${provider}. Returning to OPEN state.`);
+      return;
+    }
+
+    if (cb.failures >= this.FAILURE_THRESHOLD) {
+      cb.state = 'OPEN';
+      cb.nextAttempt = Date.now() + this.OPEN_TIMEOUT;
+      console.error(`[INTELLIGENCE-GATEWAY] Circuit Breaker TRIPPED for ${provider}. Cooling off for 60s.`);
+      
+      await storage.createInfrastructureLog({
+        component: "IntelligenceGateway",
+        event: "CIRCUIT_BREAKER_TRIPPED",
+        status: "critical",
+        actionTaken: `Circuit breaker opened for ${provider} after ${cb.failures} failures. Next attempt at ${new Date(cb.nextAttempt).toLocaleTimeString()}.`
+      }).catch(() => {});
+    }
+  }
+
+  private static recordSuccess(provider: string) {
+    const cb = this.circuitBreaker[provider];
+    cb.requestInProgress = false;
+    if (cb.state === 'HALF_OPEN' || cb.state === 'OPEN') {
+      cb.state = 'CLOSED';
+      cb.failures = 0;
+      console.log(`[INTELLIGENCE-GATEWAY] Circuit Breaker CLOSED for ${provider}. Recovery successful.`);
+    } else {
+      cb.failures = 0;
+    }
+  }
 
   private static getOpenAI(): OpenAI {
     // Re-read key lazily to ensure dotenv has loaded before class static init
@@ -67,7 +146,7 @@ export class AIGateway {
         if (attempt === maxRetries) {
            throw error;
         }
-        console.warn(`[AI-GATEWAY] Attempt ${attempt} failed: ${error.message}. Retrying...`);
+        console.warn(`[INTELLIGENCE-GATEWAY] Attempt ${attempt} failed: ${error.message}. Retrying...`);
       }
     }
     throw new Error("Maximum retries exhausted");
@@ -77,12 +156,12 @@ export class AIGateway {
    * Resilient completion endpoint with Multi-Provider Fallback & Semantic Caching
    */
   static async createCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): Promise<string> {
-    // Enforce Professional & Ethical Standards Globally
+    // 1. Standards Enforcement
     const hasSystemMessage = params.messages.some((m: any) => m.role === 'system');
     if (!hasSystemMessage) {
       params.messages.unshift({
         role: "system",
-        content: "You are a specialized AI system for Costloci. Your responses MUST be highly accurate, strictly professional, and adhere to the highest ethical and cybersecurity compliance standards without bias or hallucination."
+        content: "You are a specialized intelligence system for Costloci. Your responses MUST be highly accurate, strictly professional, and adhere to the highest ethical and cybersecurity compliance standards without bias or hallucination."
       } as any);
     } else {
       const sysMsgIndex = params.messages.findIndex((m: any) => m.role === 'system');
@@ -94,105 +173,92 @@ export class AIGateway {
     const promptText = params.messages.map(m => `${m.role}:${m.content}`).join("|");
     const promptHash = createHash("sha256").update(promptText).digest("hex");
 
-    // 0. Check Semantic Cache
+    // 2. Cache Layer
     try {
-      const cached = await storage.getAiCache(promptHash);
-      if (cached) {
-        console.log(`[AI-GATEWAY] Semantic Cache Hit: ${promptHash}`);
-        return cached;
-      }
+      const cached = await storage.getIntelligenceCache(promptHash);
+      if (cached) return cached;
     } catch (e) {
-      console.warn("[AI-GATEWAY] Cache check failed, proceeding to live inference.");
+      console.warn("[INTELLIGENCE-GATEWAY] Cache failure.");
     }
 
     let responseContent = "";
-    let usedProvider = "openai";
-    let usedModel = params.model;
+    let usedProvider = "deepseek";
+    let usedModel = "deepseek-chat";
 
-    // 1. Attempt Primary (DeepSeek - cost effective & high context)
-    try {
-      if (this.DEEPSEEK_KEY !== "missing") {
-        const deepseekParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
-        const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
-           () => this.getDeepSeek().chat.completions.create(deepseekParams as any) as any
-        );
+    // 3. Provider Cascade (Enterprise Priority: DeepSeek -> OpenAI -> Anthropic -> Local)
+    
+    // 3.1. DeepSeek Primary (Sovereign Excellence)
+    if (!responseContent && this.DEEPSEEK_KEY !== "missing" && this.isProviderAvailable("deepseek")) {
+      try {
+        const dsParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
+        const response: any = await this.withRetryAndTimeout(() => this.getDeepSeek().chat.completions.create(dsParams as any));
         responseContent = response.choices[0]?.message?.content || "";
-        usedProvider = "deepseek";
-        usedModel = deepseekParams.model;
-      }
-    } catch (error: any) {
-      console.warn(`[AI-GATEWAY] DeepSeek Engine Unavailable: ${error.message} - Degrading fully to OpenAI.`);
+        if (responseContent) { usedProvider = "deepseek"; usedModel = dsParams.model; this.recordSuccess("deepseek"); }
+      } catch (error: any) { this.recordFailure("deepseek"); }
     }
 
-    if (!responseContent) {
-      // 2. Attempt Secondary (OpenAI)
+    // 3.2. OpenAI Secondary (Industry Standard)
+    if (!responseContent && this.OPENAI_KEY !== "missing" && this.isProviderAvailable("openai")) {
       try {
-        if (this.OPENAI_KEY !== "missing") {
-          const response: OpenAI.Chat.ChatCompletion = await this.withRetryAndTimeout(
-             () => this.getOpenAI().chat.completions.create(params) as any
-          );
-          responseContent = response.choices[0]?.message?.content || "";
-          usedProvider = "openai";
-          usedModel = params.model;
+        const response: any = await this.withRetryAndTimeout(() => this.getOpenAI().chat.completions.create(params));
+        responseContent = response.choices[0]?.message?.content || "";
+        if (responseContent) { usedProvider = "openai"; usedModel = params.model; this.recordSuccess("openai"); }
+      } catch (error: any) { this.recordFailure("openai"); }
+    }
+
+    // 3.3. Anthropic (Specialized Reasoning)
+    if (!responseContent && this.ANTHROPIC_KEY !== "missing" && this.isProviderAvailable("anthropic")) {
+      try {
+        const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
+        const response = await this.getAnthropic().messages.create({
+          model: "claude-3-5-sonnet-20241022", max_tokens: 1024, messages: [{ role: "user", content: prompt }]
+        });
+        const content = response.content[0];
+        if (content.type === 'text') { 
+          responseContent = content.text; 
+          usedProvider = "anthropic"; 
+          usedModel = "claude-3-5-sonnet"; 
+          this.recordSuccess("anthropic"); 
         }
-      } catch (error: any) {
-        console.warn(`[AI-GATEWAY] OpenAI Engine Unavailable: ${error.message}`);
-      }
+      } catch (error: any) { this.recordFailure("anthropic"); }
     }
 
-    if (!responseContent) {
-      // 3. Attempt Tertiary (Anthropic)
+    // 3.4. Local Ollama (Internal Sovereign Privacy)
+    if (!responseContent && this.isProviderAvailable("ollama")) {
       try {
-        if (this.ANTHROPIC_KEY !== "missing") {
-          const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
-          const response = await this.getAnthropic().messages.create({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1024,
-            messages: [{ role: "user", content: prompt }],
-          });
-          
-          const content = response.content[0];
-          if (content.type === 'text') {
-             responseContent = content.text;
-             usedProvider = "anthropic";
-             usedModel = "claude-3-5-sonnet";
-          }
-        }
-      } catch (error: any) {
-        console.warn(`[AI-GATEWAY] Anthropic Engine Unavailable: ${error.message}`);
-      }
-    }
-
-    if (!responseContent) {
-      // 4. Attempt Quaternary (Sovereign Local AI - Ollama)
-      try {
-        const localParams = { ...params, model: 'deepseek-r1:1.5b' };
         const localOpenAI = new OpenAI({ apiKey: "ollama", baseURL: this.LOCAL_BASE });
-        const response = await localOpenAI.chat.completions.create(localParams as any);
+        const response: any = await localOpenAI.chat.completions.create({ ...params, model: 'deepseek-r1:1.5b' } as any);
         responseContent = response.choices[0]?.message?.content || "";
-        usedProvider = "ollama";
-        usedModel = "deepseek-r1:1.5b";
-      } catch (error: any) {
-        console.warn(`[AI-GATEWAY] Local AI Engine Unavailable (Ollama): ${error.message}`);
-      }
+        if (responseContent) { usedProvider = "ollama"; usedModel = "deepseek-r1:1.5b"; this.recordSuccess("ollama"); }
+      } catch (error: any) { this.recordFailure("ollama"); }
     }
 
-    if (!responseContent) {
-       console.warn(`[AI-GATEWAY] All AI Providers Exhausted. Activating Sovereign Fallback.`);
-       return this.executeSovereignFallback(params);
+    // 3.5. Hugging Face Fine-Tuned (Specific Domain Knowledge)
+    if (!responseContent && this.HF_TOKEN !== "missing" && this.isProviderAvailable("huggingface")) {
+      try {
+        const response = await this.withRetryAndTimeout(async () => {
+          const res = await fetch(`https://api-inference.huggingface.co/models/${this.HF_MODEL_ID}`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${this.HF_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              inputs: `### Instruction: Analyze the following contract clause.\n### Input: ${promptText}\n### Output:`,
+              parameters: { max_new_tokens: 512, return_full_text: false }
+            }),
+          });
+          if (!res.ok) throw new Error(`HF Error: ${res.statusText}`);
+          const data = await res.json();
+          return data[0]?.generated_text || "";
+        }, 30000);
+        if (response) { responseContent = response; usedProvider = "huggingface"; usedModel = this.HF_MODEL_ID; this.recordSuccess("huggingface"); }
+      } catch (error: any) { this.recordFailure("huggingface"); }
     }
 
-    // Populate Cache
+    // 4. Final Fallback or Success
+    if (!responseContent) return this.executeSovereignFallback(params);
+
     try {
-      await storage.createAiCache({
-        promptHash,
-        response: JSON.stringify(responseContent),
-        provider: usedProvider,
-        model: usedModel
-      });
-    } catch (e) {
-      console.warn("[AI-GATEWAY] Failed to populate semantic cache.");
-    }
+      await storage.createIntelligenceCache({ promptHash, response: JSON.stringify(responseContent), provider: usedProvider, model: usedModel });
+    } catch (e) { }
 
     return responseContent;
   }
@@ -207,7 +273,7 @@ export class AIGateway {
            return await this.withRetryAndTimeout(() => this.getDeepSeek().chat.completions.create(deepseekParams as any) as any);
         }
      } catch (error: any) {
-        console.warn(`[AI-GATEWAY] DeepSeek Streaming Failed: ${error.message}. Degrading to OpenAI.`);
+        console.warn(`[INTELLIGENCE-GATEWAY] DeepSeek Streaming Failed: ${error.message}. Degrading to OpenAI.`);
      }
 
      try {
@@ -216,7 +282,7 @@ export class AIGateway {
         }
         throw new Error("No Primary Providers Offline");
      } catch (error: any) {
-        console.error(`[AI-GATEWAY] Streaming Failure: ${error.message}.`);
+        console.error(`[INTELLIGENCE-GATEWAY] Streaming Failure: ${error.message}.`);
         throw error;
      }
   }
@@ -322,7 +388,7 @@ ${documentText.slice(0, 30000)}`;
       return { 
         carrierName: "Extraction Failed", 
         claimRiskScore: 99, 
-        professionalOpinion: "A manual legal review is required as AI extraction failed."
+        professionalOpinion: "A manual legal review is required as Intelligence extraction failed."
       };
     }
   }
@@ -343,10 +409,10 @@ ${documentText.slice(0, 30000)}`;
   }
 
   /**
-   * AI Clause Redlining
+   * Intelligence Clause Redlining
    * Returns a modified clause based on specific instructions and jurisdictional standards.
    */
-  static async aiRedlineClause(originalClause: string, standardLanguage: string, negotiationInstructions: string): Promise<string> {
+  static async redlineClauseIntelligence(originalClause: string, standardLanguage: string, negotiationInstructions: string): Promise<string> {
     const prompt = `You are an expert cybersecurity attorney.
 Original Clause: "${originalClause}"
 Standard/Target Language: "${standardLanguage}"
@@ -361,8 +427,8 @@ Return ONLY the newly written clause text without quotes or explanations.`;
         messages: [{ role: "user", content: prompt }]
       });
     } catch (error) {
-      console.error("[AIGATEWAY] Clause Redlining Failed:", error);
-      return originalClause; // Fallback to original text if AI fails
+      console.error("[IntelligenceGateway] Clause Redlining Failed:", error);
+      return originalClause; // Fallback to original text if intelligence fails
     }
   }
 
@@ -371,7 +437,7 @@ Return ONLY the newly written clause text without quotes or explanations.`;
    * Analyzes deviation between contract text and standard library text.
    */
   static async compareClauseIntelligence(contractText: string, libraryText: string, category: string): Promise<any> {
-    const prompt = `You are an expert legal AI specializing in cybersecurity contract auditing.
+    const prompt = `You are an expert legal intelligence specializing in cybersecurity contract auditing.
 Compare the following Contract Text against the Standard Library Text for the category: ${category}.
 
 [Contract Text]
@@ -400,7 +466,7 @@ Return ONLY the JSON.`;
       });
       return JSON.parse(response);
     } catch (error: any) {
-      console.error("[AIGATEWAY] Clause Comparison Failed:", error.message);
+      console.error("[IntelligenceGateway] Clause Comparison Failed:", error.message);
       return { 
         error: "Comparison failed",
         deviationSeverity: "unknown"
@@ -409,7 +475,7 @@ Return ONLY the JSON.`;
   }
 
   /**
-   * Parameter-Driven AI Clause Generation
+   * Parameter-Driven Intelligence Clause Generation
    * Drafts a custom clause based on multi-standard compliance and risk profile.
    */
   static async generateClauseIntelligence(params: {
@@ -419,7 +485,7 @@ Return ONLY the JSON.`;
     risks: string[];
     tone: string;
   }): Promise<any> {
-    const prompt = `You are an elite legal AI drafter. Create a professional, legally enforceable ${params.category} clause.
+    const prompt = `You are an elite legal intelligence drafter. Create a professional, legally enforceable ${params.category} clause.
 Requirements:
 - Standards: ${params.standards.join(", ")}
 - Specific Needs: ${params.requirements}
@@ -446,7 +512,7 @@ Return ONLY the JSON.`;
       });
       return JSON.parse(response);
     } catch (error: any) {
-      console.error("[AIGATEWAY] Clause Generation Failed:", error.message);
+      console.error("[IntelligenceGateway] Clause Generation Failed:", error.message);
       return { 
         error: "Generation failed",
         clauseText: "Drafting failed due to an upstream engine error."
@@ -472,7 +538,7 @@ Return ONLY the JSON.`;
   private static executeSovereignFallback(params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): string {
      return JSON.stringify({
          status: "sovereign_fallback",
-         message: "The primary and secondary AI engines are currently unavailable (Sovereign mode active). This addendum has been queued for manual review by enterprise legal operators.",
+         message: "The primary and secondary governance services are currently unavailable (Sovereign mode active). This addendum has been queued for manual review by enterprise legal operators.",
          draft: "Due to jurisdictional or network isolation, standard legal clauses could not be dynamically synthesized. Please use the pre-approved enterprise templates residing in the Clause Library for this remediation."
      });
   }

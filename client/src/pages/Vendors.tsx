@@ -11,6 +11,7 @@ import {
 import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
 import { motion } from "framer-motion";
 import { SEO } from "@/components/SEO";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Vendors() {
     const { data: benchmarks, isLoading: loadingBenchmarks } = useVendorBenchmarks();
@@ -46,7 +47,9 @@ export default function Vendors() {
                 {/* Strategic Overview Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="bg-slate-900/20 backdrop-blur-md rounded-[2.5rem] border border-slate-800/50 p-2 overflow-hidden shadow-2xl">
-                        <RiskHeatmap data={heatmapData} />
+                        <ErrorBoundary>
+                            <RiskHeatmap data={heatmapData} />
+                        </ErrorBoundary>
                     </div>
                     
                     <Card className="bg-slate-950/40 backdrop-blur-xl border-slate-800/60 shadow-3xl relative overflow-hidden group rounded-[2.5rem]">

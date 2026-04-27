@@ -7,7 +7,7 @@ import { SOC2Logger } from "../services/SOC2Logger.js";
 
 const router = Router();
 
-// Use the CGO AI for high-fidelity posture reports
+// Use the CGO Intelligence for high-fidelity posture reports
 // Cached for 60 minutes as per user agreement
 const cachedPosture = memoize(
   () => GovernanceAuditor.generatePostureReport(),
@@ -16,7 +16,7 @@ const cachedPosture = memoize(
 
 /**
  * GET /api/governance/posture
- * Returns the Chief Governance Officer (CGO) AI review of the platform.
+ * Returns the Chief Governance Officer (CGO) intelligence review of the platform.
  */
 router.get("/governance/posture", isAuthenticated, async (req: any, res) => {
   try {
@@ -27,7 +27,7 @@ router.get("/governance/posture", isAuthenticated, async (req: any, res) => {
         userId: req.user.id,
         resourceType: "Infrastructure",
         resourceId: "GLOBAL_SYSTEM",
-        details: "AI-Generated Executive Posture Report accessed."
+        details: "Intelligence-Generated Executive Posture Report accessed."
     });
 
     res.json(report);

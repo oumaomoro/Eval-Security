@@ -1,4 +1,4 @@
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 import { storage } from "../storage.js";
 import { ROIService } from "./ROIService.js";
 import { type Contract, type Risk, type Clause } from "../../shared/schema.js";
@@ -36,7 +36,7 @@ export class PlaybookService {
         - CURRENT ANNUAL COST: $${(contract.annualCost || 0).toLocaleString()}
         - MARKET AVERAGE: $${benchmarks.avg_annual_cost.toLocaleString()}
         - COST DEVIATION: ${costDelta.toFixed(1)}% vs Market
-        - CONTRACT HEALTH SCORE: ${contract.aiAnalysis?.riskScore || "Unknown"}
+        - CONTRACT HEALTH SCORE: ${contract.intelligenceAnalysis?.riskScore || "Unknown"}
         
         ### IDENTIFIED VULNERABILITIES (LEVERAGE):
         - CRITICAL RISKS: ${criticalRisks.map(r => r.riskTitle).join(", ") || "None"}
@@ -57,12 +57,12 @@ export class PlaybookService {
         }
       `;
 
-      const content = await AIGateway.createCompletion({
+      const content = await IntelligenceGateway.createCompletion({
         model: "gpt-4o", // Premium model for executive logic
         messages: [{ role: "system", content: "You generate executive-level vendor negotiation strategies in JSON format." }, { role: "user", content: prompt }],
         response_format: { type: "json_object" },
       });
-      if (!content) throw new Error("AI failed to generate playbook");
+      if (!content) throw new Error("Intelligence failed to generate playbook");
 
       const result = JSON.parse(content);
       
@@ -77,7 +77,7 @@ export class PlaybookService {
       await storage.createPlaybook({
         workspaceId: contract.workspaceId!,
         name: `Strategic Playbook: ${contract.vendorName}`,
-        description: `AI-generated negotiation strategy for ${contract.category} services. Rules identified: ${result.leveragePoints.join(", ")}`,
+        description: `Intelligence-generated negotiation strategy for ${contract.category} services. Rules identified: ${result.leveragePoints.join(", ")}`,
         category: contract.category,
       });
 

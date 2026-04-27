@@ -204,14 +204,14 @@ export default function Rulesets() {
                                     {editingId ? "Edit Ruleset" : "Create Custom Ruleset"}
                                 </DialogTitle>
                                 <DialogDescription className="text-slate-400">
-                                    Define a new compliance standard or policy checklist for AI analysis.
+                                    Define a new compliance standard or policy checklist for Intelligence analysis.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-6 py-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-slate-300">Ruleset Name</Label>
-                                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Internal AI Ethics" className="bg-slate-900 border-slate-800" />
+                                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Internal Intelligence Ethics" className="bg-slate-900 border-slate-800" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-slate-300">Standard Code</Label>
@@ -274,7 +274,7 @@ export default function Rulesets() {
                                                                     </div>
                                                                     <div className="pl-8">
                                                                         <Label className="text-[10px] text-slate-500 uppercase font-bold">Detailed Description</Label>
-                                                                        <Input value={rule.description} onChange={(e) => updateRuleField(idx, "description", e.target.value)} placeholder="Specific details for AI detection" className="h-8 bg-slate-950 border-slate-800 text-xs" />
+                                                                        <Input value={rule.description} onChange={(e) => updateRuleField(idx, "description", e.target.value)} placeholder="Specific details for Intelligence detection" className="h-8 bg-slate-950 border-slate-800 text-xs" />
                                                                     </div>
                                                                 </div>
                                                             )}

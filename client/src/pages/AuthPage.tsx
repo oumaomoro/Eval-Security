@@ -157,8 +157,8 @@ export default function AuthPage() {
           {/* Core Proof Points */}
           <div className="mt-12 grid grid-cols-1 gap-4 max-w-sm">
             {[
-              { icon: Brain, label: "Jurisdictional AI Engine", desc: "Real-time legal drift detection" },
-              { icon: ShieldCheck, label: "Forensic Data Privacy", desc: "Sovereign-grade evidence packs" },
+              { icon: Brain, label: "Governance Engine", desc: "Real-time legal drift detection" },
+              { icon: ShieldCheck, label: "Compliance Mapping", desc: "Sovereign-grade evidence packs" },
             ].map((p, i) => (
               <motion.div
                 key={i}
@@ -231,8 +231,8 @@ export default function AuthPage() {
             </div>
 
             <TabsList className="grid w-full grid-cols-2 bg-slate-900 border border-slate-800 rounded-xl p-1 h-12">
-              <TabsTrigger value="login" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] italic">Access Portal</TabsTrigger>
-              <TabsTrigger value="register" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] italic">Initialize Agent</TabsTrigger>
+              <TabsTrigger value="login" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] italic">Sign In</TabsTrigger>
+              <TabsTrigger value="register" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] italic">Register Account</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">

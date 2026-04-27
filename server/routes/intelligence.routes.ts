@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../replit_integrations/auth/index.js";
 import { SOC2Logger } from "../services/SOC2Logger.js";
-import { AIGateway } from "../services/AIGateway.js";
+import { IntelligenceGateway } from "../services/IntelligenceGateway.js";
 
 const router = Router();
 
@@ -49,7 +49,7 @@ router.post("/intelligence/generate-clause", isAuthenticated, async (req: any, r
       return res.status(400).json({ message: "Category and requirements are required." });
     }
 
-    const result = await AIGateway.generateClauseIntelligence({
+    const result = await IntelligenceGateway.generateClauseIntelligence({
       category,
       standards,
       requirements,
@@ -78,30 +78,91 @@ router.post("/intelligence/generate-clause", isAuthenticated, async (req: any, r
  */
 router.post("/intelligence/compare-clauses", isAuthenticated, async (req: any, res) => {
   try {
-    const { contractClauseId, libraryClauseId } = req.body;
+    const { contractClauseId, libraryClauseId, contractText } = req.body;
     
-    const [clauses, library] = await Promise.all([
-      storage.getContractClauses(),
-      storage.getClauseLibrary()
-    ]);
+    let comparisonText = contractText;
+    let category = "General";
 
-    const contractClause = clauses.find(c => c.id === contractClauseId);
-    const standardClause = library.find(c => c.id === libraryClauseId);
-
-    if (!contractClause || !standardClause) {
-      return res.status(404).json({ message: "One or both clauses not found." });
+    if (contractClauseId) {
+      const clauses = await storage.getContractClauses();
+      const contractClause = clauses.find(c => c.id === contractClauseId);
+      if (contractClause) {
+        comparisonText = contractClause.content;
+        category = contractClause.category;
+      }
     }
 
-    const comparison = await AIGateway.compareClauseIntelligence(
-      contractClause.content,
+    const library = await storage.getClauseLibrary();
+    const standardClause = library.find(c => c.id === libraryClauseId);
+
+    if (!standardClause) {
+      return res.status(404).json({ message: "Standard library clause not found." });
+    }
+
+    if (!comparisonText) {
+      return res.status(400).json({ message: "Contract text or clause ID is required." });
+    }
+
+    const comparison = await IntelligenceGateway.compareClauseIntelligence(
+      comparisonText,
       standardClause.standardLanguage,
-      standardClause.clauseCategory
+      standardClause.clauseCategory || category
     );
 
     res.json(comparison);
   } catch (error: any) {
     console.error("[INTELLIGENCE API ERROR]", error.message);
     res.status(500).json({ message: "Clause comparison failed." });
+  }
+});
+
+/**
+ * GET /api/contracts/:id/versions
+ * Fetches the version history of a contract.
+ */
+router.get("/contracts/:id/versions", isAuthenticated, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
+    const versions = await storage.getContractVersions(id);
+    res.json(versions);
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to fetch version history." });
+  }
+});
+
+/**
+ * POST /api/contracts/:id/versions
+ * Creates a new version for a contract (e.g., after a manual upload or automated remediation).
+ */
+router.post("/contracts/:id/versions", isAuthenticated, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { fileUrl, changesSummary } = req.body;
+    
+    if (isNaN(id) || !fileUrl) {
+      return res.status(400).json({ message: "Contract ID and file URL are required." });
+    }
+
+    const existingVersions = await storage.getContractVersions(id);
+    const nextVersion = existingVersions.length > 0 
+      ? Math.max(...existingVersions.map((v: any) => v.versionNumber)) + 1 
+      : 1;
+
+    const version = await storage.createContractVersion({
+      contractId: id,
+      versionNumber: nextVersion,
+      fileUrl,
+      changesSummary: changesSummary || `Manual version ${nextVersion} upload.`,
+      createdBy: req.user.id
+    });
+
+    // Optionally update the main contract record to point to this new fileUrl
+    await storage.updateContract(id, { fileUrl });
+
+    res.json(version);
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to create new version." });
   }
 });
 

@@ -1,4 +1,4 @@
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 import { storage } from "../storage.js";
 import { type Clause } from "../../shared/schema.js";
 
@@ -8,10 +8,10 @@ export class Redliner {
     const clauses = await storage.getClauseLibrary();
     
     // 2. Identify relevant standards based on the risk category if possible
-    // For now, we provide the full context to AI to find the best match
+    // For now, we provide the full context to Intelligence to find the best match
     const context = clauses.map(c => `- ${c.clauseName}: ${c.standardLanguage}`).join("\n");
 
-    const systemPrompt = `You are a Senior Legal AI specialized in contract redlining.
+    const systemPrompt = `You are a Senior Legal Intelligence specialized in contract redlining.
       Your goal is to suggest a corrected version of a problematic contract clause.
       Use the provided organization standard clause library as the source of truth for 'Ideal' language.
       Ensure the output is professional, enterprise-grade, and strictly addresses the identified risk.
@@ -25,7 +25,7 @@ export class Redliner {
       Suggest a corrected version of this clause that aligns with the organization's standards and mitigates the risk.
       Return ONLY the corrected text, no preamble.`;
 
-    const suggestedText = await AIGateway.createCompletion({
+    const suggestedText = await IntelligenceGateway.createCompletion({
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },

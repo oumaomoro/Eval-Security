@@ -4,6 +4,7 @@ import { isAuthenticated } from "../replit_integrations/auth/index.js";
 import { api } from "../../shared/routes.js";
 import { z } from "zod";
 import { SOC2Logger } from "../services/SOC2Logger.js";
+import { requireRole } from "../middleware/rbac.js";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get("/api/org/members", isAuthenticated, async (req: any, res) => {
 });
 
 // POST /api/org/invite - Send an invite (Simulated as direct creation for now)
-router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
+router.post("/api/org/invite", isAuthenticated, requireRole(['admin', 'owner']), async (req: any, res) => {
   try {
     const orgId = req.user.organizationId;
     const clientId = req.user.clientId;
@@ -89,7 +90,7 @@ router.post("/api/org/invite", isAuthenticated, async (req: any, res) => {
 });
 
 // PUT /api/org/member - Update a member's role
-router.put("/api/org/member", isAuthenticated, async (req: any, res) => {
+router.put("/api/org/member", isAuthenticated, requireRole(['admin', 'owner']), async (req: any, res) => {
   try {
     const clientId = req.user.clientId;
 

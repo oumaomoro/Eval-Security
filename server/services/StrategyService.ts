@@ -65,7 +65,7 @@ export class StrategyService {
     }));
     zip.addFile("Evidence/Risk_Register.csv", Buffer.from(stringify(risksCsv, { header: true })));
 
-    // 6. JSON Export (Full AI Details)
+    // 6. JSON Export (Full Intelligence Details)
     const jsonData = JSON.stringify({
       contracts: filteredContracts,
       insurance,

@@ -1,8 +1,8 @@
 import memoize from "memoizee";
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 
-// Cache AI responses 60 min to reduce latency and cost
+// Cache Intelligence responses 60 min to reduce latency and cost
 export const cachedCompletion = memoize(
-  (params: any) => AIGateway.createCompletion(params),
+  (params: any) => IntelligenceGateway.createCompletion(params),
   { promise: true, maxAge: 3600000, normalizer: (args: any[]) => JSON.stringify(args) }
 );

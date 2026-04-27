@@ -439,8 +439,8 @@ router.post("/contracts/:id/apply-playbooks", isAuthenticated, async (req: any, 
         
         // Simplified evaluation logic for MVP
         let matches = false;
-        if (condition.field === "aiAnalysis.riskScore") {
-          const score = contract.aiAnalysis?.riskScore || 0;
+        if (condition.field === "intelligenceAnalysis.riskScore") {
+          const score = contract.intelligenceAnalysis?.riskScore || 0;
           if (condition.operator === "greaterThan" && score > Number(condition.value)) matches = true;
           if (condition.operator === "lessThan" && score < Number(condition.value)) matches = true;
         } else if (condition.field === "vendorName") {

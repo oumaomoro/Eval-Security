@@ -1,4 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React from "react";
+import { MetricCard } from "@/components/MetricCard";
 import { 
   ShieldAlert, 
   Map, 
@@ -161,7 +163,7 @@ export default function DPODashboard() {
             icon={<Briefcase className="text-blue-400" />} 
             label={t("dpo.dpas_reviewed")} 
             value={String(metrics?.dpasReviewed || 0)} 
-            subValue="Sovereign Ledger Synced"
+            subValue="Audit Trail Synchronized"
             trend="Live"
             trendColor="text-blue-400"
           />
@@ -348,7 +350,7 @@ export default function DPODashboard() {
                       <Badge className="bg-rose-500/80 hover:bg-rose-500 text-white border-none text-[10px] font-black">CRITICAL</Badge>
                    </div>
                    <p className="text-slate-300 text-base leading-relaxed font-medium">
-                     New sovereign requirements for cross-border data transfers to AI providers detected. 12 active contracts require immediate amendment.
+                     New requirements for cross-border data transfers to AI providers detected. 12 active contracts require immediate amendment.
                    </p>
                 </div>
                 
@@ -384,7 +386,7 @@ export default function DPODashboard() {
                 </div>
                 Compliance Trajectory
               </CardTitle>
-              <CardDescription className="text-slate-400">Audit score trend with neural redline activity overlay</CardDescription>
+              <CardDescription className="text-slate-400">Audit score trend with Intelligence review activity overlay</CardDescription>
             </CardHeader>
             <CardContent className="h-[260px] pt-4">
               <ResponsiveContainer width="100%" height="100%">
@@ -418,9 +420,9 @@ export default function DPODashboard() {
                 <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                   <Brain className="h-5 w-5 text-indigo-400" />
                 </div>
-                Neural Redlines
+                Smart Clause Review
               </CardTitle>
-              <CardDescription className="text-slate-400">AI clause remediation efficiency</CardDescription>
+              <CardDescription className="text-slate-400">Intelligence clause remediation efficiency</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 pt-4">
               {/* Acceptance Rate Ring */}
@@ -444,7 +446,7 @@ export default function DPODashboard() {
                 </div>
               ))}
               <Button asChild variant="outline" className="w-full border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/20 text-indigo-300 mt-2">
-                <a href="/redline-studio">Open Redline Studio <ChevronRight className="ml-1 h-4 w-4" /></a>
+                <a href="/redline-studio">Open Review Studio <ChevronRight className="ml-1 h-4 w-4" /></a>
               </Button>
             </CardContent>
           </Card>
@@ -454,31 +456,5 @@ export default function DPODashboard() {
   );
 }
 
-function MetricCard({ icon, label, value, subValue, trend, trendColor, variants }: any) {
-  return (
-    <motion.div variants={variants}>
-      <Card className="bg-slate-900/40 border-slate-800/60 backdrop-blur-xl shadow-xl overflow-hidden relative group hover:border-blue-500/40 transition-all duration-300">
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600/40 group-hover:bg-blue-500 transition-colors" />
-        <CardContent className="p-7">
-          <div className="flex items-start justify-between">
-             <div className="h-14 w-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
-               {icon}
-             </div>
-             <div className={`text-[10px] font-black uppercase tracking-tighter ${trendColor} bg-slate-950/80 px-2 py-1 rounded border border-slate-800/60`}>
-                {trend}
-             </div>
-          </div>
-          <div className="mt-6">
-             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
-             <h3 className="text-3xl font-black text-slate-100 tracking-tighter">{value}</h3>
-             <p className="text-sm text-slate-400 mt-2 font-medium flex items-center gap-1">
-               <TrendingUp className="h-3 w-3 text-emerald-400" />
-               {subValue}
-             </p>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+// Removed local MetricCard implementation
 

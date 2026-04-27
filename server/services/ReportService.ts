@@ -25,7 +25,31 @@ export class ReportService {
       storage.getSavingsOpportunities()
     ]);
 
-    // 2. Synthesize Intelligence Payload
+    // 3. Synthesize Intelligence Payload with AI Executive Summary
+    const { cachedCompletion } = await import("./openai.js");
+    
+    const aiPrompt = `You are an expert Cybersecurity Strategist. 
+    Synthesize an executive summary for this organization based on the following data points:
+    - Total Contracts: ${contracts.length}
+    - Total Annual Spend: $${contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0)}
+    - Compliance Health: ${this.calculateComplianceHealth(compliance, workspaceId)}%
+    - Critical Risks: ${risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length}
+    - Savings Identified: $${savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0)}
+    
+    Write a 2-paragraph professional assessment. Paragraph 1: Strategic Posture. Paragraph 2: Priority Actions.
+    Return only the summary text.`;
+
+    let executiveSummary = `Executive summary for ${type} report is being synthesized based on ${contracts.length} active assets.`;
+    try {
+      const response = await cachedCompletion({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: aiPrompt }]
+      });
+      if (response) executiveSummary = response;
+    } catch (e) {
+      console.warn("[REPORT-SERVICE] AI Summary failed:", e);
+    }
+
     const summary = {
       timestamp: new Date().toISOString(),
       totalContracts: contracts.length,
@@ -33,10 +57,11 @@ export class ReportService {
       complianceHealth: this.calculateComplianceHealth(compliance, workspaceId),
       criticalRiskCount: risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length,
       identifiedSavings: savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0),
-      topRecommendations: this.extractTopRecommendations(risks, savings)
+      topRecommendations: this.extractTopRecommendations(risks, savings),
+      executiveSummary: executiveSummary
     };
 
-    // 3. Persist Report Entity
+    // 4. Persist Report Entity
     const report = await storage.createReport({
       workspaceId,
       title: `${type.toUpperCase()} Report - ${new Date().toLocaleDateString()}`,
@@ -105,6 +130,15 @@ export class ReportService {
                 lastRun: now,
                 nextRun: this.calculateNextRun(schedule.frequency)
              });
+             
+             // Dispatch notification if recipient exists
+             if (schedule.recipientEmail) {
+                await EmailService.sendReportReadyNotification(
+                   schedule.recipientEmail, 
+                   report.id, 
+                   report.title
+                ).catch(e => console.error(`[REPORTS] Email dispatch failed for schedule ${schedule.id}:`, e));
+             }
 
           } catch (err) {
              console.error(`[REPORTS] Schedule processing failed for ID ${schedule.id}:`, err);

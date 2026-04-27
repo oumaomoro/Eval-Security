@@ -33,7 +33,7 @@ export default function Contracts() {
           <SEO title="Contract Inventory" description="Manage and analyze your master service agreements and vendor contracts with precision." />
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Contracts</h1>
-            <p className="text-sm text-muted-foreground">Manage and analyze your enterprise agreements with AI-powered precision.</p>
+            <p className="text-sm text-muted-foreground">Manage and analyze your enterprise agreements with Intelligence-powered precision.</p>
           </div>
           <div className="flex gap-4">
             <div className="relative">
@@ -109,7 +109,7 @@ export default function Contracts() {
                 <EmptyState 
                   icon={FileText} 
                   title="No Contracts Found" 
-                  description="Start by adding your first vendor contract or MSA for automated AI analysis."
+                  description="Start by adding your first vendor contract or MSA for automated Intelligence analysis."
                 />
               </div>
             )}
@@ -137,7 +137,7 @@ function CreateContractDialog() {
         formData.append("file", file);
         if (activeWorkspaceId) formData.append("workspaceId", String(activeWorkspaceId));
         
-        toast({ title: "Analyzing File", description: "Our AI is extracting contract terms." });
+        toast({ title: "Analyzing File", description: "Our Intelligence is extracting contract terms." });
         await uploadFile(formData);
         setIsOpen(false);
         return;
@@ -235,7 +235,7 @@ function CreateContractDialog() {
                     {file ? file.name : "Upload MSA or Contract PDF"}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    AI will automatically extract key clauses and risk flags
+                    Intelligence will automatically extract key clauses and risk flags
                   </p>
                 </div>
               </div>

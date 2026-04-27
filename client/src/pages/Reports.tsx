@@ -58,6 +58,7 @@ export default function Reports() {
   // Schedule State
   const [schedTitle, setSchedTitle] = useState("");
   const [schedFrequency, setSchedFrequency] = useState("monthly");
+  const [recipientEmail, setRecipientEmail] = useState("");
 
   const { data: reports, isLoading: isLoadingReports } = useReports();
   const { data: schedules, isLoading: isLoadingSchedules } = useReportSchedules();
@@ -77,6 +78,7 @@ export default function Reports() {
       type: "compliance", 
       frequency: schedFrequency,
       regulatoryBodies: [regulatoryBody],
+      recipientEmail,
       isActive: true
     });
     setScheduleDialogOpen(false);
@@ -340,7 +342,7 @@ export default function Reports() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Configure Automation</DialogTitle>
-                        <DialogDescription>Engage recurrent AI report generation for active monitoring.</DialogDescription>
+                        <DialogDescription>Engage recurrent Intelligence report generation for active monitoring.</DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -358,6 +360,10 @@ export default function Reports() {
                               <SelectItem value="quarterly">Quarterly Jurisdictional</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="sched-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recipient Email</Label>
+                          <Input id="sched-email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="e.g., dpo@organization.com" />
                         </div>
                       </div>
                       <div className="flex justify-end gap-3">

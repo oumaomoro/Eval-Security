@@ -25,7 +25,7 @@ export class ROIService {
     let totalIdentifiedGaps = 0;
     contracts.forEach(c => {
       // Approximate identified gaps based on risk score inversion or ai flags
-      const ai = c.aiAnalysis as any;
+      const ai = c.intelligenceAnalysis as any;
       if (ai && ai.riskFlags && Array.isArray(ai.riskFlags)) {
         totalIdentifiedGaps += ai.riskFlags.length;
       } else {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   ShieldCheck, 
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Dialog, 
@@ -25,8 +26,12 @@ import {
   DialogTrigger 
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ReactDiffViewer from 'react-diff-viewer';
+const ReactDiffViewer = lazy(() => import('react-diff-viewer'));
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ReactDiffViewerSkeleton } from "@/components/ReactDiffViewerSkeleton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+// Removed local ErrorBoundary implementation
 
 export default function CyberInsurance() {
   const { toast } = useToast();
@@ -55,7 +60,7 @@ export default function CyberInsurance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance/policies"] });
-      toast({ title: "Policy Uploaded", description: "AI has successfully extracted coverage details." });
+      toast({ title: "Policy Uploaded", description: "Intelligence has successfully extracted coverage details." });
       setIsUploading(false);
     },
     onError: (err: any) => {
@@ -177,9 +182,11 @@ export default function CyberInsurance() {
                     <CardTitle className="text-lg">{policy.carrierName}</CardTitle>
                     <CardDescription>Policy #{policy.policyNumber}</CardDescription>
                   </div>
-                  <Badge variant={policy.claimRiskScore > 70 ? "destructive" : "secondary"}>
-                    Risk Score: {policy.claimRiskScore}
-                  </Badge>
+                  <ErrorBoundary>
+                    <Badge variant={policy.claimRiskScore > 70 ? "destructive" : "secondary"}>
+                      Risk Score: {policy.claimRiskScore}
+                    </Badge>
+                  </ErrorBoundary>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 mt-4">
@@ -198,12 +205,12 @@ export default function CyberInsurance() {
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm" className="w-full">
                           <FileText className="mr-2 h-3 w-3" />
-                          Full AI Analysis
+                          Full Intelligence Analysis
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl bg-slate-950 border-slate-800">
                         <DialogHeader>
-                          <DialogTitle>AI Policy Extraction: {policy.carrierName}</DialogTitle>
+                          <DialogTitle>Intelligence Policy Extraction: {policy.carrierName}</DialogTitle>
                         </DialogHeader>
                         <div className="grid grid-cols-2 gap-8 py-4">
                           <div className="space-y-4">
@@ -231,9 +238,9 @@ export default function CyberInsurance() {
                         </div>
                         <div className="mt-4 p-4 rounded bg-slate-900 border border-slate-800">
                           <h4 className="flex items-center text-sm font-semibold text-emerald-400 mb-2">
-                            <Info className="mr-2 h-4 w-4" /> AI Strategic Insight
+                            <Info className="mr-2 h-4 w-4" /> Intelligence Strategic Insight
                           </h4>
-                          <p className="text-sm text-slate-300 italic">{policy.aiAnalysisSummary}</p>
+                          <p className="text-sm text-slate-300 italic">{policy.intelligenceAnalysisSummary}</p>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -264,21 +271,23 @@ export default function CyberInsurance() {
                  <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: comparisonData.comparisonSummary }} />
                  <div className="mt-8">
                    <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase">Extraction Comparison</h3>
-                   <ReactDiffViewer
-                      oldValue={JSON.stringify(comparisonData.policyA.coverageLimits, null, 2)}
-                      newValue={JSON.stringify(comparisonData.policyB.coverageLimits, null, 2)}
-                      splitView={true}
-                      leftTitle={comparisonData.policyA.carrierName}
-                      rightTitle={comparisonData.policyB.carrierName}
-                      styles={{
-                         variables: {
-                            dark: {
-                               addedBackground: '#064e3b',
-                               removedBackground: '#7f1d1d',
-                            }
-                         }
-                      }}
-                   />
+                   <Suspense fallback={<ReactDiffViewerSkeleton />}>
+                     <ReactDiffViewer
+                        oldValue={JSON.stringify(comparisonData.policyA.coverageLimits, null, 2)}
+                        newValue={JSON.stringify(comparisonData.policyB.coverageLimits, null, 2)}
+                        splitView={true}
+                        leftTitle={comparisonData.policyA.carrierName}
+                        rightTitle={comparisonData.policyB.carrierName}
+                        styles={{
+                           variables: {
+                              dark: {
+                                 addedBackground: '#064e3b',
+                                 removedBackground: '#7f1d1d',
+                              }
+                           }
+                        }}
+                     />
+                   </Suspense>
                  </div>
               </CardContent>
             </Card>
@@ -289,6 +298,3 @@ export default function CyberInsurance() {
   );
 }
 
-function Label({ htmlFor, children, className }: any) {
-  return <label htmlFor={htmlFor} className={className}>{children}</label>;
-}

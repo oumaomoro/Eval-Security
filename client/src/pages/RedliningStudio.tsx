@@ -93,7 +93,7 @@ export default function RedliningStudio() {
         description: "Autonomous Agent has generated a favorable redline." 
       });
     } catch (err: any) {
-      toast({ variant: "destructive", title: "AI Error", description: err.message });
+      toast({ variant: "destructive", title: "Intelligence Error", description: err.message });
     } finally {
       setIsProcessing(false);
     }
@@ -128,7 +128,7 @@ export default function RedliningStudio() {
                 Redline <span className="text-primary drop-shadow-[0_0_15px_rgba(6,182,212,0.4)]">Studio</span>
               </h1>
               <p className="text-slate-400 mt-4 max-w-2xl font-medium tracking-tight text-lg">
-                Harness sovereign AI to bridge the gap between vendor proposals and enterprise standards. 
+                Harness sovereign Intelligence to bridge the gap between vendor proposals and enterprise standards. 
                 <span className="text-slate-200"> Precise. Legally aware. Forceful.</span>
               </p>
             </div>

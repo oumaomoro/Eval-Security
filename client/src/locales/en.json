@@ -4,7 +4,7 @@
     "dpo_command": "DPO Command Center",
     "costloci_intel": "Costloci Intelligence",
     "contracts": "Contracts & DPAs",
-    "redline_studio": "AI Redline Studio",
+    "redline_studio": "Contract Review Studio",
     "risk_register": "Risk Register",
     "clause_library": "Clause Library",
     "vendor_governance": "Vendor Governance",
@@ -28,17 +28,17 @@
   "auth": {
     "login": "Login",
     "register": "Register",
-    "initialize_agent": "Initialize Agent",
+    "initialize_agent": "Setup Account",
     "email": "Email Address",
     "password": "Password",
     "first_name": "First Name",
     "last_name": "Last Name",
     "welcome": "Welcome to Costloci",
     "login_title": "Executive Sign In",
-    "register_title": "Agentic Onboarding",
+    "register_title": "Enterprise Registration",
     "forgot_title": "Identity Recovery",
     "login_subtitle": "Access your enterprise intelligence dashboard",
-    "register_subtitle": "Initialize your autonomic governance hub",
+    "register_subtitle": "Create your automated governance hub",
     "forgot_subtitle": "Recover access to your secure portal",
     "sso_google": "Sign in with Google Gateway"
   },
@@ -62,8 +62,8 @@
     "no_renewals": "No upcoming renewals found."
   },
   "dpo": {
-    "title": "DPO Intelligence Command",
-    "subtitle": "Sovereign oversight of data protection, compliance heatmaps, and breach readiness.",
+    "title": "DPO Compliance Center",
+    "subtitle": "Unified oversight of data protection, compliance heatmaps, and breach readiness.",
     "live_monitoring": "Live Monitoring",
     "run_audit": "Run Global Audit",
     "compliance_risk": "Compliance Risk",
@@ -77,7 +77,7 @@
     "remediation_tasks": "Recent Remediation Tasks",
     "remediation_desc": "Critical gaps identified in vendor DPA contracts.",
     "view_all": "View All",
-    "regulatory_sentinel": "Regulatory Sentinel",
+    "regulatory_sentinel": "Compliance Monitor",
     "analyze_impact": "Analyze Impact"
   }
 }

@@ -12,8 +12,8 @@ test.describe('Platform Authentication', () => {
     // Page must load with Costloci branding
     await expect(page).toHaveTitle(/Costloci/i, { timeout: 20000 });
 
-    // Switch to the Registration tab — label matches "Initialize Agent"
-    const registerTab = page.locator('button[role="tab"]').filter({ hasText: /initialize agent/i });
+    // Switch to the Registration tab — label matches "Register Account"
+    const registerTab = page.locator('button[role="tab"]').filter({ hasText: /register account/i });
     await registerTab.waitFor({ state: 'visible', timeout: 10000 });
     await registerTab.click();
 

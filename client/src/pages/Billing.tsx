@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Layout } from "@/components/Layout";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,7 @@ const PLANS = [
     name: "Business Pro",
     price: 299,
     contractLimit: 250,
-    features: ["250 Contracts", "AI Redlining", "POPIA / GDPR Maps", "Webhooks", "Priority Support"],
+    features: ["250 Contracts", "Intelligence Redlining", "POPIA / GDPR Maps", "Webhooks", "Priority Support"],
     icon: Zap,
     popular: true,
   },
@@ -40,6 +42,26 @@ const PLANS = [
 export default function Billing() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      toast({
+        title: "Payment Successful",
+        description: "Your account has been upgraded. It may take a moment for the status to reflect.",
+      });
+      // Clear the URL parameters
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("canceled") === "true") {
+      toast({
+        title: "Payment Canceled",
+        description: "Your checkout session was canceled.",
+        variant: "destructive"
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [toast]);
 
   const { data: telemetry, isLoading: loadingTelemetry } = useQuery<any[]>({
     queryKey: ["/api/billing/telemetry"],

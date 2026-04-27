@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../replit_integrations/auth/index.js";
-import { AIGateway } from "../services/AIGateway.js";
+import { IntelligenceGateway } from "../services/IntelligenceGateway.js";
 import { SOC2Logger } from "../services/SOC2Logger.js";
 import { storageContext } from "../services/storageContext.js";
 import multer from "multer";
@@ -29,7 +29,7 @@ router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (
     const pdfData = await pdf(req.file.buffer);
     const extractedText = pdfData.text.substring(0, 15000);
 
-    const analysis = await AIGateway.analyzeInsurancePolicy(extractedText, workspaceId);
+    const analysis = await IntelligenceGateway.analyzeInsurancePolicy(extractedText, workspaceId);
 
     // Upload to Supabase Storage
     const { adminClient: supabaseAdmin } = await import("../services/supabase.js");
@@ -50,7 +50,7 @@ router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (
     const policy = await storage.createInsurancePolicy({
       workspaceId,
       clientId,
-      carrierName: analysis.carrierName || "Pending AI Extraction",
+      carrierName: analysis.carrierName || "Pending Intelligence Extraction",
       policyNumber: analysis.policyNumber || "UNKNOWN",
       premiumAmount: 0,
       fileUrl: publicUrlData.publicUrl,
@@ -62,7 +62,7 @@ router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (
       endorsements: analysis.endorsements || [],
       notificationRequirements: analysis.notificationRequirements || {},
       claimRiskScore: analysis.claimRiskScore,
-      aiAnalysisSummary: analysis.aiAnalysisSummary
+      intelligenceAnalysisSummary: analysis.intelligenceAnalysisSummary
     });
 
     await SOC2Logger.logEvent(req, {
@@ -88,14 +88,14 @@ router.post("/insurance/redline", isAuthenticated, async (req: any, res) => {
       return res.status(400).json({ message: "Missing required redlining parameters." });
     }
 
-    const redlinedClause = await AIGateway.aiRedlineClause(originalClause, standardLanguage, instructions || "");
+    const redlinedClause = await IntelligenceGateway.redlineClauseIntelligence(originalClause, standardLanguage, instructions || "");
 
     await SOC2Logger.logEvent(req, {
       action: "CLAUSE_REDLINING_EXECUTED",
       userId: req.user.id,
       resourceType: "Clause",
-      resourceId: "Redlined AI Generation",
-      details: "AI redlined a cyber insurance clause."
+      resourceId: "Redlined Intelligence Generation",
+      details: "Intelligence engine redlined a cyber insurance clause."
     });
 
     res.json({ redlinedClause });
@@ -133,16 +133,16 @@ router.post("/insurance/compare", isAuthenticated, async (req: any, res) => {
       return res.status(404).json({ message: "One or both policies not found." });
     }
 
-    // AI comparison layer
+    // Intelligence comparison layer
     const comparisonContext = `
-      Policy A: ${policyA.aiAnalysisSummary}
-      Policy B: ${policyB.aiAnalysisSummary}
+      Policy A: ${policyA.intelligenceAnalysisSummary}
+      Policy B: ${policyB.intelligenceAnalysisSummary}
       
       Limits A: ${JSON.stringify(policyA.coverageLimits)}
       Limits B: ${JSON.stringify(policyB.coverageLimits)}
     `;
 
-    const comparisonSummary = await AIGateway.createCompletion({
+    const comparisonSummary = await IntelligenceGateway.createCompletion({
       model: "gpt-4o",
       messages: [
         { role: "system", content: "You are a cyber insurance analyst comparing two policies. Identify key differences in coverage, deductibles, and risk scores. Format as a HTML table fragment." },
@@ -180,7 +180,7 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
 
     // Calculate Scores (Aggregated)
     const complianceScore = Math.round(
-      filteredContracts.reduce((acc, c) => acc + (c.aiAnalysis?.legalAlignmentScore || 85), 0) / 
+      filteredContracts.reduce((acc, c) => acc + (c.intelligenceAnalysis?.legalAlignmentScore || 85), 0) / 
       (filteredContracts.length || 1)
     );
 
@@ -290,7 +290,7 @@ router.patch("/remediation-suggestions/:id/accept", isAuthenticated, async (req:
       userId: req.user.id,
       resourceType: "RemediationSuggestion",
       resourceId: id,
-      details: "User accepted an AI-generated redline suggestion."
+      details: "User accepted an intelligence-generated redline suggestion."
     });
 
     res.json(updated);
@@ -314,7 +314,7 @@ router.patch("/remediation-suggestions/:id/reject", isAuthenticated, async (req:
       userId: req.user.id,
       resourceType: "RemediationSuggestion",
       resourceId: id,
-      details: "User rejected an AI-generated redline suggestion."
+      details: "User rejected an intelligence-generated redline suggestion."
     });
 
     res.json(updated);

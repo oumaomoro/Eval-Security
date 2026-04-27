@@ -7,13 +7,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SEO } from "@/components/SEO";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Risks() {
   const { data: risks, isLoading } = useRisks();
 
   const totalExposure = risks?.reduce((sum, r) => {
-    const exposure = (r as any).financialExposure;
-    return sum + (exposure?.maxEstimate || 0);
+    return sum + (r.financialExposureMax || 0);
   }, 0) || 0;
 
   return (
@@ -50,7 +50,9 @@ export default function Risks() {
                 <Target className="w-4 h-4 text-primary" />
                 Risk Distribution Matrix
               </h3>
-              <RiskMatrix risks={risks || []} />
+              <ErrorBoundary>
+                <RiskMatrix risks={risks || []} />
+              </ErrorBoundary>
             </motion.div>
 
             <motion.div 
@@ -127,7 +129,7 @@ export default function Risks() {
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="font-black text-xl text-white tracking-tight leading-none italic">{risk.riskTitle}</h3>
                               <Badge variant="outline" className="bg-slate-950/50 text-[9px] border-slate-800 text-slate-500 uppercase tracking-tighter">
-                                {(risk as any).aiConfidence || 95}% AI CONFIDENCE
+                                {risk.intelligenceConfidence || 95}% INTELLIGENCE CONFIDENCE
                               </Badge>
                             </div>
                             <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">{risk.riskCategory} Risk Vector</p>
@@ -141,7 +143,7 @@ export default function Risks() {
                         <div className="flex flex-wrap gap-4 pt-2">
                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/50 border border-slate-800">
                              <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                             <span className="text-xs font-bold text-slate-300">Exposure: <span className="text-emerald-400">${((risk as any).financialExposure?.maxEstimate || 0).toLocaleString()}</span></span>
+                             <span className="text-xs font-bold text-slate-300">Exposure: <span className="text-emerald-400">${(risk.financialExposureMax || 0).toLocaleString()}</span></span>
                            </div>
                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/50 border border-slate-800">
                              <Target className="w-3.5 h-3.5 text-primary" />

@@ -41,7 +41,7 @@ export default function SystemHealth() {
                 {/* Real-time Health Matrix */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <HealthCard label="API Latency" value={`${technical.apiResponseTimeAvgMs}ms`} icon={Zap} trend="-12ms" color="text-cyan-500" />
-                    <HealthCard label="AI Precision" value={`${technical.aiAccuracyRate}%`} icon={Cpu} trend="+0.2%" color="text-purple-500" />
+                    <HealthCard label="Intelligence Precision" value={`${technical.aiAccuracyRate}%`} icon={Cpu} trend="+0.2%" color="text-purple-500" />
                     <HealthCard label="Global Uptime" value={`${technical.systemUptime}%`} icon={Globe} trend="Stable" color="text-emerald-500" />
                     <HealthCard label="Error Rate" value={`${stats?.technicalMetrics?.errorRate || 0.1}%`} icon={AlertCircle} trend="Low" color="text-blue-500" />
                 </div>
@@ -116,7 +116,7 @@ export default function SystemHealth() {
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center font-black text-primary">ROI</div>
                                     <div>
-                                        <h4 className="text-sm font-black uppercase tracking-tighter text-slate-100">AI Efficiency Factor</h4>
+                                        <h4 className="text-sm font-black uppercase tracking-tighter text-slate-100">Intelligence Efficiency Factor</h4>
                                         <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Performance Intelligence</p>
                                     </div>
                                 </div>

@@ -1,5 +1,5 @@
 import { storage } from "../storage.js";
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 import { SOC2Logger } from "./SOC2Logger.js";
 
 export class MarketplaceService {
@@ -27,13 +27,13 @@ export class MarketplaceService {
       const userPrompt = `
       Contract Vendor: ${contract.vendorName}
       Contract Category: ${contract.category}
-      Current Risks: ${JSON.stringify(contract.aiAnalysis?.riskFlags || [])}
+      Current Risks: ${JSON.stringify(contract.intelligenceAnalysis?.riskFlags || [])}
       
       Available Marketplace Listings: ${JSON.stringify(verifiedListings.map(l => ({ id: l.id, title: l.title, category: l.category })))}
       
       Analyze and suggest the best matches.`;
 
-      const responseText = await AIGateway.createCompletion({
+      const responseText = await IntelligenceGateway.createCompletion({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
@@ -46,7 +46,7 @@ export class MarketplaceService {
 
       // Update contract analysis with marketplace insights
       const updatedAnalysis = {
-        ...contract.aiAnalysis,
+        ...contract.intelligenceAnalysis,
         marketplaceInsights: result
       };
       await storage.updateContractAnalysis(contractId, updatedAnalysis);

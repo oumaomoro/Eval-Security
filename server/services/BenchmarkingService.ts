@@ -1,17 +1,17 @@
 import { storage } from "../storage.js";
-import { AIGateway } from "./AIGateway.js";
+import { IntelligenceGateway } from "./IntelligenceGateway.js";
 import type { Contract, SavingsOpportunity } from "../../shared/schema.js";
 
 /**
  * BENCHMARKING SERVICE - PRODUCTION GRADE
  * 
- * Performs AI-driven cost analysis by comparing contract data against 
+ * Performs Intelligence-driven cost analysis by comparing contract data against 
  * localized market benchmarks (East African focus).
  */
 export class BenchmarkingService {
   /**
    * SOVEREIGN MARKET RESEARCH ENGINE
-   * If a category lacks benchmarking data, use AI to perform regional market research 
+   * If a category lacks benchmarking data, use Intelligence to perform regional market research 
    * and persist the result to the database for future real-time comparisons.
    */
   private static async getOrResearchBenchmark(category: string, serviceName: string): Promise<any[]> {
@@ -35,7 +35,7 @@ export class BenchmarkingService {
     `;
 
     try {
-      const response = await AIGateway.generateAnalysis(researchPrompt);
+      const response = await IntelligenceGateway.generateAnalysis(researchPrompt);
       const data = JSON.parse(typeof response === 'string' ? response : JSON.stringify(response));
 
       const benchmark = await storage.createVendorBenchmark({
@@ -68,7 +68,7 @@ export class BenchmarkingService {
     
     if (benchmarks.length === 0) return [];
 
-    // 2. Use AI to match the contract's service to the closest market benchmark
+    // 2. Use Intelligence to match the contract's service to the closest market benchmark
     const prompt = `
       Analyze this contract and find the closest match in our market benchmark library.
       
@@ -92,7 +92,7 @@ export class BenchmarkingService {
     `;
 
     try {
-      const response = await AIGateway.generateAnalysis(prompt);
+      const response = await IntelligenceGateway.generateAnalysis(prompt);
       const result = JSON.parse(typeof response === 'string' ? response : JSON.stringify(response));
 
       if (result.isAboveMarket && result.estimatedSavingsPotential > 0 && result.matchConfidence > 0.7) {
@@ -110,7 +110,7 @@ export class BenchmarkingService {
         return [savingsObj];
       }
     } catch (err: any) {
-      console.error("[BENCHMARK] AI Analysis failed:", err.message);
+      console.error("[BENCHMARK] Intelligence Analysis failed:", err.message);
     }
 
     return [];

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage.js";
 import { apiKeyAuth } from "../middleware/api-key-auth.js";
-import { AIGateway } from "../services/AIGateway.js";
+import { IntelligenceGateway } from "../services/IntelligenceGateway.js";
 import { z } from "zod";
 
 const router = Router();
@@ -31,8 +31,8 @@ router.get("/risk-score/:contractId", apiKeyAuth, async (req: any, res) => {
     res.json({
       contractId: contract.id,
       vendor: contract.vendorName,
-      riskScore: contract.aiAnalysis?.riskScore || 0,
-      riskFlags: contract.aiAnalysis?.riskFlags || [],
+      riskScore: contract.intelligenceAnalysis?.riskScore || 0,
+      riskFlags: contract.intelligenceAnalysis?.riskFlags || [],
       forecasting: {
         renewalDate: contract.renewalDate,
         status: "active"
@@ -53,7 +53,7 @@ router.post("/analyze-clause", apiKeyAuth, async (req, res) => {
     
     CLAUSE: ${clauseText}`;
 
-    const analysisStr = await AIGateway.createCompletion({
+    const analysisStr = await IntelligenceGateway.createCompletion({
       model: "gpt-4o",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" }

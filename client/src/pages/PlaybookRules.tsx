@@ -21,7 +21,7 @@ export default function PlaybookRulesPage() {
   const [newRuleMode, setNewRuleMode] = useState(false);
   const [ruleDraft, setRuleDraft] = useState<any>({
     name: "",
-    condition: { field: "aiAnalysis.riskScore", operator: "greaterThan", value: "" },
+    condition: { field: "intelligenceAnalysis.riskScore", operator: "greaterThan", value: "" },
     action: { type: "suggestClause", message: "" }
   });
 
@@ -131,8 +131,8 @@ export default function PlaybookRulesPage() {
                     <Select value={ruleDraft.condition.field} onValueChange={v => setRuleDraft({...ruleDraft, condition: {...ruleDraft.condition, field: v}})}>
                       <SelectTrigger className="mt-1 bg-slate-900"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="aiAnalysis.riskScore">Risk Score</SelectItem>
-                        <SelectItem value="aiAnalysis.complianceGrade">Compliance Grade</SelectItem>
+                        <SelectItem value="intelligenceAnalysis.riskScore">Risk Score</SelectItem>
+                        <SelectItem value="intelligenceAnalysis.complianceGrade">Compliance Grade</SelectItem>
                         <SelectItem value="missingClauses">Missing Clauses Contains</SelectItem>
                         <SelectItem value="vendorName">Vendor Name</SelectItem>
                       </SelectContent>

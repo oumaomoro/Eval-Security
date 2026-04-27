@@ -214,7 +214,7 @@ export default function Settings() {
                 <ul className="space-y-2 text-[10px] text-slate-500 font-black uppercase tracking-tighter">
                   <li className="flex items-center gap-2"><Shield className="w-3 h-3 text-primary" /> Internal Governance Templates</li>
                   <li className="flex items-center gap-2"><Globe className="w-3 h-3 text-primary" /> Regional Privacy Playbooks</li>
-                  <li className="flex items-center gap-2"><Brain className="w-3 h-3 text-primary" /> AI Risk Mitigation Framework</li>
+                  <li className="flex items-center gap-2"><Brain className="w-3 h-3 text-primary" /> Intelligence Risk Mitigation Framework</li>
                   <li className="flex items-center gap-2"><Lock className="w-3 h-3 text-primary" /> RSA-Certified Security Manual</li>
                 </ul>
               </CardContent>
@@ -253,7 +253,7 @@ export default function Settings() {
                     <div className="flex items-center justify-between p-3 rounded-xl bg-black/40 border border-slate-800">
                         <div className="flex items-center gap-3">
                             <Brain className="w-4 h-4 text-slate-500" />
-                            <span className="text-[10px] font-black text-slate-400 uppercase">OpenAI Cortex-4</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase">Intelligence Cortex-4</span>
                         </div>
                         <span className="text-[8px] bg-emerald-500 text-emerald-950 font-black px-2 py-0.5 rounded-full font-semibold">Active</span>
                     </div>

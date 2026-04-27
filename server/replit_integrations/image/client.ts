@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import { toFile } from "openai";
-import { AIGateway } from "../../services/AIGateway.js";
+import { IntelligenceGateway } from "../../services/IntelligenceGateway.js";
 
-export const openai = AIGateway.openai;
+export const openai = IntelligenceGateway.openai;
 
 /**
  * Generate an image and return as Buffer.

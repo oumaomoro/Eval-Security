@@ -6,9 +6,9 @@ import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { AIGateway } from "../../services/AIGateway.js";
+import { IntelligenceGateway } from "../../services/IntelligenceGateway.js";
 
-export const openai = AIGateway.openai;
+export const openai = IntelligenceGateway.openai;
 
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
 

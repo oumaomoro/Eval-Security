@@ -7,8 +7,8 @@ async function registerAndLogin(page: Page): Promise<string> {
   const randomSuffix = Date.now();
   const testEmail = `playwright-${randomSuffix}@enterprise-test.com`;
 
-  // label matches "Initialize Agent"
-  const registerTab = page.locator('button[role="tab"]').filter({ hasText: /initialize agent/i });
+  // label matches "Register Account"
+  const registerTab = page.locator('button[role="tab"]').filter({ hasText: /register account/i });
   await registerTab.waitFor({ state: 'visible', timeout: 10000 });
   await registerTab.click();
 
