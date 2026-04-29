@@ -16,7 +16,7 @@ interface MetricCardProps {
 export const MetricCard = React.memo(({ icon, label, value, subValue, trend, trendColor, variants }: MetricCardProps) => {
   return (
     <motion.div variants={variants}>
-      <Card className="bg-slate-900/40 border-slate-800/60 backdrop-blur-xl shadow-xl overflow-hidden relative group hover:border-blue-500/40 transition-all duration-300">
+      <Card className="glass-card-premium overflow-hidden relative group">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-slate-400">

@@ -62,7 +62,7 @@ export default function Dashboard() {
     <Layout header={
       <div className="flex w-full items-center justify-between">
          <div>
-           <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("dashboard.title")}</h1>
+           <h1 className="text-3xl font-bold tracking-tight gradient-text-nutanix">{t("dashboard.title")}</h1>
            <p className="text-xs text-muted-foreground mt-1">Platform overview and strategic insights.</p>
          </div>
          <div className="flex items-center gap-3">
@@ -80,7 +80,7 @@ export default function Dashboard() {
     }>
       <SEO title="Dashboard" description="Monitor your enterprise posture and contract ROI." />
 
-      <div className="space-y-8 pb-12 pt-4">
+      <div className="space-y-8 pb-12 pt-4 animate-slide-up">
         {/* Onboarding Wizard */}
         <OnboardingChecklist 
           hasClients={(clients?.length || 0) > 0} 
@@ -192,7 +192,7 @@ export default function Dashboard() {
                 </p>
                 <div className="pt-4">
                   <Link href="/contracts">
-                    <Button className="rounded-lg gap-2" size="lg">
+                    <Button className="rounded-lg gap-2 nutanix-glow bg-indigo-600 hover:bg-indigo-500 text-white border-0" size="lg">
                       <Package className="w-4 h-4" />
                       Add First Contract
                     </Button>
