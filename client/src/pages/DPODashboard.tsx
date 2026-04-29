@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { 
   Card, 
@@ -46,7 +47,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 
 type RemediationTask = {
@@ -446,7 +446,7 @@ export default function DPODashboard() {
                 </div>
               ))}
               <Button asChild variant="outline" className="w-full border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/20 text-indigo-300 mt-2">
-                <a href="/redline-studio">Open Review Studio <ChevronRight className="ml-1 h-4 w-4" /></a>
+                <Link href="/redline-studio">Open Review Studio <ChevronRight className="ml-1 h-4 w-4" /></Link>
               </Button>
             </CardContent>
           </Card>

@@ -1,40 +1,39 @@
 import { Router } from "express";
-import { GovernanceAuditor } from "../services/GovernanceAuditor.js";
 import { isAuthenticated } from "../replit_integrations/auth/index.js";
-import memoize from "memoizee";
-
+import { GovernanceOrchestrator } from "../services/GovernanceOrchestrator.js";
 import { SOC2Logger } from "../services/SOC2Logger.js";
 
-const router = Router();
-
-// Use the CGO Intelligence for high-fidelity posture reports
-// Cached for 60 minutes as per user agreement
-const cachedPosture = memoize(
-  () => GovernanceAuditor.generatePostureReport(),
-  { promise: true, maxAge: 3600000 }
-);
+const governanceRouter = Router();
 
 /**
- * GET /api/governance/posture
- * Returns the Chief Governance Officer (CGO) intelligence review of the platform.
+ * Trigger a full governance scan.
  */
-router.get("/governance/posture", isAuthenticated, async (req: any, res) => {
+governanceRouter.post("/api/governance/scan", isAuthenticated, async (req: any, res) => {
   try {
-    const report = await cachedPosture();
-
+    const result = await GovernanceOrchestrator.runFullGovernanceScan(req.user.workspaceId);
+    
     await SOC2Logger.logEvent(req, {
-        action: "GOVERNANCE_POSTURE_RETRIEVED",
-        userId: req.user.id,
-        resourceType: "Infrastructure",
-        resourceId: "GLOBAL_SYSTEM",
-        details: "Intelligence-Generated Executive Posture Report accessed."
+      action: "FULL_GOVERNANCE_SCAN_TRIGGERED",
+      userId: req.user.id,
+      details: "User initiated a comprehensive contract and infrastructure governance scan."
     });
 
-    res.json(report);
-  } catch (error: any) {
-    console.error("[GOVERNANCE API ERROR]", error.message);
-    res.status(500).json({ message: "Failed to generate autonomous posture review." });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
   }
 });
 
-export default router;
+/**
+ * Get Sovereign Health Report summary.
+ */
+governanceRouter.get("/api/governance/health-report", isAuthenticated, async (req: any, res) => {
+  try {
+    const report = await GovernanceOrchestrator.generateSovereignHealthReport(req.user.workspaceId);
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+export default governanceRouter;

@@ -137,12 +137,16 @@ export class IntelligenceGateway {
    */
   private static async withRetryAndTimeout<T>(fn: () => Promise<T>, timeoutMs = 15000, maxRetries = 2): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let timeoutId: any;
       try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Request timed out")), timeoutMs)
-        );
-        return await Promise.race([fn(), timeoutPromise]);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+        });
+        const result = await Promise.race([fn(), timeoutPromise]);
+        clearTimeout(timeoutId);
+        return result;
       } catch (error: any) {
+        clearTimeout(timeoutId);
         if (attempt === maxRetries) {
            throw error;
         }

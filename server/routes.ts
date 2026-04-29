@@ -29,6 +29,7 @@ import reportsRouter from "./routes/reports.routes.js";
 import vendorsRouter from "./routes/vendors.routes.js";
 import collaborationRouter from "./routes/collaboration.routes.js";
 import playbooksRouter from "./routes/playbooks.routes.js";
+import infrastructureRouter from "./routes/infrastructure.routes.js";
 import { telemetryMiddleware } from "./middleware/telemetry.js";
 
 import multer from "multer";
@@ -116,6 +117,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use("/api", collaborationRouter);
   app.use("/api", insuranceRouter);
   app.use("/api", playbooksRouter);
+  app.use(infrastructureRouter);
   app.use("/api/v1", apiV1Router);
   
   // Enterprise Scheduled Cron Endpoints

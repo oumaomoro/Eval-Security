@@ -47,10 +47,63 @@ export class InvoiceService {
   }
 
   /**
-   * Generates a Monthly Usage Report invoice.
+   * Generates a Monthly Usage Report invoice for enterprise consumption.
    */
-  static async generateUsageReport(workspace: any, usage: any): Promise<Buffer> {
-     // Implementation for metered billing reports
-     return Buffer.from(""); 
+  static async generateUsageReport(workspace: any, metrics: any): Promise<Buffer> {
+    const doc = new jsPDF();
+    
+    // Brand Identity
+    doc.setFillColor(15, 23, 42); // Slate-900
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text("COSTLOCI", 20, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(148, 163, 184); // Slate-400
+    doc.text("ENTERPRISE USAGE ANALYTICS", 20, 28);
+    
+    // Entity Info
+    doc.setTextColor(15, 23, 42); // Slate-900
+    doc.setFontSize(14);
+    doc.text(`Account: ${workspace.name}`, 20, 55);
+    doc.setFontSize(10);
+    doc.text(`Billing Cycle: ${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`, 20, 62);
+    
+    // Metrics Grid
+    doc.setFillColor(248, 250, 252); // Slate-50
+    doc.rect(20, 75, 170, 60, 'F');
+    
+    doc.setTextColor(71, 85, 105); // Slate-600
+    doc.text("OPERATIONAL METRICS", 25, 85);
+    doc.line(25, 87, 185, 87);
+    
+    doc.text(`Contracts Analyzed:`, 25, 97);
+    doc.text(`${metrics.contractsCount || 0}`, 160, 97);
+    
+    doc.text(`Intelligence Queries:`, 25, 107);
+    doc.text(`${metrics.aiQueries || 0}`, 160, 107);
+    
+    doc.text(`Remediation Events:`, 25, 117);
+    doc.text(`${metrics.remediationEvents || 0}`, 160, 117);
+    
+    doc.text(`Active Users:`, 25, 127);
+    doc.text(`${metrics.activeUsers || 1}`, 160, 127);
+    
+    // Savings Summary
+    doc.setFontSize(12);
+    doc.setTextColor(16, 185, 129); // Emerald-500
+    doc.text("Estimated Cost Optimization Value:", 20, 155);
+    doc.setFontSize(16);
+    doc.text(`$${(metrics.estimatedSavings || 0).toFixed(2)} USD`, 20, 165);
+    
+    // Footer Legal
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Verified by Costloci Sovereign Autonomics Engine.", 20, 280);
+    doc.text(`Timestamp: ${new Date().toISOString()}`, 20, 285);
+
+    return Buffer.from(doc.output("arraybuffer"));
   }
 }

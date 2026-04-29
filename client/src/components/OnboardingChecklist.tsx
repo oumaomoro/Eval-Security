@@ -16,24 +16,24 @@ export function OnboardingChecklist({ hasClients, hasContracts, hasAudits }: Onb
   const steps = [
     {
       id: "client",
-      title: "Create Enterprise Profile",
-      description: "Define your company or client to start governance mapping.",
+      title: "Set Up Your Account",
+      description: "Complete your company profile to unlock all features.",
       icon: UserPlus,
       completed: hasClients,
-      link: "/settings"
+      link: "/workspace"
     },
     {
       id: "contract",
-      title: "Ingest Documents",
-      description: "Upload your first contract or insurance policy for analysis.",
+      title: "Upload Your First Contract",
+      description: "Upload a contract or insurance policy to run AI analysis.",
       icon: FileUp,
       completed: hasContracts,
       link: "/contracts"
     },
     {
       id: "compliance",
-      title: "Initialize Compliance",
-      description: "Run an automated audit against regional standards (KDPA/POPIA).",
+      title: "Run a Compliance Audit",
+      description: "Check your contracts against KDPA, GDPR, and other standards.",
       icon: Shield,
       completed: hasAudits,
       link: "/compliance"
@@ -60,13 +60,13 @@ export function OnboardingChecklist({ hasClients, hasContracts, hasAudits }: Onb
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold flex items-center gap-2">
-                Enterprise Onboarding
+                Get Started
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                   Step {completedCount + 1} of 3
                 </span>
               </CardTitle>
               <CardDescription className="text-sm font-medium mt-1">
-                Complete these high-fidelity steps to fully activate your governance layer.
+                Complete these steps to get the most out of CyberOptimize.
               </CardDescription>
             </div>
             <div className="text-right">
@@ -106,8 +106,8 @@ export function OnboardingChecklist({ hasClients, hasContracts, hasAudits }: Onb
                     {step.description}
                   </p>
                   {!step.completed && (
-                    <div className="mt-4 flex items-center text-[10px] font-black text-emerald-500 uppercase tracking-widest group-hover:translate-x-1 transition-transform">
-                      Initiate <ArrowRight className="w-3 h-3 ml-1" />
+                    <div className="mt-4 flex items-center text-[10px] font-black text-emerald-500 uppercase tracking-widest transition-transform">
+                      Get Started <ArrowRight className="w-3 h-3 ml-1" />
                     </div>
                   )}
                 </motion.div>

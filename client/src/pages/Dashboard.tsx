@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
-import { DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Clock, Package } from "lucide-react";
+import { DollarSign, ShieldCheck, FileCheck, Zap, Activity, Users, Clock, Package, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +94,7 @@ export default function Dashboard() {
           <MetricCard label={t("dashboard.missing_renewals")} value={stats?.upcomingRenewals?.length || 0} icon={<Clock className="w-5 h-5 text-amber-500" />} />
           <MetricCard label={t("dashboard.analyzed_contracts")} value={stats?.totalContracts || 0} icon={<FileCheck className="w-5 h-5 text-blue-500" />} />
           <MetricCard label={t("dashboard.critical_risks")} value={stats?.criticalRisks || 0} icon={<ShieldCheck className="w-5 h-5 text-rose-500" />} />
+          <MetricCard label="Infrastructure Health" value="94%" icon={<Server className="w-5 h-5 text-cyan-500" />} />
         </div>
 
         {/* Enterprise Intelligence row */}
@@ -178,106 +179,132 @@ export default function Dashboard() {
            </Card>
         </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Spend by Vendor</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 w-full min-h-[300px] pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats?.costByVendor || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} className="dark:stroke-slate-800" />
-                  <XAxis dataKey="vendor" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
-                  <Tooltip
-                    {...({
-                      contentStyle: { backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" },
-                      itemStyle: { fontSize: "12px" },
-                      cursor: { fill: "#f8fafc" }
-                    } as any)}
-                  />
-                  <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32}>
-                    {stats?.costByVendor?.map((entry: CostByVendor, index: number) => (
-                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#10b981" : "#059669"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Risk Distribution</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 w-full min-h-[300px] pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats?.riskHeatmap?.length ? stats.riskHeatmap : [{ category: "No Data", count: 1 }]}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={65}
-                    outerRadius={85}
-                    paddingAngle={6}
-                    dataKey="count"
-                    nameKey="category"
-                  >
-                    {stats?.riskHeatmap?.map((entry: RiskHeatmapEntry, i: number) => (
-                      <Cell key={i} fill={["#10b981", "#3b82f6", "#f43f5e", "#f59e0b"][i % 4]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    {...({
-                      contentStyle: { backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px" }
-                    } as any)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Contracts / Upcoming Renewals */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-1">
-            <Clock className="w-4 h-4 text-primary" />
-            <h2 className="text-lg font-bold tracking-tight text-foreground truncate">
-              {t("dashboard.upcoming_renewals")}
-            </h2>
-          </div>
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden">
-            <CardContent className="p-0">
-              <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {(!stats?.upcomingRenewals || stats.upcomingRenewals.length === 0) && (
-                  <div className="p-12 text-center">
-                    <p className="text-slate-400 text-sm">{t("dashboard.no_renewals")}</p>
-                  </div>
-                )}
-                {stats?.upcomingRenewals?.map((contract: any) => (
-                  <div key={contract.id} className="flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{contract.vendorName}</p>
-                      <p className="text-xs text-slate-500 mt-1">{contract.category}</p>
-                    </div>
-                    <div className="text-right flex items-center gap-6">
-                       <div className="hidden sm:block">
-                         <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Renew Date</p>
-                         <p className="text-xs font-mono text-slate-600 dark:text-slate-400">{contract.renewalDate || "—"}</p>
-                       </div>
-                       <Link href={`/contracts/${contract.id}`}>
-                          <Button variant="ghost" size="sm" className="h-8 text-primary hover:text-primary hover:bg-primary/5">
-                            {t("dashboard.review_contract")}
-                          </Button>
-                       </Link>
-                    </div>
-                  </div>
-                ))}
+        {stats?.totalContracts === 0 ? (
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm border-dashed bg-slate-50/50 dark:bg-slate-900/20 text-center py-20">
+            <CardContent>
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <FileCheck className="w-8 h-8 text-blue-500" />
+                </div>
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome to CyberOptimize</h2>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Your enterprise hub is ready. To unlock intelligence, risk detection, and cost optimization, upload your first cybersecurity contract or software license.
+                </p>
+                <div className="pt-4">
+                  <Link href="/contracts">
+                    <Button className="rounded-lg gap-2" size="lg">
+                      <Package className="w-4 h-4" />
+                      Add First Contract
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </div>
+        ) : (
+          <>
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Spend by Vendor</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 w-full min-h-[300px] pt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats?.costByVendor || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} className="dark:stroke-slate-800" />
+                      <XAxis dataKey="vendor" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                      <Tooltip
+                        {...({
+                          contentStyle: { backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" },
+                          itemStyle: { fontSize: "12px" },
+                          cursor: { fill: "#f8fafc" }
+                        } as any)}
+                      />
+                      <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32}>
+                        {stats?.costByVendor?.map((entry: CostByVendor, index: number) => (
+                          <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#10b981" : "#059669"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Risk Distribution</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 w-full min-h-[300px] pt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats?.riskHeatmap?.length ? stats.riskHeatmap : [{ category: "No Data", count: 1 }]}
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={65}
+                        outerRadius={85}
+                        paddingAngle={6}
+                        dataKey="count"
+                        nameKey="category"
+                      >
+                        {stats?.riskHeatmap?.map((entry: RiskHeatmapEntry, i: number) => (
+                          <Cell key={i} fill={["#10b981", "#3b82f6", "#f43f5e", "#f59e0b"][i % 4]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        {...({
+                          contentStyle: { backgroundColor: "#ffffff", borderColor: "#f1f5f9", borderRadius: "10px" }
+                        } as any)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Contracts / Upcoming Renewals */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                <Clock className="w-4 h-4 text-primary" />
+                <h2 className="text-lg font-bold tracking-tight text-foreground truncate">
+                  {t("dashboard.upcoming_renewals")}
+                </h2>
+              </div>
+              <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {(!stats?.upcomingRenewals || stats.upcomingRenewals.length === 0) && (
+                      <div className="p-12 text-center">
+                        <p className="text-slate-400 text-sm">{t("dashboard.no_renewals")}</p>
+                      </div>
+                    )}
+                    {stats?.upcomingRenewals?.map((contract: any) => (
+                      <div key={contract.id} className="flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{contract.vendorName}</p>
+                          <p className="text-xs text-slate-500 mt-1">{contract.category}</p>
+                        </div>
+                        <div className="text-right flex items-center gap-6">
+                           <div className="hidden sm:block">
+                             <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Renew Date</p>
+                             <p className="text-xs font-mono text-slate-600 dark:text-slate-400">{contract.renewalDate || "—"}</p>
+                           </div>
+                           <Link href={`/contracts/${contract.id}`}>
+                              <Button variant="ghost" size="sm" className="h-8 text-primary hover:text-primary hover:bg-primary/5">
+                                {t("dashboard.review_contract")}
+                              </Button>
+                           </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
 
       </div>
     </Layout>

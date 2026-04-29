@@ -14,7 +14,7 @@ import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSch
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: process.env.NODE_ENV === "production" ? 10 : 100, // Permissive for dev/tests
+  max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "production" ? 10 : 100), // Large number for tests
   message: { message: "Too many authentication attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -250,10 +250,10 @@ export function registerAuthRoutes(app: Express): void {
 
       if (error) throw error;
 
-      res.redirect(`${process.env.FRONTEND_URL || ''}/login?verified=true`);
+      res.redirect(`${process.env.FRONTEND_URL || ''}/auth?verified=true`);
     } catch (err: any) {
       console.error("[AUTH-DIAG] Verification Error:", err.message);
-      res.redirect(`${process.env.FRONTEND_URL || ''}/login?error=verification_failed`);
+      res.redirect(`${process.env.FRONTEND_URL || ''}/auth?error=verification_failed`);
     }
   });
 

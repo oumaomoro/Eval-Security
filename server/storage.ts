@@ -10,7 +10,9 @@ import type {
   VendorBenchmark, InsertVendorBenchmark,
   ContinuousMonitoring, InsertContinuousMonitoring,
   MarketplaceListing, InsertMarketplaceListing,
-  MarketplacePurchase, InsertMarketplacePurchase
+  MarketplacePurchase, InsertMarketplacePurchase,
+  CloudAccount, InsertCloudAccount,
+  InfrastructureAsset, InsertInfrastructureAsset
 } from "../shared/schema.js";
 
 export interface UsageEvent {
@@ -219,6 +221,16 @@ export interface IStorage {
   // Real-time Collaboration (Phase 27)
   upsertPresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void>;
   getActivePresence(workspaceId: number, resourceType: string, resourceId: string): Promise<any[]>;
+
+  // Infrastructure & Assets
+  getCloudAccounts(workspaceId: number): Promise<CloudAccount[]>;
+  createCloudAccount(account: InsertCloudAccount): Promise<CloudAccount>;
+  updateCloudAccount(id: number, updates: Partial<CloudAccount>): Promise<CloudAccount>;
+  getCloudAccount(id: number): Promise<CloudAccount | undefined>;
+  getInfrastructureAssets(workspaceId: number): Promise<InfrastructureAsset[]>;
+  createInfrastructureAsset(asset: InsertInfrastructureAsset): Promise<InfrastructureAsset>;
+  updateInfrastructureAsset(id: number, updates: Partial<InfrastructureAsset>): Promise<InfrastructureAsset>;
+  getInfrastructureAsset(id: number): Promise<InfrastructureAsset | undefined>;
 
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] };
 }
@@ -1263,7 +1275,8 @@ export class SupabaseRESTStorage implements IStorage {
     });
 
     // ── Phase 16: Executive ROI Component ──
-    const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, 'enterprise');
+    const assets = await this.getInfrastructureAssets(clientId!);
+    const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, assets, 'enterprise');
 
     const currentUser = userId ? users.find(u => u.id === userId) : (users[0] || {});
     const subscriptionTier = currentUser?.subscriptionTier || 'starter';
@@ -2117,7 +2130,8 @@ export class SupabaseRESTStorage implements IStorage {
       userId: d.user_id,
       ruleId: d.rule_id,
       createdAt: d.created_at ? new Date(d.created_at) : null,
-      acceptedAt: d.accepted_at ? new Date(d.accepted_at) : null
+      acceptedAt: d.accepted_at ? new Date(d.accepted_at) : null,
+      lastReportGenerated: d.last_report_generated ? new Date(d.last_report_generated) : null
     }));
   }
 
@@ -2151,7 +2165,8 @@ export class SupabaseRESTStorage implements IStorage {
       userId: data.user_id,
       ruleId: data.rule_id,
       createdAt: data.created_at ? new Date(data.created_at) : null,
-      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
+      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null,
+      lastReportGenerated: data.last_report_generated ? new Date(data.last_report_generated) : null
     };
   }
 
@@ -2178,7 +2193,8 @@ export class SupabaseRESTStorage implements IStorage {
       userId: data.user_id,
       ruleId: data.rule_id,
       createdAt: data.created_at ? new Date(data.created_at) : null,
-      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null
+      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null,
+      lastReportGenerated: data.last_report_generated ? new Date(data.last_report_generated) : null
     };
   }
 
@@ -2741,11 +2757,119 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
+  async getInfrastructureAsset(id: number): Promise<InfrastructureAsset | undefined> {
+    const data = await this.handleResponse<any>(supabase.from("infrastructure_assets").select("*").eq("id", id).maybeSingle());
+    return data ? this.mapInfrastructureAsset(data) : undefined;
+  }
+
+  async createInfrastructureAsset(asset: InsertInfrastructureAsset): Promise<InfrastructureAsset> {
+    const data = await this.handleResponse<any>(
+      supabase.from("infrastructure_assets")
+        .insert({
+          workspace_id: asset.workspaceId,
+          cloud_account_id: asset.cloudAccountId,
+          name: asset.name,
+          asset_type: asset.assetType,
+          resource_id: asset.resourceId,
+          severity: asset.severity || "none",
+          exposure_type: asset.exposureType || "private",
+          tags: asset.tags,
+          vulnerability_count: asset.vulnerabilityCount || 0
+        })
+        .select()
+        .single()
+    );
+    return this.mapInfrastructureAsset(data);
+  }
+
+  async updateInfrastructureAsset(id: number, updates: Partial<InfrastructureAsset>): Promise<InfrastructureAsset> {
+    const payload: any = {};
+    if (updates.severity) payload.severity = updates.severity;
+    if (updates.vulnerabilityCount !== undefined) payload.vulnerability_count = updates.vulnerabilityCount;
+    if (updates.misconfigurationFlags) payload.misconfiguration_flags = updates.misconfigurationFlags;
+
+    const data = await this.handleResponse<any>(supabase.from("infrastructure_assets").update(payload).eq("id", id).select().single());
+    return this.mapInfrastructureAsset(data);
+  }
+
+  private mapCloudAccount(d: any): CloudAccount {
+    return {
+      id: d.id,
+      workspaceId: d.workspace_id,
+      provider: d.provider,
+      accountName: d.account_name,
+      accountId: d.account_id,
+      region: d.region,
+      status: d.status,
+      lastSyncAt: d.last_sync_at ? new Date(d.last_sync_at) : null,
+      complianceScore: d.compliance_score,
+      iamPolicyCount: d.iam_policy_count
+    };
+  }
+
+  private mapInfrastructureAsset(d: any): InfrastructureAsset {
+    return {
+      id: d.id,
+      workspaceId: d.workspace_id,
+      cloudAccountId: d.cloud_account_id,
+      name: d.name,
+      assetType: d.asset_type,
+      resourceId: d.resource_id,
+      severity: d.severity,
+      exposureType: d.exposure_type,
+      tags: d.tags,
+      lastSeenAt: d.last_seen_at ? new Date(d.last_seen_at) : new Date(),
+      vulnerabilityCount: d.vulnerability_count,
+      misconfigurationFlags: d.misconfiguration_flags
+    };
+  }
+
   // Compatibility aliases for legacy AI Gateway code
   async getAiCache(promptHash: string) { return this.getIntelligenceCache(promptHash); }
   async createAiCache(cache: any) { return this.createIntelligenceCache(cache); }
 
+  // --- INFRASTRUCTURE ---
+  async getCloudAccounts(workspaceId: number): Promise<CloudAccount[]> {
+    const data = await this.handleResponse<any[]>(supabase.from("cloud_accounts").select("*").eq("workspace_id", workspaceId));
+    return (data || []).map(d => this.mapCloudAccount(d));
+  }
+
+  async getCloudAccount(id: number): Promise<CloudAccount | undefined> {
+    const data = await this.handleResponse<any>(supabase.from("cloud_accounts").select("*").eq("id", id).maybeSingle());
+    return data ? this.mapCloudAccount(data) : undefined;
+  }
+
+  async createCloudAccount(account: InsertCloudAccount): Promise<CloudAccount> {
+    const data = await this.handleResponse<any>(
+      supabase.from("cloud_accounts")
+        .insert({
+          workspace_id: account.workspaceId,
+          provider: account.provider,
+          account_name: account.accountName,
+          account_id: account.accountId,
+          region: account.region,
+          status: account.status || "active"
+        })
+        .select()
+        .single()
+    );
+    return this.mapCloudAccount(data);
+  }
+
+  async updateCloudAccount(id: number, updates: Partial<CloudAccount>): Promise<CloudAccount> {
+    const payload: any = {};
+    if (updates.status) payload.status = updates.status;
+    if (updates.complianceScore !== undefined) payload.compliance_score = updates.complianceScore;
+    if (updates.lastSyncAt) payload.last_sync_at = updates.lastSyncAt;
+
+    const data = await this.handleResponse<any>(supabase.from("cloud_accounts").update(payload).eq("id", id).select().single());
+    return this.mapCloudAccount(data);
+  }
+
+  async getInfrastructureAssets(workspaceId: number): Promise<InfrastructureAsset[]> {
+    const data = await this.handleResponse<any[]>(supabase.from("infrastructure_assets").select("*").eq("workspace_id", workspaceId));
+    return (data || []).map(d => this.mapInfrastructureAsset(d));
+  }
 }
 
 export const storage = new SupabaseRESTStorage();
-

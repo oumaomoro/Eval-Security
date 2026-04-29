@@ -1,12 +1,12 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision, varchar, pgEnum, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { createInsertSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-export * from "./models/auth.js";
-export * from "./models/chat.js";
+export * from "./models/auth";
+export * from "./models/chat";
 
-import { users } from "./models/auth.js";
+import { users } from "./models/auth";
 export const workspaceRoleEnum = pgEnum('workspace_role', ['owner', 'admin', 'editor', 'viewer']);
 
 // === TABLE DEFINITIONS ===
@@ -329,7 +329,46 @@ export const remediationSuggestions = pgTable("remediation_suggestions", {
   ruleId: integer("rule_id"), 
   createdAt: timestamp("created_at").defaultNow(),
   acceptedAt: timestamp("accepted_at"),
+  lastReportGenerated: timestamp("last_report_generated"),
 });
+
+export const cloudAccounts = pgTable("cloud_accounts", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  provider: text("provider", { enum: ["aws", "azure", "gcp", "digitalocean", "other"] }).notNull(),
+  accountName: text("account_name").notNull(),
+  accountId: text("account_id").notNull(),
+  region: text("region"),
+  status: text("status").default("active"),
+  lastSyncAt: timestamp("last_sync_at"),
+  complianceScore: integer("compliance_score").default(100),
+  iamPolicyCount: integer("iam_policy_count").default(0),
+});
+
+export const infrastructureAssets = pgTable("infrastructure_assets", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  cloudAccountId: integer("cloud_account_id").references(() => cloudAccounts.id),
+  name: text("name").notNull(),
+  assetType: text("asset_type", { enum: ["compute", "storage", "database", "network", "firewall", "other"] }).notNull(),
+  resourceId: text("resource_id"),
+  severity: text("severity", { enum: ["critical", "high", "medium", "low", "none"] }).default("none"),
+  exposureType: text("exposure_type", { enum: ["private", "public", "internal"] }).default("private"),
+  tags: jsonb("tags").$type<string[]>(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  vulnerabilityCount: integer("vulnerability_count").default(0),
+  misconfigurationFlags: jsonb("misconfiguration_flags").$type<string[]>(),
+});
+
+export const insertCloudAccountSchema = createInsertSchema(cloudAccounts);
+export const selectCloudAccountSchema = createSelectSchema(cloudAccounts);
+export type CloudAccount = typeof cloudAccounts.$inferSelect;
+export type InsertCloudAccount = typeof cloudAccounts.$inferInsert;
+
+export const insertInfrastructureAssetSchema = createInsertSchema(infrastructureAssets);
+export const selectInfrastructureAssetSchema = createSelectSchema(infrastructureAssets);
+export type InfrastructureAsset = typeof infrastructureAssets.$inferSelect;
+export type InsertInfrastructureAsset = typeof infrastructureAssets.$inferInsert;
 
 export const playbooks = pgTable("playbooks", {
   id: serial("id").primaryKey(),
@@ -750,39 +789,22 @@ export const insertVendorBenchmarkSchema = createInsertSchema(vendorBenchmarks).
 export type VendorBenchmark = typeof vendorBenchmarks.$inferSelect;
 export type InsertVendorBenchmark = z.infer<typeof insertVendorBenchmarkSchema>;
 
-export const insertContinuousMonitoringSchema = createInsertSchema(continuousMonitoring).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertContinuousMonitoringSchema = createInsertSchema(continuousMonitoring);
 export type ContinuousMonitoring = typeof continuousMonitoring.$inferSelect;
 export type InsertContinuousMonitoring = z.infer<typeof insertContinuousMonitoringSchema>;
 
-export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings);
 export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
 export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;
 
-export const insertMarketplacePurchaseSchema = createInsertSchema(marketplacePurchases).omit({
-  id: true,
-  purchasedAt: true,
-});
+export const insertMarketplacePurchaseSchema = createInsertSchema(marketplacePurchases);
 export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
 export type InsertMarketplacePurchase = z.infer<typeof insertMarketplacePurchaseSchema>;
 
-export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies);
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export type InsertInsurancePolicy = z.infer<typeof insertInsurancePolicySchema>;
 
-export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertSubscriptionSchema = createInsertSchema(subscriptions);
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;

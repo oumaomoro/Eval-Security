@@ -22,7 +22,7 @@ export const apiLimiter = rateLimit({
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === "development" ? 100 : 5, // Relaxed for dev, strict for prod
+  max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "development" ? 100 : 5), // Relaxed for dev, strict for prod
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -36,7 +36,7 @@ export const authLimiter = rateLimit({
  */
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 Hour
-  max: process.env.NODE_ENV === "development" ? 100 : 20, // 20 Uploads per hour per IP (Strict for prod)
+  max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "development" ? 100 : 20), // 20 Uploads per hour per IP (Strict for prod)
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -51,7 +51,7 @@ export const uploadLimiter = rateLimit({
  */
 export const intelligenceLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 Hour
-  max: process.env.NODE_ENV === "development" ? 100 : 30, // 30 AI calls per hour per IP
+  max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "development" ? 100 : 30), // 30 AI calls per hour per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {

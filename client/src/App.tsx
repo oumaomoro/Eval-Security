@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
+import InfrastructureDashboard from "./pages/InfrastructureDashboard";
 import Dashboard from "@/pages/Dashboard";
 import Contracts from "@/pages/Contracts";
 import Compliance from "@/pages/Compliance";
@@ -46,6 +47,8 @@ function PrivateRouter() {
     <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-950"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>}>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/infrastructure" component={InfrastructureDashboard} />
+        <Route path="/dpo" component={DPODashboard} />
         <Route path="/dpo-command" component={DPODashboard} />
         <Route path="/contracts" component={Contracts} />
         <Route path="/contracts/:id" component={ContractDetail} />
@@ -112,10 +115,10 @@ function AuthWrapper() {
           // If trying to access protected route while unauth, go to /auth
           const path = window.location.pathname;
           if (path !== "/" && path !== "/reset-password" && path !== "/auth") {
-             React.useEffect(() => {
-               setLocation("/auth");
-             }, []);
-             return null;
+            React.useEffect(() => {
+              setLocation("/auth");
+            }, []);
+            return null;
           }
           return <LandingPage />;
         }} />

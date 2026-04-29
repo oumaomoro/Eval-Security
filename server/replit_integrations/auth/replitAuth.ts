@@ -44,6 +44,54 @@ export async function setupAuth(app: Express) {
   }));
 
   app.use(async (req: Request, res: Response, next: NextFunction) => {
+    // ── TEST-MODE BYPASS ────────────────────────────────────────────────────
+    // When NODE_ENV=test and x-test-user-id header is present, inject a
+    // pre-resolved identity using a direct Postgres query (bypasses Supabase
+    // HTTP which can fail with DNS errors under parallel Jest worker load).
+    // This bypass is NEVER active in production or development.
+    if (process.env.NODE_ENV === "test" && req.headers["x-test-user-id"]) {
+      const testUserId = req.headers["x-test-user-id"] as string;
+      try {
+        let localUser: any = null;
+        if (pool) {
+          const result = await pool.query(
+            `SELECT id, email, first_name, last_name, role, client_id, subscription_tier, contracts_count
+             FROM profiles WHERE id = $1 LIMIT 1`,
+            [testUserId]
+          );
+          localUser = result.rows[0] ?? null;
+        }
+        if (localUser) {
+          (req as any).user = {
+            id: testUserId,
+            email: localUser.email,
+            firstName: localUser.first_name ?? "Test",
+            lastName: localUser.last_name ?? "User",
+            clientId: localUser.client_id ?? null,
+            role: localUser.role ?? "admin",
+            subscriptionTier: localUser.subscription_tier ?? "starter",
+            contractsCount: localUser.contracts_count ?? 0,
+            profileImageUrl: null,
+            ip: req.ip,
+            userAgent: "test-agent"
+          };
+          // Resolve workspace via direct pool query too
+          let workspaceId: number | undefined;
+          if (pool) {
+            const wsResult = await pool.query(
+              `SELECT workspace_id FROM workspace_members WHERE user_id = $1 LIMIT 1`,
+              [testUserId]
+            );
+            workspaceId = wsResult.rows[0]?.workspace_id;
+          }
+          return storageContext.run({ client: null as any, workspaceId }, () => next());
+        }
+      } catch (err: any) {
+        console.warn(`[AUTH-TEST] Test bypass lookup failed for ${testUserId}: ${err.message}`);
+      }
+    }
+    // ── END TEST-MODE BYPASS ────────────────────────────────────────────────
+
     // 1. Resolve Identity (Cookie, Session, or Header)
     let token: string | undefined;
 
@@ -103,10 +151,6 @@ export async function setupAuth(app: Express) {
       const workspaceId = defaultWorkspace?.id;
 
       const userClient = createUserClient(token);
-      
-      if (workspaceId) {
-          // storageContext.run handles the workspace isolation in the application layer.
-      }
 
       return storageContext.run({ client: userClient, workspaceId }, () => next());
     } catch (err: any) {

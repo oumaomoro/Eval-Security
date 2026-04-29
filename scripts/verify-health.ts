@@ -1,4 +1,6 @@
 import { storage } from "../server/storage.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 async function verifyHealth() {
   console.log("--- 🕵️ SYSTEM HEALTH VALIDATION ---");

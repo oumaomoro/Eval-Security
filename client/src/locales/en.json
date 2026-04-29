@@ -1,6 +1,8 @@
 {
   "nav": {
     "dashboard": "Dashboard",
+    "infrastructure": "Infrastructure Intelligence",
+    "governance_studio": "Governance Studio",
     "dpo_command": "DPO Command Center",
     "costloci_intel": "Costloci Intelligence",
     "contracts": "Contracts & DPAs",

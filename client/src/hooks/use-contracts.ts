@@ -22,6 +22,11 @@ export function useContracts(filters?: { clientId?: string; status?: string }) {
       if (!res.ok) throw new Error("Failed to fetch contracts");
       return api.contracts.list.responses[200].parse(await res.json());
     },
+    refetchInterval: (query) => {
+      // If there are pending contracts, poll every 3 seconds to get the analysis results.
+      const hasPending = query.state.data?.some(c => c.status === "pending");
+      return hasPending ? 3000 : false;
+    },
   });
 }
 
@@ -36,6 +41,10 @@ export function useContract(id: number) {
       return api.contracts.get.responses[200].parse(await res.json());
     },
     enabled: !!id,
+    refetchInterval: (query) => {
+      // If the contract is pending, poll every 3 seconds
+      return query.state.data?.status === "pending" ? 3000 : false;
+    },
   });
 }
 

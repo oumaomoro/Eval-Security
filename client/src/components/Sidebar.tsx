@@ -14,6 +14,8 @@ export function Sidebar() {
 
   const navItems = [
     { label: t("nav.dashboard"), icon: LayoutDashboard, href: "/", group: "core" },
+    { label: t("nav.infrastructure"), icon: Server, href: "/infrastructure", group: "core" },
+    { label: t("nav.governance_studio"), icon: ShieldCheck, href: "/governance-studio", group: "core" },
     { label: t("nav.dpo_command"), icon: Globe, href: "/dpo-command", group: "core" },
     { label: t("nav.contracts"), icon: FileText, href: "/contracts", group: "core" },
     { label: t("nav.redline_studio"), icon: Zap, href: "/redline-studio", group: "core" },
