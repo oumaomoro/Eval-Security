@@ -90,6 +90,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use('/api/intelligence/', intelligenceLimiter);
   app.use('/api/cron/', cronLimiter);
 
+  // Phase 34: Security Hardening - IP allow-listing for admin endpoints
+  app.use('/api/admin', (req, res, next) => {
+    // In production, configure ADMIN_ALLOWED_IPS in the environment (e.g., '192.168.1.100,203.0.113.5')
+    const allowedIpsStr = process.env.ADMIN_ALLOWED_IPS || '127.0.0.1,::1';
+    if (allowedIpsStr === '*') return next(); // wildcard escape hatch if needed
+    
+    const allowedIps = allowedIpsStr.split(',').map(ip => ip.trim());
+    const clientIp = req.headers['x-forwarded-for'] as string || req.ip || req.socket.remoteAddress || '';
+    
+    // x-forwarded-for could be a comma separated list
+    const ipToCheck = clientIp.split(',')[0].trim();
+
+    if (!allowedIps.includes(ipToCheck) && process.env.NODE_ENV === 'production') {
+      console.warn(`[SECURITY] Blocked admin access from unauthorized IP: ${ipToCheck}`);
+      return res.status(403).json({ error: "forbidden", message: "IP not allow-listed for admin access." });
+    }
+    next();
+  });
+
   // Multi-tenant Workspace Context
   app.use(workspaceContextMiddleware);
 

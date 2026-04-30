@@ -106,7 +106,7 @@ export class AutonomicEngine {
 
             if (contractIds.length > 0) {
               const audit = await storage.createComplianceAudit({
-                workspaceId: config.workspaceId,
+                workspaceId: config.workspaceId ?? undefined,
                 rulesetId: config.rulesetId,
                 auditName: `Autonomic Continuous Audit - ${new Date().toISOString().split('T')[0]}`,
                 auditType: 'continuous',

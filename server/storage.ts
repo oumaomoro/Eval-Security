@@ -1114,13 +1114,13 @@ export class SupabaseRESTStorage implements IStorage {
     );
   }
 
-  async getReportSchedule(id: number): Promise<ReportSchedule | null> {
+  async getReportSchedule(id: number): Promise<ReportSchedule | undefined> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("report_schedules").select("*").eq("id", id);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any>(query.single());
-    if (!data) return null;
+    if (!data) return undefined;
     
     return {
       ...data,
@@ -1704,6 +1704,9 @@ export class SupabaseRESTStorage implements IStorage {
         .select("*")
         .single()
     );
+    
+    await this.invalidateIntelligenceCache(); // Force fresh analysis when library changes
+    
     return {
       id: data.id,
       clauseName: data.clause_name,
@@ -2728,6 +2731,11 @@ export class SupabaseRESTStorage implements IStorage {
           model: cache.model
         })
     );
+  }
+
+  async invalidateIntelligenceCache(): Promise<void> {
+    // Purges the intelligence cache to force fresh analysis when core rulesets/clauses change
+    await adminClient.from("ai_cache").delete().gte('id', 0);
   }
   async upsertPresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void> {
     await adminClient

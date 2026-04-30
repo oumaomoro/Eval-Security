@@ -16,8 +16,8 @@ export function useDashboardStats() {
       if (!res.ok) throw new Error("Failed to fetch dashboard stats");
       return api.dashboard.stats.responses[200].parse(await res.json());
     },
-    refetchInterval: 30000, // Balanced 30s refresh
-    staleTime: 120000, // 2 minutes caching
+    refetchInterval: 60000, // 1 minute refresh
+    staleTime: 300000, // 5 minutes caching
   });
 }
 

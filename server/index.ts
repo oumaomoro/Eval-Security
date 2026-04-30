@@ -9,8 +9,28 @@ import { registerRoutes, seedDatabase } from "./routes.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { serveStatic } from "./static.js";
 import { sanitizeRequest } from "./middleware/sanitizer.js";
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || "https://public@sentry.example.com/1",
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+  profilesSampleRate: 1.0,
+  environment: process.env.NODE_ENV || "development",
+});
 
 const app = express();
+
+// Sentry request and tracing handlers must be the first middlewares
+// Sentry v10: request/tracing handlers (Handlers removed in v10)
+if ((Sentry as any).Handlers) {
+  app.use((Sentry as any).Handlers.requestHandler());
+  app.use((Sentry as any).Handlers.tracingHandler());
+}
+
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
 
 function validateEnv() {
@@ -179,6 +199,14 @@ const httpServer = createServer(app);
     console.log("[BOOTSTRAP] Registering routes...");
     await registerRoutes(httpServer, app);
     console.log("[BOOTSTRAP] Routes registered.");
+
+    // Sentry error handler must be before any other error middleware and after all controllers
+    // Sentry v10 compatible error handler
+    if ((Sentry as any).Handlers) {
+      app.use((Sentry as any).Handlers.errorHandler());
+    } else if (typeof (Sentry as any).expressErrorHandler === 'function') {
+      app.use((Sentry as any).expressErrorHandler());
+    }
 
     app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
       const status = err.status || err.statusCode || 500;

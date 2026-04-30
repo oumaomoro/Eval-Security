@@ -36,9 +36,12 @@ export const authLimiter = rateLimit({
  */
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 Hour
-  max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "development" ? 100 : 20), // 20 Uploads per hour per IP (Strict for prod)
+  max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "development" ? 100 : 20), // 20 Uploads per hour per user
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: any) => {
+    return req.user?.id?.toString() || req.ip || 'anonymous';
+  },
   message: {
     error: "Quota Exceeded",
     message: "Maximum document upload limits reached. Please wait before submitting more contracts."

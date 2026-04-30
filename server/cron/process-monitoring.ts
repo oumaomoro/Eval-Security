@@ -54,7 +54,7 @@ router.post("/process-monitoring", async (req, res) => {
           // We use AuditService directly or call the storage method
           // The AuditService.runAudit logic usually involves AI analysis
           const audit = await storage.createComplianceAudit({
-            workspaceId: config.workspaceId,
+            workspaceId: config.workspaceId ?? undefined,
             rulesetId: config.rulesetId,
             auditName: `Automated Continuous Audit - ${now.toISOString().split('T')[0]}`,
             auditType: 'continuous',
