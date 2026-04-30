@@ -89,3 +89,23 @@ export function useDeleteReportSchedule() {
     },
   });
 }
+
+export function useRunReportSchedule() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetchApi(`/api/reports/schedules/${id}/run`, {
+        method: "POST"
+      });
+      if (!res.ok) throw new Error("Failed to trigger schedule execution");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/schedules"] });
+      toast({ title: "Schedule Triggered", description: "Manual execution has been initiated successfully." });
+    },
+  });
+}

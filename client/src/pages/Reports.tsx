@@ -10,14 +10,16 @@ import {
   Filter,
   ChevronRight,
   RefreshCw,
-  Zap
+  Zap,
+  Play
 } from "lucide-react";
 import { 
   useReports, 
   useGenerateReport, 
   useReportSchedules, 
   useCreateReportSchedule, 
-  useDeleteReportSchedule 
+  useDeleteReportSchedule,
+  useRunReportSchedule
 } from "@/hooks/use-reports";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -65,6 +67,7 @@ export default function Reports() {
   const generateReport = useGenerateReport();
   const createSchedule = useCreateReportSchedule();
   const deleteSchedule = useDeleteReportSchedule();
+  const runSchedule = useRunReportSchedule();
 
   const handleGenerate = async () => {
     await generateReport.mutateAsync({ title, type, regulatoryBody });
@@ -382,6 +385,7 @@ export default function Reports() {
                         <TableRow className="hover:bg-transparent border-border/50 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                           <TableHead className="px-6 py-3">Schedule Configuration</TableHead>
                           <TableHead>Frequency</TableHead>
+                          <TableHead>Last Run</TableHead>
                           <TableHead>Next Deployment</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right px-6">Actions</TableHead>
@@ -420,6 +424,9 @@ export default function Reports() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-xs font-medium text-muted-foreground">
+                                {schedule.lastRun ? format(new Date(schedule.lastRun), "MMM d, HH:mm") : "Never"}
+                              </TableCell>
+                              <TableCell className="text-xs font-medium text-muted-foreground">
                                 {schedule.nextRun ? format(new Date(schedule.nextRun), "MMM d, HH:mm") : "Pending"}
                               </TableCell>
                               <TableCell>
@@ -429,14 +436,26 @@ export default function Reports() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right px-6 py-4">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
-                                  onClick={() => deleteSchedule.mutate(schedule.id)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                                    onClick={() => runSchedule.mutate(schedule.id)}
+                                    disabled={runSchedule.isPending}
+                                    title="Run Now"
+                                  >
+                                    <Play className={`w-4 h-4 ${runSchedule.isPending ? 'animate-pulse' : ''}`} />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
+                                    onClick={() => deleteSchedule.mutate(schedule.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))

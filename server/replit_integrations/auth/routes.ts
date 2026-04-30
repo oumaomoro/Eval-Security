@@ -45,6 +45,21 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  // Debug endpoint for tests to fetch userId by email
+  app.get("/api/auth/debug/user-id", async (req, res) => {
+    if (process.env.NODE_ENV === "production") return res.status(403).json({ message: "Forbidden" });
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ message: "Email required" });
+    
+    try {
+      const user = await storage.getUserByEmail(email as string);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json({ userId: user.id });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user id" });
+    }
+  });
+
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {

@@ -12,8 +12,13 @@ describe("Contracts API & Isolation", () => {
 
   beforeAll(async () => {
     await cleanupDatabase();
-    user1 = await createTestUser("user1@costloci.test", "Password123!!", "User", "One");
-    user2 = await createTestUser("user2@costloci.test", "Password123!!", "User", "Two");
+    // Unique emails per run to avoid identity collision
+    const runId = Date.now();
+    user1 = await createTestUser(`user1-${runId}@costloci.test`, "Password123!!", "User", "One");
+    user2 = await createTestUser(`user2-${runId}@costloci.test`, "Password123!!", "User", "Two");
+    
+    // Propagation delay for Supabase background provisioning (ClientId/WorkspaceId)
+    await new Promise(r => setTimeout(r, 2000));
   }, 60000);
 
   it("should allow User 1 to create a contract", async () => {

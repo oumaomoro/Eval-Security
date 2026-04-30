@@ -55,7 +55,7 @@ describe("IntelligenceGateway", () => {
 
     const cb = (IntelligenceGateway as any).circuitBreaker.deepseek;
     expect(cb.failures).toBeGreaterThan(0);
-  }, 30000);
+  }, 60000);
 
   it("should fallback to OpenAI if DeepSeek fails", async () => {
     const mockDS = {

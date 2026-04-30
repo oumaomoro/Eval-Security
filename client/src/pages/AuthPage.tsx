@@ -112,7 +112,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-950 font-sans">
-      <SEO title="Sign In | CyberOptimize" description="Sign in to your CyberOptimize account." />
+      <SEO title="Sign In | Costloci" description="Sign in to your Costloci account." />
 
       {/* Left: Branding */}
       <div className="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden border-r border-slate-800/60">
@@ -125,7 +125,7 @@ export default function AuthPage() {
               <DiamondIcon className="w-7 h-7" />
             </div>
             <div>
-              <span className="text-2xl font-black tracking-tighter text-white">CyberOptimize</span>
+              <span className="text-2xl font-black tracking-tighter text-white">Costloci</span>
               <p className="text-[10px] text-primary font-semibold uppercase tracking-widest mt-0.5">Contract Intelligence</p>
             </div>
           </div>

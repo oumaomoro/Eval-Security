@@ -21,9 +21,11 @@ export async function cleanupDatabase() {
   if (userError) throw userError;
 
   const testUsers = users.users.filter(u => u.email?.endsWith(testEmailDomain));
+  console.log(`[CLEANUP] Found ${users.users.length} total users, ${testUsers.length} test users to delete.`);
 
   // 2. Delete test users (and cascading data)
   for (const user of testUsers) {
+    console.log(`[CLEANUP] Deleting user: ${user.email} (${user.id})`);
     await supabaseAdmin.auth.admin.deleteUser(user.id);
   }
 
@@ -31,7 +33,7 @@ export async function cleanupDatabase() {
   // Use raw SQL if necessary, but here we'll use the API for common tables
   const tables = [
     'audit_logs', 'infrastructure_logs', 'intelligence_cache', 
-    'remediation_tasks', 'risks', 'contracts', 'clients', 'workspaces'
+    'remediation_tasks', 'risks', 'contracts', 'clients', 'workspaces', 'profiles'
   ];
 
   for (const table of tables) {

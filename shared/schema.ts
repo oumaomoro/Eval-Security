@@ -655,11 +655,24 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 
 // === SCHEMA DEFINITIONS ===
 
-export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
-export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertAuditRulesetSchema = createInsertSchema(auditRulesets).omit({ id: true, createdAt: true });
-export const insertComplianceAuditSchema = createInsertSchema(complianceAudits).omit({ id: true, createdAt: true });
-export const insertRiskSchema = createInsertSchema(risks).omit({ id: true, createdAt: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true }).extend({
+  workspaceId: z.number().optional()
+});
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  clientId: z.number().optional(),
+  workspaceId: z.number().optional()
+});
+export const insertAuditRulesetSchema = createInsertSchema(auditRulesets).omit({ id: true, createdAt: true }).extend({
+  workspaceId: z.number().optional()
+});
+export const insertComplianceAuditSchema = createInsertSchema(complianceAudits).omit({ id: true, createdAt: true }).extend({
+  workspaceId: z.number().optional(),
+  contractId: z.number().optional()
+});
+export const insertRiskSchema = createInsertSchema(risks).omit({ id: true, createdAt: true }).extend({
+  workspaceId: z.number().optional(),
+  contractId: z.number().optional()
+});
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;

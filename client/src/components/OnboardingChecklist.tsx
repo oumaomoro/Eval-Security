@@ -66,7 +66,7 @@ export function OnboardingChecklist({ hasClients, hasContracts, hasAudits }: Onb
                 </span>
               </CardTitle>
               <CardDescription className="text-sm font-medium mt-1">
-                Complete these steps to get the most out of CyberOptimize.
+                Complete these steps to get the most out of Costloci.
               </CardDescription>
             </div>
             <div className="text-right">

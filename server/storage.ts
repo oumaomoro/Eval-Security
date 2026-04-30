@@ -106,6 +106,10 @@ export interface IStorage {
   getContractClauses(contractId?: number): Promise<ContractClause[]>;
   createClause(clause: InsertContractClause): Promise<ContractClause>;
 
+  // Usage & Billing Governance
+  incrementApiUsage(workspaceId: number): Promise<void>;
+  logUsageEvent(event: { workspaceId: number; eventType: string; creditsUsed: number; metadata?: any; userId?: string }): Promise<void>;
+
   // Savings
   getSavingsOpportunities(contractId?: number): Promise<SavingsOpportunity[]>;
   createSavingsOpportunity(savings: InsertSavings): Promise<SavingsOpportunity>;
@@ -117,6 +121,7 @@ export interface IStorage {
 
   // Report Schedules
   getReportSchedules(): Promise<ReportSchedule[]>;
+  getReportSchedule(id: number): Promise<ReportSchedule | undefined>;
   createReportSchedule(schedule: InsertReportSchedule): Promise<ReportSchedule>;
   updateReportSchedule(id: number, updates: Partial<ReportSchedule>): Promise<ReportSchedule>;
   deleteReportSchedule(id: number): Promise<void>;
@@ -208,6 +213,7 @@ export interface IStorage {
   getContinuousMonitoringConfigs(clientId?: number): Promise<ContinuousMonitoring[]>;
   createContinuousMonitoringConfig(config: InsertContinuousMonitoring): Promise<ContinuousMonitoring>;
   updateContinuousMonitoringConfig(id: number, updates: Partial<ContinuousMonitoring>): Promise<ContinuousMonitoring>;
+  deleteContinuousMonitoringConfig(id: number): Promise<void>;
 
   // Insurance Policies
   getInsurancePolicies(clientId?: number): Promise<InsurancePolicy[]>;
@@ -822,22 +828,7 @@ export class SupabaseRESTStorage implements IStorage {
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
-    return (data || []).map(d => ({
-      id: d.id,
-      workspaceId: d.workspace_id,
-      contractId: d.contract_id,
-      rulesetId: d.ruleset_id,
-      auditName: d.audit_name,
-      auditType: d.audit_type,
-      scope: d.scope,
-      status: d.status,
-      overallComplianceScore: Number(d.overall_compliance_score),
-      findings: d.findings,
-      complianceByStandard: d.compliance_by_standard,
-      systemicIssues: d.systemic_issues,
-      executiveSummary: d.executive_summary,
-      createdAt: d.created_at ? new Date(d.created_at) : null
-    }));
+    return (data || []).map(d => this.mapComplianceAudit(d));
   }
 
   async createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit> {
@@ -857,12 +848,13 @@ export class SupabaseRESTStorage implements IStorage {
       executive_summary: audit.executiveSummary
     };
 
-    return this.handleResponse<ComplianceAudit>(
+    const data = await this.handleResponse<any>(
       supabase.from("compliance_audits")
         .insert(payload)
         .select()
         .single()
     );
+    return this.mapComplianceAudit(data);
   }
 
   async updateComplianceAudit(id: number, updates: Partial<ComplianceAudit>): Promise<ComplianceAudit> {
@@ -874,13 +866,33 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.systemicIssues !== undefined) payload.systemic_issues = updates.systemicIssues;
     if (updates.executiveSummary !== undefined) payload.executive_summary = updates.executiveSummary;
 
-    return this.handleResponse<ComplianceAudit>(
+    const data = await this.handleResponse<any>(
       supabase.from("compliance_audits")
         .update(payload)
         .eq("id", id)
         .select()
         .single()
     );
+    return this.mapComplianceAudit(data);
+  }
+
+  private mapComplianceAudit(d: any): ComplianceAudit {
+    return {
+      id: d.id,
+      workspaceId: d.workspace_id,
+      contractId: d.contract_id,
+      rulesetId: d.ruleset_id,
+      auditName: d.audit_name,
+      auditType: d.audit_type,
+      scope: d.scope,
+      status: d.status,
+      overallComplianceScore: Number(d.overall_compliance_score),
+      findings: d.findings,
+      complianceByStandard: d.compliance_by_standard,
+      systemicIssues: d.systemic_issues,
+      executiveSummary: d.executive_summary,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    };
   }
 
   // --- RISKS ---
@@ -963,7 +975,8 @@ export class SupabaseRESTStorage implements IStorage {
     delete (payload as any).mitigationStrategies;
     delete (payload as any).workspaceId;
 
-    return this.handleResponse<Risk>(supabase.from("risks").insert(payload).select().single());
+    const data = await this.handleResponse<any>(supabase.from("risks").insert(payload).select().single());
+    return this.mapRisk(data);
   }
 
   async updateRisk(id: number, updates: Partial<Risk>): Promise<Risk> {
@@ -985,7 +998,8 @@ export class SupabaseRESTStorage implements IStorage {
     let query = supabase.from("risks").update(payload).eq("id", id);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
 
-    return this.handleResponse(query.select().single());
+    const data = await this.handleResponse<any>(query.select().single());
+    return this.mapRisk(data);
   }
 
   // --- SAVINGS ---
@@ -1100,8 +1114,26 @@ export class SupabaseRESTStorage implements IStorage {
     );
   }
 
+  async getReportSchedule(id: number): Promise<ReportSchedule | null> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("report_schedules").select("*").eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any>(query.single());
+    if (!data) return null;
+    
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      regulatoryBodies: data.regulatory_bodies,
+      nextRun: data.next_run ? new Date(data.next_run) : null,
+      lastRun: data.last_run ? new Date(data.last_run) : null,
+      isActive: data.is_active,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
   // --- REPORT SCHEDULES ---
-  // @ts-ignore
   async getReportSchedules(): Promise<ReportSchedule[]> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     let query = supabase.from("report_schedules").select("*");
@@ -1118,7 +1150,6 @@ export class SupabaseRESTStorage implements IStorage {
     }));
   }
 
-  // @ts-ignore
   async createReportSchedule(schedule: InsertReportSchedule): Promise<ReportSchedule> {
     const workspaceId = storageContext.getStore()?.workspaceId;
     
@@ -1154,7 +1185,6 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
-  // @ts-ignore
   async updateReportSchedule(id: number, updates: Partial<ReportSchedule>): Promise<ReportSchedule> {
     const payload: any = {};
     if (updates.title !== undefined) payload.title = updates.title;
@@ -1233,14 +1263,15 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- DASHBOARD & ANALYTICS ---
   async getDashboardStats(clientId?: number, userId?: string): Promise<any> {
-    const [contracts, risks, savings, users, logs, infraLogs, workspace] = await Promise.all([
+    const [contracts, risks, savings, users, logs, infraLogs, workspace, monitoringConfigs] = await Promise.all([
       this.getContracts({ clientId }),
       this.getRisks(),
       this.getSavingsOpportunities(),
       supabase.from("profiles").select("*").then(r => (r.data || []).map(p => this.mapProfileToUser(p))),
       this.getAuditLogs(clientId),
       this.getInfrastructureLogs(),
-      clientId ? this.getWorkspace(clientId) : Promise.resolve(null)
+      clientId ? this.getWorkspace(clientId) : Promise.resolve(null),
+      this.getContinuousMonitoringConfigs()
     ]);
 
     const activeStandards = Array.isArray(workspace?.activeStandards) ? workspace.activeStandards : [];
@@ -1249,7 +1280,8 @@ export class SupabaseRESTStorage implements IStorage {
     const totalAnnualCost = contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0);
     const criticalRisks = risks.filter(r => r.severity === 'critical').length;
     const totalPotentialSavings = savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0);
-    
+    const activePipelinesCount = monitoringConfigs.filter(m => m.isActive).length;
+
     const liveMrr = users.reduce((sum, u) => {
        if (u.subscriptionTier === 'enterprise') return sum + 999;
        if (u.subscriptionTier === 'pro') return sum + 299;
@@ -1291,6 +1323,7 @@ export class SupabaseRESTStorage implements IStorage {
       totalPotentialSavings,
       avgComplianceScore: Math.max(100 - (criticalRisks * 5), 0),
       criticalRisks,
+      activePipelinesCount,
       upcomingRenewals: contracts.slice(0, 5).sort((a, b) => String(a.renewalDate).localeCompare(String(b.renewalDate))),
       costByVendor: Object.entries(costByVendorMap).map(([vendor, cost]) => ({ vendor, cost })).sort((a, b) => b.cost - a.cost).slice(0, 5),
       complianceTrends: [],
@@ -2313,6 +2346,10 @@ export class SupabaseRESTStorage implements IStorage {
       nextRun: data.next_run ? new Date(data.next_run) : null,
       createdAt: data.created_at ? new Date(data.created_at) : null
     };
+  }
+  
+  async deleteContinuousMonitoringConfig(id: number): Promise<void> {
+    await this.handleResponse(supabase.from("continuous_monitoring").delete().eq("id", id));
   }
   // --- INSURANCE POLICIES ---
   async createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy> {

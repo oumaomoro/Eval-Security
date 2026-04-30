@@ -84,4 +84,30 @@ router.patch("/compliance/monitoring/:id", isAuthenticated, async (req: any, res
   }
 });
 
+/**
+ * DELETE /api/compliance/monitoring/:id
+ * Permanently terminate a continuous monitoring pipeline.
+ */
+router.delete("/compliance/monitoring/:id", isAuthenticated, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid configuration ID" });
+
+    await storage.deleteContinuousMonitoringConfig(id);
+
+    await SOC2Logger.logEvent(req, {
+      action: "MONITORING_CONFIG_DELETED",
+      userId: req.user.id,
+      resourceType: "ContinuousMonitoring",
+      resourceId: String(id),
+      details: `Monitoring pipeline terminated by user.`
+    });
+
+    res.status(204).end();
+  } catch (error: any) {
+    console.error("[MONITORING API ERROR]", error.message);
+    res.status(500).json({ message: "Failed to delete monitoring configuration." });
+  }
+});
+
 export default router;

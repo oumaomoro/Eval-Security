@@ -12,8 +12,12 @@ describe("Marketplace API & Commission Logic", () => {
 
   beforeAll(async () => {
     await cleanupDatabase();
-    seller = await createTestUser("seller@costloci.test", "Password123!!", "Seller", "User");
-    buyer  = await createTestUser("buyer@costloci.test",  "Password123!!", "Buyer",  "User");
+    const runId = Date.now();
+    seller = await createTestUser(`seller-${runId}@costloci.test`, "Password123!!", "Seller", "User");
+    buyer  = await createTestUser(`buyer-${runId}@costloci.test`,  "Password123!!", "Buyer",  "User");
+    
+    // Propagation delay for Supabase background provisioning
+    await new Promise(r => setTimeout(r, 2000));
   }, 60000);
 
   it("should allow a seller to list a clause/asset", async () => {

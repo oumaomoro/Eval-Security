@@ -38,7 +38,19 @@ export async function createTestUser(
 
   // Registration returns { message, userId } — userId is the Supabase UUID
   // which is also the primary key in the local users table.
-  const userId: string = regRes.body?.userId ?? "";
+  let userId: string = regRes.body?.userId ?? "";
+
+  if (!userId && regRes.status === 400 && regRes.body?.message?.includes("already been registered")) {
+    // Attempt to recover by fetching existing user ID from Supabase directly
+    const res = await request(API_URL)
+      .get(`/api/auth/debug/user-id?email=${encodeURIComponent(email)}`);
+    const profile = res.body;
+    
+    if (profile?.userId) {
+      userId = profile.userId;
+      console.log(`[test-auth] Recovered userId for ${email}: ${userId}`);
+    }
+  }
 
   if (!userId) {
     console.warn(

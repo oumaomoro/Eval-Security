@@ -1,4 +1,4 @@
-﻿import { Resend } from "resend";
+import { Resend } from "resend";
 
 let resend: any = null;
 
@@ -32,18 +32,18 @@ export class EmailService {
       const verificationUrl = `${host}/api/auth/verify?token=${token}`;
 
       const { data, error } = await getResend().emails.send({
-        from: "CyberOptimize <onboarding@costloci.com>",
+        from: "Costloci <onboarding@costloci.com>",
         to: [email],
-        subject: "Verify your CyberOptimize account",
+        subject: "Verify your Costloci account",
         html: `
           <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; background-color: #020617; color: #f8fafc; border-radius: 12px;">
             <div style="margin-bottom: 32px; border-bottom: 1px solid #1e293b; padding-bottom: 24px;">
-              <h1 style="color: #60a5fa; margin: 0; font-size: 24px; letter-spacing: -0.025em;">CyberOptimize</h1>
+              <h1 style="color: #60a5fa; margin: 0; font-size: 24px; letter-spacing: -0.025em;">Costloci</h1>
               <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;">AI-Powered Contract Intelligence</p>
             </div>
             <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">Verify your email address</h2>
             <p style="font-size: 16px; line-height: 24px; color: #94a3b8; margin-bottom: 32px;">
-              Thanks for signing up! Click the button below to verify your email and start using CyberOptimize.
+              Thanks for signing up! Click the button below to verify your email and start using Costloci.
             </p>
             <div style="margin: 40px 0;">
               <a href="${verificationUrl}" style="background: linear-gradient(to right, #2563eb, #0891b2); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
@@ -58,7 +58,7 @@ export class EmailService {
               This link expires in 24 hours. If you did not create an account, you can safely ignore this email.
             </p>
             <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid #1e293b; font-size: 12px; color: #475569;">
-              <p>&copy; 2026 CyberOptimize. All rights reserved.</p>
+              <p>&copy; 2026 Costloci. All rights reserved.</p>
             </div>
           </div>
         `,
@@ -93,13 +93,13 @@ export class EmailService {
       const reportUrl = `${host}/reports`;
 
       const { data, error } = await getResend().emails.send({
-        from: "CyberOptimize Reports <intelligence@costloci.com>",
+        from: "Costloci Reports <intelligence@costloci.com>",
         to: [email],
         subject: `[Report Ready] ${reportTitle}`,
         html: `
           <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; background-color: #020617; color: #f8fafc; border-radius: 12px;">
             <div style="margin-bottom: 32px; border-bottom: 1px solid #1e293b; padding-bottom: 24px;">
-              <h1 style="color: #60a5fa; margin: 0; font-size: 24px; letter-spacing: -0.025em;">CyberOptimize</h1>
+              <h1 style="color: #60a5fa; margin: 0; font-size: 24px; letter-spacing: -0.025em;">Costloci</h1>
               <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;">Your report is ready</p>
             </div>
             <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">Report Ready: ${reportTitle}</h2>
@@ -112,7 +112,7 @@ export class EmailService {
               </a>
             </div>
             <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid #1e293b; font-size: 12px; color: #475569;">
-              <p>&copy; 2026 CyberOptimize. All rights reserved.</p>
+              <p>&copy; 2026 Costloci. All rights reserved.</p>
             </div>
           </div>
         `,

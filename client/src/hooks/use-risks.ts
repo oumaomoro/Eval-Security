@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { type InsertRisk } from "@shared/schema";
+import { type Risk, type InsertRisk } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { fetchApi } from "@/lib/api-client";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -8,7 +8,7 @@ import { useWorkspace } from "@/hooks/use-workspace";
 export function useRisks(filters?: { contractId?: string }) {
   const { activeWorkspaceId } = useWorkspace();
   
-  return useQuery({
+  return useQuery<Risk[]>({
     queryKey: [api.risks.list.path, filters, activeWorkspaceId],
     queryFn: async () => {
       const url = filters?.contractId 

@@ -22,8 +22,8 @@ export async function seedMarketplace() {
     console.log("[SEED] Creating System Identity for Marketplace...");
     await storage.createUser({
       id: systemUserId,
-      email: "system@cyberoptimize.ai",
-      firstName: "CyberOptimize",
+      email: "system@costloci.com",
+      firstName: "Costloci",
       lastName: "System",
       role: "admin",
       subscriptionTier: "enterprise"

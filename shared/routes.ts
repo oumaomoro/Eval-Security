@@ -467,6 +467,7 @@ export const api = {
           costByVendor: z.array(z.object({ vendor: z.string(), cost: z.number() })),
           complianceTrends: z.array(z.object({ month: z.string(), score: z.number() })),
           riskHeatmap: z.array(z.object({ category: z.string(), count: z.number() })),
+          activePipelinesCount: z.number().optional(),
           technicalMetrics: z.object({
             apiResponseTimeAvgMs: z.number(),
             aiAccuracyRate: z.number(),

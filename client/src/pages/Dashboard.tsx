@@ -46,6 +46,7 @@ interface DashboardStats {
   };
   costByVendor: CostByVendor[];
   riskHeatmap: RiskHeatmapEntry[];
+  activePipelinesCount?: number;
 }
 
 export default function Dashboard() {
@@ -78,7 +79,7 @@ export default function Dashboard() {
          </div>
       </div>
     }>
-      <SEO title="Dashboard" description="Monitor your enterprise posture and contract ROI." />
+      <SEO title="Dashboard | Costloci" description="Monitor your enterprise posture and contract ROI." />
 
       <div className="space-y-8 pb-12 pt-4 animate-slide-up">
         {/* Onboarding Wizard */}
@@ -94,6 +95,7 @@ export default function Dashboard() {
           <MetricCard label={t("dashboard.missing_renewals")} value={stats?.upcomingRenewals?.length || 0} icon={<Clock className="w-5 h-5 text-amber-500" />} />
           <MetricCard label={t("dashboard.analyzed_contracts")} value={stats?.totalContracts || 0} icon={<FileCheck className="w-5 h-5 text-blue-500" />} />
           <MetricCard label={t("dashboard.critical_risks")} value={stats?.criticalRisks || 0} icon={<ShieldCheck className="w-5 h-5 text-rose-500" />} />
+          <MetricCard label="Active Pipelines" value={stats?.activePipelinesCount || 0} icon={<Activity className="w-5 h-5 text-indigo-500" />} />
           <MetricCard label="Infrastructure Health" value="94%" icon={<Server className="w-5 h-5 text-cyan-500" />} />
         </div>
 
@@ -102,7 +104,7 @@ export default function Dashboard() {
            <Card className="border-slate-200 dark:border-slate-800 shadow-sm bg-gradient-to-br from-blue-50/30 to-indigo-50/30 dark:from-blue-950/10 dark:to-indigo-950/10">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                   <CardTitle className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
                     <Zap className="w-3 h-3" />
                     Intelligence Efficiency
                   </CardTitle>
@@ -186,7 +188,7 @@ export default function Dashboard() {
                 <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                   <FileCheck className="w-8 h-8 text-blue-500" />
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome to CyberOptimize</h2>
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome to Costloci</h2>
                 <p className="text-muted-foreground max-w-md mx-auto">
                   Your enterprise hub is ready. To unlock intelligence, risk detection, and cost optimization, upload your first cybersecurity contract or software license.
                 </p>

@@ -147,7 +147,7 @@ export default function Risks() {
                            </div>
                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/50 border border-slate-800">
                              <Target className="w-3.5 h-3.5 text-primary" />
-                             <span className="text-xs font-bold text-slate-300">Likelihood: <span className="text-primary uppercase">{(risk as any).likelihood || 'High'}</span></span>
+                             <span className="text-xs font-bold text-slate-300">Likelihood: <span className="text-primary uppercase">{risk.likelihood || 'High'}</span></span>
                            </div>
                         </div>
                       </div>
@@ -168,9 +168,9 @@ export default function Risks() {
                           <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Active Mitigation Strategy</h4>
                         </div>
                         <p className="text-sm text-slate-300 font-medium italic">
-                          {typeof risk.mitigationStrategies[0] === 'string' 
+                          {typeof risk.mitigationStrategies?.[0] === 'string' 
                             ? risk.mitigationStrategies[0] 
-                            : (risk.mitigationStrategies[0] as any).strategy}
+                            : (risk.mitigationStrategies?.[0] as any)?.strategy}
                         </p>
                       </div>
                     )}
@@ -185,7 +185,7 @@ export default function Risks() {
   );
 }
 
-function Button({ children, className, variant, size, onClick, disabled }: any) {
+function Button({ children, className, variant, size, onClick, disabled }: { children: React.ReactNode, className?: string, variant?: 'ghost' | 'outline' | 'primary', size?: 'sm' | 'icon', onClick?: () => void, disabled?: boolean }) {
   const base = "inline-flex items-center justify-center transition-all disabled:opacity-50 disabled:pointer-events-none";
   const variants: any = {
     ghost: "bg-transparent",

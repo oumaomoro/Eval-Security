@@ -2,9 +2,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { getApiUrl } from "@/lib/api-config";
+import { type AuditRuleset } from "@shared/schema";
 
 export function useRulesets() {
-  return useQuery({
+  return useQuery<AuditRuleset[]>({
     queryKey: [api.auditRulesets.list.path],
     queryFn: async () => {      const res = await fetch(getApiUrl(api.auditRulesets.list.path), { 
         credentials: "include",      });
@@ -13,6 +14,8 @@ export function useRulesets() {
     },
   });
 }
+
+export const useAuditRulesets = useRulesets;
 
 export function useCreateRuleset() {
   return useMutation({

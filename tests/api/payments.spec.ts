@@ -10,8 +10,12 @@ describe("Payments API (Multi-Gateway Subscription)", () => {
 
   beforeAll(async () => {
     await cleanupDatabase();
-    user = await createTestUser("billing_test@costloci.test", "Password123!!", "Billing", "Tester");
-  }, 30000);
+    const runId = Date.now();
+    user = await createTestUser(`billing-test-${runId}@costloci.test`, "Password123!!", "Billing", "Tester");
+    
+    // Propagation delay for Supabase background provisioning
+    await new Promise(r => setTimeout(r, 2000));
+  }, 60000);
 
   it("should initialize a subscription session (Multi-Gateway)", async () => {
     const res = await request(API_URL)

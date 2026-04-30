@@ -147,6 +147,31 @@ export class ReportService {
     }
   }
 
+  /**
+   * Manually execute a specific report schedule.
+   */
+  static async runSchedule(id: number): Promise<Report> {
+    const schedule = await storage.getReportSchedule(id);
+    if (!schedule) throw new Error("Schedule not found");
+
+    const report = await this.generateReport(schedule.workspaceId!, schedule.type || "automated_summary");
+    
+    await storage.updateReportSchedule(schedule.id, {
+      lastRun: new Date(),
+      nextRun: this.calculateNextRun(schedule.frequency)
+    });
+
+    if (schedule.recipientEmail) {
+      await EmailService.sendReportReadyNotification(
+        schedule.recipientEmail, 
+        report.id, 
+        report.title
+      ).catch(e => console.error(`[REPORTS] Email dispatch failed for schedule ${schedule.id}:`, e));
+    }
+
+    return report;
+  }
+
   private static calculateNextRun(freq: string): Date {
      const next = new Date();
      if (freq === 'daily') next.setDate(next.getDate() + 1);

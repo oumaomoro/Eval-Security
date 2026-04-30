@@ -96,6 +96,21 @@ router.delete("/reports/schedules/:id", isAuthenticated, async (req, res) => {
 });
 
 /**
+ * POST /api/reports/schedules/:id/run
+ * Manually trigger a scheduled report execution.
+ */
+router.post("/reports/schedules/:id/run", isAuthenticated, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const report = await ReportService.runSchedule(id);
+    res.json(report);
+  } catch (error: any) {
+    console.error("[REPORTS API ERROR]", error.message);
+    res.status(500).json({ message: "Failed to manually trigger schedule execution." });
+  }
+});
+
+/**
  * GET /api/reports/:id/export
  * Serves the generated PDF report.
  */
