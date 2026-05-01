@@ -15,10 +15,10 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center border border-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
-                <DiamondIcon className="w-5 h-5" />
+             <div className="w-10 h-10 rounded-xl bg-[#0a0a0a] flex items-center justify-center border border-emerald-500/30 relative nutanix-glow">
+                <DiamondIcon className="w-6 h-6 text-emerald-500" />
              </div>
-             <span className="text-xl font-black tracking-tighter text-white uppercase italic">Costloci</span>
+             <span className="text-2xl font-black tracking-tighter text-white uppercase italic">Costloci</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8">
@@ -55,8 +55,8 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/auth">
-                <Button size="lg" className="h-16 px-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-2xl shadow-[0_20px_50px_rgba(16,185,129,0.3)] group uppercase italic transition-all active:scale-95">
-                  Start Free Audit <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <Button size="lg" className="h-16 px-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-2xl nutanix-glow group uppercase italic transition-all active:scale-95 border-0">
+                   Start Free Audit <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
               <Link href="/auth">
@@ -122,19 +122,19 @@ export default function LandingPage() {
                 features: ["Automated Redlining", "SignNow Integration", "Remediation Tracking"]
               }
             ].map((feature, i) => (
-              <Card key={i} className="bg-slate-900/40 border-white/5 p-8 rounded-[2rem] hover:border-emerald-500/20 transition-all group overflow-hidden relative">
+              <Card key={i} className="nutanix-card p-8 rounded-[2rem] hover:border-emerald-500/40 transition-all group overflow-hidden relative prism-border">
                 <div className="absolute -right-8 -top-8 w-24 h-24 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-colors" />
                 <CardContent className="p-0">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-emerald-500/20 flex items-center justify-center mb-6 shadow-inner text-emerald-500">
-                    <feature.icon className="w-6 h-6" />
+                  <div className="w-16 h-16 rounded-2xl bg-[#0a0a0a] border border-emerald-500/20 flex items-center justify-center mb-6 nutanix-glow text-emerald-500">
+                    <feature.icon className="w-7 h-7" />
                   </div>
-                  <h3 className="text-2xl font-black text-white mb-4 italic uppercase">{feature.title}</h3>
-                  <p className="text-slate-400 mb-8 font-medium leading-relaxed">
+                  <h3 className="text-2xl font-black text-white mb-4 italic uppercase tracking-tighter">{feature.title}</h3>
+                  <p className="text-slate-500 mb-8 font-bold leading-relaxed text-sm">
                     {feature.description}
                   </p>
                   <ul className="space-y-3">
                     {feature.features.map((f, j) => (
-                      <li key={j} className="flex items-center gap-3 text-xs font-bold text-slate-500 group-hover:text-slate-200 transition-colors">
+                      <li key={j} className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-slate-300 transition-colors">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" /> {f}
                       </li>
                     ))}

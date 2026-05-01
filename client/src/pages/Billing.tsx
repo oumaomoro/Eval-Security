@@ -13,6 +13,14 @@ import { useToast } from "@/hooks/use-toast";
 // Contract limits aligned with server/routes.ts enforcement
 const PLANS = [
   {
+    id: "free",
+    name: "Free Trial",
+    price: 0,
+    contractLimit: 5,
+    features: ["5 Contracts", "Basic Compliance Scan", "Community Support"],
+    icon: Shield,
+  },
+  {
     id: "starter",
     name: "Starter",
     price: 99,

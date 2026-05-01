@@ -43,7 +43,14 @@ describe("IntelligenceGateway", () => {
       }
     };
     (IntelligenceGateway as any).getDeepSeek = () => mockDS;
-    (IntelligenceGateway as any).DEEPSEEK_KEY = "valid";
+    
+    // Set keys via process.env
+    process.env.DEEPSEEK_API_KEY = "valid";
+    process.env.OPENAI_API_KEY = "missing";
+    process.env.GEMINI_API_KEY = "missing";
+    process.env.ANTHROPIC_API_KEY = "missing";
+    process.env.HF_TOKEN = "missing";
+    process.env.LOCAL_INTELLIGENCE_BASE_URL = "http://127.0.0.1:0";
 
     // Call once and check failure count
     try {
@@ -55,9 +62,13 @@ describe("IntelligenceGateway", () => {
 
     const cb = (IntelligenceGateway as any).circuitBreaker.deepseek;
     expect(cb.failures).toBeGreaterThan(0);
-  }, 60000);
+  }, 10000);
 
   it("should fallback to OpenAI if DeepSeek fails", async () => {
+    // Set keys via process.env
+    process.env.DEEPSEEK_API_KEY = "valid";
+    process.env.OPENAI_API_KEY = "valid";
+
     const mockDS = {
       chat: { completions: { create: jest.fn<any>().mockRejectedValue(new Error("DS Error")) } }
     };
@@ -67,8 +78,6 @@ describe("IntelligenceGateway", () => {
 
     (IntelligenceGateway as any).getDeepSeek = () => mockDS;
     (IntelligenceGateway as any).getOpenAI = () => mockOA;
-    (IntelligenceGateway as any).DEEPSEEK_KEY = "valid";
-    (IntelligenceGateway as any).OPENAI_KEY = "valid";
 
     const response = await IntelligenceGateway.createCompletion({
       model: "gpt-4o",

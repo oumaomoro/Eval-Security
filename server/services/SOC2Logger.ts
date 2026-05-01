@@ -12,7 +12,7 @@ import { NotificationService } from "./NotificationService.js";
  */
 export class SOC2Logger {
   static async logEvent(
-    req: Request,
+    req: Request | null,
     eventData: {
       userId: string;
       action: string;
@@ -26,7 +26,9 @@ export class SOC2Logger {
   ) {
     try {
       // Extract IP (handling Cloudflare/Vercel proxies if present)
-      const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim();
+      const ipAddress = req 
+        ? (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim()
+        : "SYSTEM";
       
       const log: InsertAuditLog = {
         userId: eventData.userId,

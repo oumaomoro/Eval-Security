@@ -10,7 +10,7 @@ import { cookieHandler } from "../../middleware/cookie-handler.js";
 import { SOC2Logger } from "../../services/SOC2Logger.js";
 import { EmailService } from "../../services/EmailService.js";
 import { z } from "zod";
-import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from "../../../shared/auth-schemas.js";
+import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, magicLinkSchema } from "../../../shared/auth-schemas.js";
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
@@ -72,9 +72,13 @@ export function registerAuthRoutes(app: Express): void {
         user_metadata: { first_name: firstName, last_name: lastName }
       });
       
-      // FALLBACK: If admin creation fails (e.g. missing service_role key), try standard signUp
       if (registrationResult.error && (registrationResult.error.message.includes("not allowed") || registrationResult.error.message.includes("service_role"))) {
-        console.warn(`[AUTH-DIAG] Admin provisioning restricted. Attempting standard Enterprise Sign-Up for ${email}...`);
+        await storage.createInfrastructureLog({
+          component: "AuthSystem",
+          event: "ADMIN_PROVISIONING_RESTRICTED",
+          status: "analyzing",
+          actionTaken: `Admin provisioning restricted for ${email}. Attempting standard Enterprise Sign-Up.`
+        }).catch(() => {});
         registrationResult = await supabase.auth.signUp({
           email,
           password,
@@ -95,7 +99,7 @@ export function registerAuthRoutes(app: Express): void {
       
       if (!data.user) throw new Error("Registration failed: Supabase Identity Engine did not return a valid user.");
 
-      console.log(`[AUTH-DIAG] Registration Success: ${data.user.id}. Provisioning enterprise assets...`);
+      if (!data.user) throw new Error("Registration failed: Supabase Identity Engine did not return a valid user.");
 
       // 2. Initial Profile Sync (Basic)
       await authStorage.upsertUser({
@@ -272,24 +276,31 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  // Magic Link / OTP
-  app.post("/api/auth/magic-link", async (req, res) => {
+  // Magic Link / OTP with Auto-Provisioning (Phase 34 Enhancement)
+  app.post("/api/auth/magic-link", async (req: any, res) => {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
+      const { email } = magicLinkSchema.parse(req.body);
       
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${process.env.FRONTEND_URL}/auth/callback`,
+          emailRedirectTo: `${process.env.FRONTEND_URL || ''}/auth/callback`,
         }
       });
       
       if (error) throw error;
-      res.json({ message: "Magic link sent successfully." });
+
+      await SOC2Logger.logEvent(req, {
+        userId: "GUEST",
+        action: "MAGIC_LINK_REQUESTED",
+        details: `Magic link dispatched to ${email}`
+      });
+
+      res.json({ message: "Magic link sent successfully. Please check your enterprise inbox." });
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
       console.error("[AUTH-DIAG] Magic Link Error:", err.message);
       res.status(400).json({ message: err.message });
     }
@@ -378,9 +389,10 @@ export function registerAuthRoutes(app: Express): void {
         return res.redirect(`${frontendUrl}/auth?error=no_session`);
       }
 
-      // Provision or sync local identity (handles first-time Google users)
+      // Provision or sync local identity (handles first-time Google/MagicLink users)
       let user = await authStorage.getUser(data.user.id).catch(() => null);
       if (!user || !user.clientId) {
+        console.log(`[AUTH-DIAG] Provisioning missing identity for ${data.user.email}...`);
         user = await healUserIdentity(data.user, user);
       }
 
@@ -637,8 +649,6 @@ async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
         plan: "starter"
       });
       const workspaceId = Array.isArray(workspace) ? workspace[0]?.id : (workspace as any).id;
-
-      console.log(`[AUTH-DIAG] Healing Membership for ${userId}...`);
       await storage.addWorkspaceMember({
         userId,
         workspaceId,
@@ -665,10 +675,15 @@ async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
     });
 
     return healedUser;
-  } catch (err: any) {
-    console.error(`[IDENTITY-RESILLIENCE] Healing CRITICAL FAILURE:`, err.message);
-    return localUser; // Fallback to raw user to avoid blocking access
-  } finally {
+    } catch (err: any) {
+      await storage.createInfrastructureLog({
+        component: "IdentityHealing",
+        event: "IDENTITY_HEALING_FAILURE",
+        status: "critical",
+        actionTaken: `Healing CRITICAL FAILURE for user ${userId}: ${err.message}`
+      }).catch(() => {});
+      return localUser; // Fallback to raw user to avoid blocking access
+    } finally {
     healingInProgress.delete(userId);
   }
 })();

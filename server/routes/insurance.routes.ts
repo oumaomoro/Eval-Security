@@ -174,18 +174,18 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
       storage.getComplianceAudits()
     ]);
 
-    const filteredContracts = contracts.filter(c => c.workspaceId === workspaceId);
-    const filteredRisks = risks.filter(r => filteredContracts.some(c => c.id === r.contractId));
-    const scopeStandards = [...new Set(audits.flatMap(a => a.scope?.standards || []))].slice(0, 4);
+    const filteredContracts = (contracts as any[]).filter(c => c.workspaceId === workspaceId);
+    const filteredRisks = (risks as any[]).filter(r => filteredContracts.some(c => c.id === r.contractId));
+    const scopeStandards = [...new Set((audits as any[]).flatMap(a => a.scope?.standards || []))].slice(0, 4);
 
     // Calculate Scores (Aggregated)
     const complianceScore = Math.round(
-      filteredContracts.reduce((acc, c) => acc + (c.intelligenceAnalysis?.legalAlignmentScore || 85), 0) / 
+      filteredContracts.reduce((acc: number, c: any) => acc + (c.intelligenceAnalysis?.legalAlignmentScore || 85), 0) / 
       (filteredContracts.length || 1)
     );
 
     const readinessScore = Math.round(
-      filteredRisks.reduce((acc, r) => acc + (r.mitigationStatus === 'mitigated' ? 100 : 50), 0) /
+      filteredRisks.reduce((acc: number, r: any) => acc + (r.mitigationStatus === 'mitigated' ? 100 : 50), 0) /
       (filteredRisks.length || 1)
     );
 
@@ -194,10 +194,10 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
       readinessScore,
       dpasReviewed: filteredContracts.length,
       openFindings: filteredRisks.length,
-      heatmap: scopeStandards.length > 0 ? scopeStandards.map(std => {
-        const stdAudits = audits.filter(a => a.workspaceId === workspaceId && a.scope?.standards?.includes(std));
+      heatmap: scopeStandards.length > 0 ? scopeStandards.map((std: string) => {
+        const stdAudits = (audits as any[]).filter(a => a.workspaceId === workspaceId && a.scope?.standards?.includes(std));
         const avgScore = stdAudits.length > 0
-          ? Math.round(stdAudits.reduce((acc, a) => acc + (a.overallComplianceScore || 0), 0) / stdAudits.length)
+          ? Math.round(stdAudits.reduce((acc: number, a: any) => acc + (a.overallComplianceScore || 0), 0) / stdAudits.length)
           : 0;
         
         const colors: Record<string, string> = {
@@ -227,100 +227,6 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ message: "Failed to fetch DPO metrics" });
-  }
-});
-
-// ─── REMEDIATION SUGGESTIONS ───────────────────────────────────────────────
-// POST /api/remediation-suggestions
-router.post("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
-  try {
-    const { contractId, title, suggestedClause, findingId, severity } = req.body;
-    
-    if (!title || !suggestedClause) {
-      return res.status(400).json({ message: "Title and suggested clause are required." });
-    }
-
-    const suggestion = await storage.createRemediationSuggestion({
-      workspaceId: storageContext.getStore()?.workspaceId,
-      contractId: contractId || null,
-      clauseTitle: title,
-      originalText: title, // Using title as placeholder for original text in manual suggestions
-      suggestedText: suggestedClause,
-      status: "pending",
-    });
-
-    await SOC2Logger.logEvent(req, {
-      action: "REMEDIATION_SUGGESTION_CREATED",
-      userId: req.user.id,
-      resourceType: "RemediationSuggestion",
-      resourceId: String(suggestion.id),
-      details: `New manual remediation suggestion created: ${title}`
-    });
-
-    res.status(201).json(suggestion);
-  } catch (error: any) {
-    console.error("[REMEDIATION SUGGESTION POST]", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-// GET /api/remediation-suggestions?contractId=X
-router.get("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
-  try {
-    const contractId = req.query.contractId ? Number(req.query.contractId) : undefined;
-    const suggestions = await storage.getRemediationSuggestions(contractId);
-    res.json(suggestions);
-  } catch (error: any) {
-    console.error("[REMEDIATION SUGGESTIONS GET]", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// PATCH /api/remediation-suggestions/:id/accept
-router.patch("/remediation-suggestions/:id/accept", isAuthenticated, async (req: any, res) => {
-  try {
-    const { id } = req.params;
-    const updated = await storage.updateRemediationSuggestion(id, {
-      status: "accepted",
-      userId: req.user?.id,
-      acceptedAt: new Date()
-    });
-
-    await SOC2Logger.logEvent(req, {
-      action: "REDLINE_SUGGESTION_ACCEPTED",
-      userId: req.user.id,
-      resourceType: "RemediationSuggestion",
-      resourceId: id,
-      details: "User accepted an intelligence-generated redline suggestion."
-    });
-
-    res.json(updated);
-  } catch (error: any) {
-    console.error("[REMEDIATION SUGGESTION ACCEPT]", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// PATCH /api/remediation-suggestions/:id/reject
-router.patch("/remediation-suggestions/:id/reject", isAuthenticated, async (req: any, res) => {
-  try {
-    const { id } = req.params;
-    const updated = await storage.updateRemediationSuggestion(id, {
-      status: "rejected",
-      userId: req.user?.id
-    });
-
-    await SOC2Logger.logEvent(req, {
-      action: "REDLINE_SUGGESTION_REJECTED",
-      userId: req.user.id,
-      resourceType: "RemediationSuggestion",
-      resourceId: id,
-      details: "User rejected an intelligence-generated redline suggestion."
-    });
-
-    res.json(updated);
-  } catch (error: any) {
-    console.error("[REMEDIATION SUGGESTION REJECT]", error);
-    res.status(500).json({ message: error.message });
   }
 });
 

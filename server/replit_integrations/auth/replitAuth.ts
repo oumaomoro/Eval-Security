@@ -51,6 +51,7 @@ export async function setupAuth(app: Express) {
     // This bypass is NEVER active in production or development.
     if (process.env.NODE_ENV === "test" && req.headers["x-test-user-id"]) {
       const testUserId = req.headers["x-test-user-id"] as string;
+      console.log(`[AUTH-TEST] Bypass attempt for ${testUserId}. Pool available: ${!!pool}`);
       try {
         let localUser: any = null;
         if (pool) {
@@ -60,6 +61,7 @@ export async function setupAuth(app: Express) {
             [testUserId]
           );
           localUser = result.rows[0] ?? null;
+          console.log(`[AUTH-TEST] Local user found: ${!!localUser}`);
         }
         if (localUser) {
           (req as any).user = {
@@ -84,7 +86,10 @@ export async function setupAuth(app: Express) {
             );
             workspaceId = wsResult.rows[0]?.workspace_id;
           }
+          console.log(`[AUTH-TEST] Bypass success. Workspace: ${workspaceId}`);
           return storageContext.run({ client: null as any, workspaceId }, () => next());
+        } else {
+          console.warn(`[AUTH-TEST] Bypass failed: user ${testUserId} not found in profiles table.`);
         }
       } catch (err: any) {
         console.warn(`[AUTH-TEST] Test bypass lookup failed for ${testUserId}: ${err.message}`);

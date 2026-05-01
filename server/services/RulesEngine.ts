@@ -1,6 +1,7 @@
 import { storage } from "../storage.js";
 import { type Contract, type PlaybookRule } from "../../shared/schema.js";
 import { RedlineEngine } from "./RedlineEngine.js";
+import { SOC2Logger } from "./SOC2Logger.js";
 
 export class RulesEngine {
   /**
@@ -8,7 +9,6 @@ export class RulesEngine {
    * Typically invoked synchronously right after IntelligenceGateway analysis completes.
    */
   static async evaluateContract(contractId: number, workspaceId: number): Promise<void> {
-    console.log(`[RulesEngine] Starting evaluation for contract ID ${contractId}`);
     
     // 1. Fetch Contract & Playbooks in parallel
     const [contract, playbooks] = await Promise.all([
@@ -25,7 +25,6 @@ export class RulesEngine {
     const activePlaybooks = playbooks.filter(pb => pb.isActive && pb.workspaceId === workspaceId);
     
     if (activePlaybooks.length === 0) {
-      console.log(`[RulesEngine] No active playbooks found for workspace ${workspaceId}.`);
       return;
     }
     
@@ -37,8 +36,6 @@ export class RulesEngine {
     // Sort rules by priority (highest first)
     allRules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
     
-    console.log(`[RulesEngine] Loaded ${allRules.length} active rules for evaluation.`);
-    
     const contextMap = this.flattenObject(contract.intelligenceAnalysis);
 
     const actionPromises: Promise<void>[] = [];
@@ -47,14 +44,16 @@ export class RulesEngine {
       try {
         const isTriggered = this.evaluateCondition(rule.condition, contextMap);
         if (isTriggered) {
-          console.log(`[RulesEngine] [✓] TRIGGERED: [${rule.name}] (Rule ID: ${rule.id})`);
           // Queue the action for concurrent execution
           actionPromises.push(this.executeAction(rule, contract));
-        } else {
-          console.log(`[RulesEngine] [ ] Skipped: [${rule.name}] (Condition not met)`);
         }
       } catch (err: any) {
-        console.error(`[RulesEngine] [!] Error evaluating rule [${rule.name}]:`, err.message);
+        await storage.createInfrastructureLog({
+           component: "RulesEngine",
+           event: "RULE_EVAL_ERROR",
+           status: "analyzing",
+           actionTaken: `Error evaluating rule [${rule.name}]: ${err.message}`
+        });
       }
     }
 
@@ -65,8 +64,6 @@ export class RulesEngine {
 
     // 4. Temporal Risk Forecasting (Phase 27)
     await this.checkTemporalRisks(contract);
-    
-    console.log(`[RulesEngine] Evaluation complete for contract ID ${contractId}`);
   }
 
   /**
@@ -81,7 +78,6 @@ export class RulesEngine {
 
     // If renewal is within 6 months, flag for "Compliance Drift" assessment
     if (monthsUntilRenewal > 0 && monthsUntilRenewal <= 6) {
-      console.log(`[RulesEngine] [TEMPORAL] Forecasting compliance drift for ${contract.vendorName} (Renewal in ${Math.round(monthsUntilRenewal)} months)`);
       
       await storage.createRisk({
         workspaceId: contract.workspaceId!,
@@ -190,7 +186,6 @@ export class RulesEngine {
 
         case "sendNotification":
           // To be wired to standard websocket/webhook integrations later
-          console.log(`[RulesEngine] Triggering Notification Action: ${action.message}`);
           break;
 
         default:
@@ -207,7 +202,12 @@ export class RulesEngine {
         details: `Rule '${rule.name}' triggered action: ${action.type}`,
       });
     } catch (err: any) {
-      console.error(`[RulesEngine] Failed to execute action ${action.type} for rule ${rule.id}:`, err);
+       await storage.createInfrastructureLog({
+          component: "RulesEngine",
+          event: "RULE_ACTION_ERROR",
+          status: "analyzing",
+          actionTaken: `Failed to execute action ${action.type} for rule ${rule.id}: ${err.message}`
+       });
     }
   }
 

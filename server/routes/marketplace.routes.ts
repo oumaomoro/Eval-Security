@@ -23,6 +23,22 @@ router.get("/marketplace/listings", isAuthenticated, async (req: any, res) => {
 });
 
 /**
+ * GET /api/marketplace/my-listings
+ * Returns listings created by the current authenticated user.
+ */
+router.get("/marketplace/my-listings", isAuthenticated, async (req: any, res) => {
+  try {
+    const listings = await storage.getMarketplaceListings();
+    // Filter by sellerId if storage method doesn't support it directly
+    const myListings = listings.filter(l => l.sellerId === req.user.id);
+    res.json(myListings);
+  } catch (error: any) {
+    console.error("[MARKETPLACE MY LISTINGS]", error.message);
+    res.status(500).json({ message: "Failed to fetch your listings." });
+  }
+});
+
+/**
  * POST /api/marketplace/listings
  * Allows legal professionals to list their clauses for sale.
  */
@@ -143,6 +159,60 @@ router.get("/marketplace/insurance-suggestion/:contractId", isAuthenticated, asy
     res.json(suggestion);
   } catch (error: any) {
     res.status(500).json({ message: "Insurance suggestion failed." });
+  }
+});
+
+
+/**
+ * PUT /api/marketplace/listings/:id
+ * Allows sellers to update their listings.
+ */
+router.put("/marketplace/listings/:id", isAuthenticated, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const listing = await storage.getMarketplaceListing(id);
+    
+    if (!listing) return res.status(404).json({ message: "Listing not found." });
+    if (listing.sellerId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    const { title, description, category, content, price } = req.body;
+    
+    const updatedListing = await storage.updateMarketplaceListing(id, {
+        title,
+        description,
+        category,
+        content,
+        price: price !== undefined ? parseFloat(price) : undefined
+    });
+
+    res.json(updatedListing);
+  } catch (error: any) {
+    console.error("[MARKETPLACE UPDATE]", error.message);
+    res.status(500).json({ message: "Failed to update listing." });
+  }
+});
+
+/**
+ * DELETE /api/marketplace/listings/:id
+ * Allows sellers to remove their listings.
+ */
+router.delete("/marketplace/listings/:id", isAuthenticated, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const listing = await storage.getMarketplaceListing(id);
+    
+    if (!listing) return res.status(404).json({ message: "Listing not found." });
+    if (listing.sellerId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    await storage.deleteMarketplaceListing(id);
+    res.json({ success: true, message: "Listing removed." });
+  } catch (error: any) {
+    console.error("[MARKETPLACE DELETE]", error.message);
+    res.status(500).json({ message: "Failed to remove listing." });
   }
 });
 

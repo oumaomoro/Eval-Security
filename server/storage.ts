@@ -1,9 +1,9 @@
 import { randomUUID, createHash } from "crypto";
 import bcrypt from "bcryptjs";
-import { ROIService } from "./services/ROIService.js";
-import { AuditService } from "./services/AuditService.js";
-import { adminClient } from "./services/supabase.js";
-import { storageContext } from "./services/storageContext.js";
+import { ROIService } from "./services/ROIService";
+import { AuditService } from "./services/AuditService";
+import { adminClient } from "./services/supabase";
+import { storageContext } from "./services/storageContext";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   RemediationTask, InsertRemediationTask,
@@ -13,7 +13,7 @@ import type {
   MarketplacePurchase, InsertMarketplacePurchase,
   CloudAccount, InsertCloudAccount,
   InfrastructureAsset, InsertInfrastructureAsset
-} from "../shared/schema.js";
+} from "../shared/schema";
 
 export interface UsageEvent {
   id: number;
@@ -56,7 +56,7 @@ import {
   type InsurancePolicy, type Subscription,
   type InsertInsurancePolicy, type InsertSubscription,
   type ContractVersion, type InsertContractVersion
-} from "../shared/schema.js";
+} from "../shared/schema";
 
 /**
  * SOVEREIGN REST STORAGE ENGINE - PRODUCTION HARDENED V3 (SOVEREIGN MODE PREMIUMLY RESTORED)
@@ -98,9 +98,13 @@ export interface IStorage {
 
   // Risks
   getRisks(contractId?: number): Promise<Risk[]>;
-  getRisksByClientId(clientId: number): Promise<Risk[]>;
   createRisk(risk: InsertRisk): Promise<Risk>;
   updateRisk(id: number, updates: Partial<Risk>): Promise<Risk>;
+
+  // Admin
+  getInfrastructureStats(): Promise<any>;
+  getAllUsers(): Promise<User[]>;
+  getUser(id: string): Promise<User | undefined>;
 
   // Clauses
   getContractClauses(contractId?: number): Promise<ContractClause[]>;
@@ -201,8 +205,9 @@ export interface IStorage {
   createRemediationTask(task: InsertRemediationTask): Promise<RemediationTask>;
   updateRemediationTask(id: number, updates: Partial<RemediationTask>): Promise<RemediationTask>;
   getRemediationSuggestions(contractId?: number): Promise<RemediationSuggestion[]>;
+  getRemediationSuggestion(id: number): Promise<RemediationSuggestion | undefined>;
   createRemediationSuggestion(suggestion: InsertRemediationSuggestion): Promise<RemediationSuggestion>;
-  updateRemediationSuggestion(id: string, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion>;
+  updateRemediationSuggestion(id: string | number, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion>;
 
   // Benchmarking
   getVendorBenchmarks(category?: string): Promise<VendorBenchmark[]>;
@@ -217,6 +222,7 @@ export interface IStorage {
 
   // Insurance Policies
   getInsurancePolicies(clientId?: number): Promise<InsurancePolicy[]>;
+  getInsurancePolicy(id: number): Promise<InsurancePolicy | undefined>;
   createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy>;
   updateInsurancePolicy(id: number, updates: Partial<InsurancePolicy>): Promise<InsurancePolicy>;
 
@@ -887,7 +893,7 @@ export class SupabaseRESTStorage implements IStorage {
       scope: d.scope,
       status: d.status,
       overallComplianceScore: Number(d.overall_compliance_score),
-      findings: d.findings,
+      findings: d.findings as any,
       complianceByStandard: d.compliance_by_standard,
       systemicIssues: d.systemic_issues,
       executiveSummary: d.executive_summary,
@@ -1308,7 +1314,7 @@ export class SupabaseRESTStorage implements IStorage {
 
     // ── Phase 16: Executive ROI Component ──
     const assets = await this.getInfrastructureAssets(clientId!);
-    const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, assets, 'enterprise');
+    const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, assets, 'enterprise', savings);
 
     const currentUser = userId ? users.find(u => u.id === userId) : (users[0] || {});
     const subscriptionTier = currentUser?.subscriptionTier || 'starter';
@@ -2152,7 +2158,57 @@ export class SupabaseRESTStorage implements IStorage {
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
-    return (data || []).map(d => ({
+    return (data || []).map(d => this.mapRemediationSuggestion(d));
+  }
+
+  async getRemediationSuggestion(id: number): Promise<RemediationSuggestion | undefined> {
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions").select("*").eq("id", id).maybeSingle()
+    );
+    return data ? this.mapRemediationSuggestion(data) : undefined;
+  }
+
+  async createRemediationSuggestion(suggestion: InsertRemediationSuggestion): Promise<RemediationSuggestion> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions")
+        .insert({
+          workspace_id: workspaceId || suggestion.workspaceId,
+          contract_id: suggestion.contractId,
+          clause_title: suggestion.clauseTitle,
+          original_text: suggestion.originalText,
+          suggested_text: suggestion.suggestedText,
+          reason: suggestion.reason,
+          standard: suggestion.standard,
+          severity: suggestion.severity || "medium",
+          status: suggestion.status || "pending",
+          user_id: suggestion.userId,
+          rule_id: suggestion.ruleId
+        })
+        .select()
+        .single()
+    );
+    return this.mapRemediationSuggestion(data);
+  }
+
+  async updateRemediationSuggestion(id: string | number, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion> {
+    const payload: any = {};
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.acceptedAt !== undefined) payload.accepted_at = updates.acceptedAt instanceof Date ? updates.acceptedAt.toISOString() : updates.acceptedAt;
+    if (updates.userId !== undefined) payload.user_id = updates.userId;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("remediation_suggestions")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return this.mapRemediationSuggestion(data);
+  }
+
+  private mapRemediationSuggestion(d: any): RemediationSuggestion {
+    return {
       id: d.id,
       workspaceId: d.workspace_id,
       contractId: d.contract_id,
@@ -2168,69 +2224,6 @@ export class SupabaseRESTStorage implements IStorage {
       createdAt: d.created_at ? new Date(d.created_at) : null,
       acceptedAt: d.accepted_at ? new Date(d.accepted_at) : null,
       lastReportGenerated: d.last_report_generated ? new Date(d.last_report_generated) : null
-    }));
-  }
-
-  async createRemediationSuggestion(suggestion: InsertRemediationSuggestion): Promise<RemediationSuggestion> {
-    const workspaceId = storageContext.getStore()?.workspaceId;
-    const data = await this.handleResponse<any>(
-      supabase.from("remediation_suggestions")
-        .insert({
-          workspace_id: workspaceId || suggestion.workspaceId,
-          contract_id: suggestion.contractId,
-          clause_title: suggestion.clauseTitle,
-          original_text: suggestion.originalText,
-          suggested_text: suggestion.suggestedText,
-          reason: suggestion.reason,
-          standard: suggestion.standard,
-          severity: suggestion.severity,
-          status: suggestion.status || "pending",
-          user_id: suggestion.userId,
-          rule_id: suggestion.ruleId
-        })
-        .select()
-        .single()
-    );
-    return {
-      id: data.id,
-      workspaceId: data.workspace_id,
-      contractId: data.contract_id,
-      clauseTitle: data.clause_title, originalText: data.original_text,
-      suggestedText: data.suggested_text,
-      reason: data.reason, standard: data.standard, severity: data.severity, status: data.status,
-      userId: data.user_id,
-      ruleId: data.rule_id,
-      createdAt: data.created_at ? new Date(data.created_at) : null,
-      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null,
-      lastReportGenerated: data.last_report_generated ? new Date(data.last_report_generated) : null
-    };
-  }
-
-  async updateRemediationSuggestion(id: string, updates: Partial<RemediationSuggestion>): Promise<RemediationSuggestion> {
-    const payload: any = {};
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.acceptedAt !== undefined) payload.accepted_at = updates.acceptedAt;
-    if (updates.userId !== undefined) payload.user_id = updates.userId;
-
-    const data = await this.handleResponse<any>(
-      supabase.from("remediation_suggestions")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single()
-    );
-    return {
-      id: data.id,
-      workspaceId: data.workspace_id,
-      contractId: data.contract_id,
-      clauseTitle: data.clause_title, originalText: data.original_text,
-      suggestedText: data.suggested_text,
-      reason: data.reason, standard: data.standard, severity: data.severity, status: data.status,
-      userId: data.user_id,
-      ruleId: data.rule_id,
-      createdAt: data.created_at ? new Date(data.created_at) : null,
-      acceptedAt: data.accepted_at ? new Date(data.accepted_at) : null,
-      lastReportGenerated: data.last_report_generated ? new Date(data.last_report_generated) : null
     };
   }
 
@@ -2493,12 +2486,42 @@ export class SupabaseRESTStorage implements IStorage {
     };
   }
 
+  async updateMarketplaceListing(id: number, updates: Partial<MarketplaceListing>): Promise<MarketplaceListing> {
+    const payload: any = { updated_at: new Date().toISOString() };
+    if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.content !== undefined) payload.content = updates.content;
+    if (updates.price !== undefined) payload.price = updates.price;
+    if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("marketplace_listings")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return {
+      ...data,
+      workspaceId: data.workspace_id,
+      sellerId: data.seller_id,
+      salesCount: data.sales_count,
+      isVerified: data.is_verified,
+      createdAt: data.created_at ? new Date(data.created_at) : null
+    };
+  }
+
+  async deleteMarketplaceListing(id: number): Promise<void> {
+    await this.handleResponse(supabase.from("marketplace_listings").delete().eq("id", id));
+  }
+
   async createMarketplacePurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase> {
     const data = await this.handleResponse<any>(
       supabase.from("marketplace_purchases")
         .insert({
           buyer_workspace_id: purchase.buyerWorkspaceId,
-          workspace_id: storageContext.getStore()?.workspaceId || purchase.buyerWorkspaceId, // Align with core patterns
+          workspace_id: storageContext.getStore()?.workspaceId || purchase.buyerWorkspaceId,
           buyer_id: purchase.buyerId,
           listing_id: purchase.listingId,
           amount: purchase.amount,
@@ -2517,6 +2540,7 @@ export class SupabaseRESTStorage implements IStorage {
       listingId: data.listing_id,
       platformFee: data.platform_fee,
       sellerPayout: data.seller_payout,
+      transactionId: data.transaction_id,
       purchasedAt: data.purchased_at ? new Date(data.purchased_at) : null
     };
   }
@@ -2914,6 +2938,57 @@ export class SupabaseRESTStorage implements IStorage {
   async getInfrastructureAssets(workspaceId: number): Promise<InfrastructureAsset[]> {
     const data = await this.handleResponse<any[]>(supabase.from("infrastructure_assets").select("*").eq("workspace_id", workspaceId));
     return (data || []).map(d => this.mapInfrastructureAsset(d));
+  }
+
+
+  // --- ADMIN METHODS ---
+  async getInfrastructureStats(): Promise<any> {
+    const [revenueRes, failedWebhooksRes] = await Promise.all([
+      supabase.from("billing_telemetry").select("value").eq("metric_type", "mrr_capture"),
+      supabase.from("infrastructure_logs").select("id", { count: 'exact' }).eq("status", "error")
+    ]);
+
+    const revenue = (revenueRes.data || []).reduce((acc: number, curr: any) => acc + (curr.value || 0), 0);
+    const failedWebhooks = failedWebhooksRes.count || 0;
+
+    return {
+      revenue,
+      failedWebhooks,
+      overages: 0,
+      trafficData: [
+        { name: "Mon", requests: 400 },
+        { name: "Tue", requests: 300 },
+        { name: "Wed", requests: 600 },
+        { name: "Thu", requests: 800 },
+        { name: "Fri", requests: 500 },
+      ],
+      allocationData: [
+        { name: "Compute", value: 45 },
+        { name: "Storage", value: 30 },
+        { name: "Intelligence", value: 25 },
+      ]
+    };
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const data = await this.handleResponse<any[]>(supabase.from("profiles").select("*").order("created_at", { ascending: false }));
+    return (data || []).map(d => ({
+      id: d.id,
+      email: d.email,
+      firstName: d.first_name,
+      lastName: d.last_name,
+      clientId: d.client_id,
+      role: d.role,
+      profileImageUrl: d.profile_image_url,
+      webauthnId: d.webauthn_id,
+      webauthnCredential: d.webauthn_credential,
+      mfaEnabled: d.mfa_enabled,
+      subscriptionTier: d.subscription_tier,
+      contractsCount: d.contracts_count,
+      apiKey: d.api_key,
+      createdAt: d.created_at ? new Date(d.created_at) : new Date(),
+      updatedAt: d.updated_at ? new Date(d.updated_at) : null
+    }));
   }
 }
 

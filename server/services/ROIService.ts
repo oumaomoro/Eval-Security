@@ -13,7 +13,7 @@ export class ROIService {
   /**
    * Calculates the total economic impact for an organization based on system intelligence.
    */
-  static calculateEconomicImpact(contracts: Contract[] = [], risks: Risk[] = [], assets: any[] = [], tier: string = 'enterprise') {
+  static calculateEconomicImpact(contracts: Contract[] = [], risks: Risk[] = [], assets: any[] = [], tier: string = 'enterprise', savings: any[] = []) {
     const totalContracts = contracts.length;
     const tierMultiplier = tier === 'enterprise' ? 1.5 : tier === 'pro' ? 1.2 : 1.0;
     
@@ -45,7 +45,16 @@ export class ROIService {
       }
     });
 
-    // 4. Infrastructure Resilience Value (Prevented Breach Cost)
+    // 4. Actual Identified Savings (New Phase 36 Enhancement)
+    const actualSavings = savings
+      .filter(s => s.status === 'realized' || s.status === 'implemented')
+      .reduce((sum, s) => sum + (s.estimatedSavings || 0), 0);
+    
+    const potentialSavings = savings
+      .filter(s => s.status === 'identified')
+      .reduce((sum, s) => sum + (s.estimatedSavings || 0), 0);
+
+    // 5. Infrastructure Resilience Value (Prevented Breach Cost)
     let infrastructureValue = 0;
     assets.forEach(asset => {
       // Each hardened asset represents a reduction in breach likelihood
@@ -54,7 +63,7 @@ export class ROIService {
       else if (asset.severity === 'medium') infrastructureValue += 1000;
     });
 
-    const totalImpact = efficiencySavings + riskMitigationValue + mitigatedExposure + infrastructureValue;
+    const totalImpact = efficiencySavings + riskMitigationValue + mitigatedExposure + infrastructureValue + actualSavings;
 
     return {
       totalImpact,
@@ -63,6 +72,8 @@ export class ROIService {
       riskMitigationValue,
       mitigatedExposure,
       infrastructureValue,
+      actualSavings,
+      potentialSavings,
       roiRatio: totalImpact > 0 ? parseFloat((totalImpact / (this.getPlanPrice(tier) * 12)).toFixed(1)) : 0
     };
   }

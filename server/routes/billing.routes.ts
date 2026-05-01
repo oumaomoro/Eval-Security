@@ -74,8 +74,19 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
        enterprise: 999
     };
 
-    const monthlyPrice = basePrices[planType as keyof typeof basePrices] || 99;
+    const monthlyPrice = basePrices[planType as keyof typeof basePrices] || (planType === "free" ? 0 : 99);
     const finalAmount = isAnnual ? (monthlyPrice * 12 * 0.8) : monthlyPrice; // 20% discount
+
+    // 0. FREE TIER BYPASS
+    if (planType === "free" || finalAmount === 0) {
+      await storage.updateUser(req.user.id, { subscriptionTier: "free" });
+      await SOC2Logger.logEvent(req, {
+          action: "SUBSCRIPTION_FREE_ACTIVATED",
+          userId: req.user.id,
+          details: "Free Trial activated via Billing Hub."
+      });
+      return res.json({ success: true, message: "Free plan activated" });
+    }
 
     // Mock response for tests to avoid external gateway calls
     if (process.env.NODE_ENV === "test") {

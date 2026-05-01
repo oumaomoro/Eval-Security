@@ -1,5 +1,6 @@
 import { supabase, adminClient } from "../../services/supabase.js";
 import { type User, type UpsertUser } from "../../../shared/models/auth.js";
+import { storage } from "../../storage";
 
 /**
  * SOVEREIGN AUTH STORAGE (REST)
@@ -39,7 +40,12 @@ class AuthRESTStorage implements IAuthStorage {
 
 
     if (error) {
-      console.error("[AUTH STORAGE ERROR]", error.message);
+      await storage.createInfrastructureLog({
+        component: "AuthStorage",
+        event: "USER_FETCH_ERROR",
+        status: "analyzing",
+        actionTaken: `Failed to fetch user profile ${id}: ${error.message}`
+      }).catch(() => {});
       return undefined;
     }
     return this.mapProfileToUser(data) || undefined;
@@ -61,7 +67,6 @@ class AuthRESTStorage implements IAuthStorage {
 
 
 
-    console.log(`[AUTH-DIAG] upsertUser Payload: id=${userData.id} clientId=${userData.clientId}`);
     const { data, error } = await adminClient
       .from("profiles")
       .upsert(profilePayload, { onConflict: 'id' })
@@ -71,7 +76,12 @@ class AuthRESTStorage implements IAuthStorage {
 
 
     if (error) {
-      console.error("[AUTH UPSERT ERROR]", error.message);
+      await storage.createInfrastructureLog({
+        component: "AuthStorage",
+        event: "USER_UPSERT_ERROR",
+        status: "critical",
+        actionTaken: `Failed to provision user ${userData.id}: ${error.message}`
+      }).catch(() => {});
       throw new Error(`Failed to provision user: ${error.message}`);
     }
     return this.mapProfileToUser(data);

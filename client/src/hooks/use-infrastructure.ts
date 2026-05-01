@@ -44,3 +44,17 @@ export function useHealInfrastructure() {
         },
     });
 }
+
+export function useAdminStats() {
+    return useQuery({
+        queryKey: ["/api/admin/stats"],
+        queryFn: async () => {
+            const res = await fetch(getApiUrl("/api/admin/stats"), {
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error("Failed to fetch admin stats");
+            return res.json();
+        },
+        refetchInterval: 30000,
+    });
+}

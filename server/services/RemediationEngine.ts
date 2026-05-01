@@ -9,8 +9,6 @@ export class RemediationEngine {
    */
   static async remediateContract(contractId: number): Promise<any> {
     try {
-      console.log(`[REMEDIATION] Initiating self-healing for Contract #${contractId}...`);
-      
       const contract = await storage.getContract(contractId);
       if (!contract) throw new Error("Contract not found");
 
@@ -19,7 +17,12 @@ export class RemediationEngine {
       const latestAudit = audits[0]; // Assuming sorted by date descending
       
       if (!latestAudit || !latestAudit.findings) {
-        console.warn(`[REMEDIATION] No findings found for Contract #${contractId}.`);
+        await storage.createInfrastructureLog({
+          component: "RemediationEngine",
+          event: "REMEDIATION_SKIPPED",
+          status: "resolved",
+          actionTaken: `No findings found for Contract #${contractId}. Remediation skipped.`
+        }).catch(() => {});
         return { status: "no_action_required", message: "No compliance gaps detected." };
       }
 
@@ -39,7 +42,14 @@ export class RemediationEngine {
           suggestedClauses: finding.recommendation || "",
           severity: finding.severity || "medium",
           status: "pending"
-        }).catch(err => console.error(`[REMEDIATION] Task creation failed for finding ${finding.id}:`, err.message));
+        }).catch(async err => {
+           await storage.createInfrastructureLog({
+             component: "RemediationEngine",
+             event: "TASK_CREATION_FAILURE",
+             status: "analyzing",
+             actionTaken: `Task creation failed for finding ${finding.id}: ${err.message}`
+           }).catch(() => {});
+        });
       }
 
       // 3. Fetch matching clauses from the library
@@ -47,8 +57,12 @@ export class RemediationEngine {
       const relevantClauses = library.filter(c => categories.includes(c.clauseCategory));
 
       if (relevantClauses.length === 0) {
-        console.warn(`[REMEDIATION] No standard clauses found in library for categories: ${categories.join(", ")}`);
-        // Fallback: AI will draft based on general knowledge if library is empty for these categories
+        await storage.createInfrastructureLog({
+          component: "RemediationEngine",
+          event: "LIBRARY_MISS_FALLBACK",
+          status: "analyzing",
+          actionTaken: `No standard clauses found for categories: ${categories.join(", ")}. Using AI fallback.`
+        }).catch(() => {});
       }
 
       // 4. Draft the Addendum using AI
@@ -123,7 +137,12 @@ export class RemediationEngine {
         });
       }
       
-      console.log(`[REMEDIATION] Contract #${contractId} has been successfully healed.`);
+      await storage.createInfrastructureLog({
+        component: "RemediationEngine",
+        event: "REMEDIATION_SUCCESS",
+        status: "resolved",
+        actionTaken: `Contract #${contractId} has been successfully healed.`
+      }).catch(() => {});
 
       // Notify the team via the Collaboration Studio (Phase 33)
       CollaborationService.broadcastToWorkspace(contract.workspaceId || (contract as any).workspace_id, {
@@ -141,8 +160,13 @@ export class RemediationEngine {
         summary: remediationSummary,
         addendum: addendumContent
       };
-    } catch (err) {
-      console.error("[REMEDIATION] Execution Failed:", err);
+    } catch (err: any) {
+      await storage.createInfrastructureLog({
+        component: "RemediationEngine",
+        event: "REMEDIATION_FAILURE",
+        status: "critical",
+        actionTaken: `Execution Failed for contract ${contractId}: ${err.message}`
+      }).catch(() => {});
       throw err;
     }
   }

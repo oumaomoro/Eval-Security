@@ -1,11 +1,31 @@
 import { Layout } from "@/components/Layout";
-import { useComplianceAudits, useRunAudit } from "@/hooks/use-compliance";
+import { useComplianceAudits, useRunAudit, useRemediationSuggestions, useAcceptRemediation, useDismissRemediation } from "@/hooks/use-compliance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, CheckCircle, XCircle, AlertCircle, Loader2, Shield, Zap, History as HistoryIcon, Globe, ArrowRight, FileText, Clock, Trash2 } from "lucide-react";
+import { 
+  Play, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  Loader2, 
+  Shield, 
+  Zap, 
+  History as HistoryIcon, 
+  Globe, 
+  ArrowRight, 
+  FileText, 
+  Clock, 
+  Trash2,
+  Activity,
+  Settings2,
+  Plus,
+  Cpu,
+  Fingerprint,
+  Scale
+} from "lucide-react";
 import { format } from "date-fns";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ExecutiveSummary } from "@/components/Intelligence/ExecutiveSummary";
 import { useDashboardStats } from "@/hooks/use-dashboard";
 import { SEO } from "@/components/SEO";
@@ -20,8 +40,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertContinuousMonitoringSchema } from "@shared/schema";
-import { Plus, Activity, Settings2 } from "lucide-react";
 import { z } from "zod";
+import { motion, AnimatePresence } from "framer-motion";
+import { Input } from "@/components/ui/input";
 
 export default function Compliance() {
   const { data: audits, isLoading } = useComplianceAudits();
@@ -34,6 +55,9 @@ export default function Compliance() {
   const { mutate: createMonitoring } = useCreateMonitoringConfig();
   const { mutate: updateMonitoring } = useUpdateMonitoringConfig();
   const { mutate: deleteMonitoring } = useDeleteMonitoringConfig();
+  const { data: suggestions, isLoading: isSuggestionsLoading } = useRemediationSuggestions();
+  const { mutate: acceptRemediation } = useAcceptRemediation();
+  const { mutate: dismissRemediation } = useDismissRemediation();
 
   const form = useForm({
     resolver: zodResolver(insertContinuousMonitoringSchema),
@@ -46,7 +70,7 @@ export default function Compliance() {
   });
 
   const handleRunAudit = () => {
-    runAudit({ scope: { contractIds: [1, 2], standards: ["KDPA", "IRA Kenya 2025", "POPIA", "NDPR", "SAMA"] } });
+    runAudit({ scope: { contractIds: [], standards: ["KDPA", "CBK", "GDPR", "ISO27001", "IRA Kenya 2025"], categories: [] } });
   };
 
   const onMonitoringSubmit = (data: z.infer<typeof insertContinuousMonitoringSchema>) => {
@@ -57,21 +81,19 @@ export default function Compliance() {
     <Layout header={
       <div className="flex w-full items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Compliance Hub</h1>
-          <p className="text-xs text-muted-foreground mt-1">Sovereign jurisdictional intelligence and audit monitoring.</p>
+          <h1 className="text-2xl font-black uppercase tracking-tighter italic flex items-center gap-2">
+            <Scale className="w-6 h-6 text-primary" /> Governance Hub
+          </h1>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sovereign Jurisdictional Intelligence & Audit Monitoring</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Dialog>
             <DialogTrigger asChild>
-                <Button 
-                    variant="outline"
-                    className="rounded-lg h-9 px-4 gap-2 text-xs font-semibold border-slate-200 dark:border-slate-800"
-                >
-                    <FileText className="w-4 h-4 text-primary" /> 
-                    Board Report
+                <Button variant="outline" className="h-12 px-6 rounded-2xl bg-slate-950 border-slate-800 hover:bg-slate-900 text-xs font-black uppercase tracking-widest gap-2">
+                    <FileText className="w-4 h-4 text-primary" /> Board Report
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[1000px] max-h-[90vh] overflow-y-auto p-0 rounded-2xl border-none shadow-2xl">
+            <DialogContent className="max-w-[1000px] max-h-[90vh] overflow-y-auto p-0 rounded-[2.5rem] border-none shadow-2xl bg-slate-950">
                 {stats && (
                     <ExecutiveSummary 
                         stats={{
@@ -86,86 +108,99 @@ export default function Compliance() {
           <Button 
             onClick={handleRunAudit} 
             disabled={isRunning} 
-            className="rounded-lg h-9 px-4 gap-2 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
+            className="h-12 px-8 rounded-2xl bg-slate-100 hover:bg-white text-slate-950 font-black uppercase tracking-tighter italic gap-2 shadow-xl shadow-primary/10"
           >
-            {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-            {isRunning ? "Running..." : "Run Global Audit"}
+            {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
+            {isRunning ? "PROCESSING..." : "RUN GLOBAL AUDIT"}
           </Button>
         </div>
       </div>
     }>
       <SEO title="Governance Hub" description="Monitor regulatory updates and enterprise compliance posture." />
-      <div className="space-y-8 pb-12 pt-4">
-
+      
+      <div className="space-y-10 pb-12">
         {/* Autonomic Intelligence Hub */}
         <AutonomicJurisdictionSync />
 
         {/* Intelligence Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <StatCard icon={CheckCircle} label="Global Compliance" value="91.2%" color="text-emerald-500" />
-          <StatCard icon={AlertCircle} label="Jurisdiction Risk" value="Low" color="text-emerald-500" />
-          <StatCard icon={Shield} label="DPO Verified" value="18/20" color="text-blue-500" />
-          <StatCard icon={Zap} label="Policy Drift" value="0.02%" color="text-emerald-500" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatCard icon={CheckCircle} label="Aggregated Compliance" value="91.2%" color="text-emerald-500" trend="+1.4%" />
+          <StatCard icon={AlertCircle} label="Jurisdiction Risk" value="Optimal" color="text-emerald-400" trend="Safe" />
+          <StatCard icon={Shield} label="Operator Verification" value="100%" color="text-blue-500" trend="DPO+" />
+          <StatCard icon={Zap} label="Policy Drift" value="0.02%" color="text-primary" trend="Nominal" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* DPO Registration Tracker */}
-            <Card className="lg:col-span-1 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden flex flex-col">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                        <Shield className="w-4 h-4" /> Multi-Regional DPO
+            <Card className="lg:col-span-4 bg-slate-950 border-slate-800 shadow-2xl rounded-[2rem] overflow-hidden flex flex-col group">
+                <CardHeader className="pb-4 border-b border-slate-900">
+                    <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> Multi-Regional DPO Matrix
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 flex-1">
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        <DPOItem vendor="Apex Cloud" status="registered" expiry="Dec 2026" region="KE" />
-                        <DPOItem vendor="SafePay Ltd" status="pending" expiry="RENEWAL REQ" region="NG" />
-                        <DPOItem vendor="Global SCM" status="missing" expiry="ACTION REQ" region="KSA" />
-                        <DPOItem vendor="Infrastruct" status="registered" expiry="July 2025" region="SA" />
+                    <div className="divide-y divide-slate-900">
+                        <DPOItem vendor="Apex Cloud Infrastructure" status="registered" expiry="Dec 2026" region="KE" />
+                        <DPOItem vendor="SafePay Sovereign" status="pending" expiry="RENEWAL REQ" region="NG" />
+                        <DPOItem vendor="Global SCM Hub" status="missing" expiry="ACTION REQ" region="KSA" />
+                        <DPOItem vendor="Infrastruct Grid" status="registered" expiry="July 2025" region="SA" />
                     </div>
                 </CardContent>
             </Card>
 
             {/* Audit History */}
-            <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl flex flex-col">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                        <HistoryIcon className="w-4 h-4" /> Audit Ledger
+            <Card className="lg:col-span-8 bg-slate-950 border-slate-800 shadow-2xl rounded-[2.5rem] flex flex-col relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                   <Activity className="w-24 h-24" />
+                </div>
+                <CardHeader className="pb-4 border-b border-slate-900">
+                    <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <HistoryIcon className="w-4 h-4 text-primary" /> Immutable Audit Ledger
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0 max-h-[400px] overflow-y-auto flex-1">
-                    {isLoading ? <div className="p-12 text-center text-slate-400 text-sm">Loading Ledger...</div> : (
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                <CardContent className="p-0 max-h-[480px] overflow-y-auto flex-1 scrollbar-hide">
+                    {isLoading ? <div className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></div> : (
+                        <div className="divide-y divide-slate-900">
                         {(!audits || audits.length === 0) && (
-                          <div className="p-12 text-center text-slate-400 text-sm">No audit history found.</div>
+                          <div className="p-12 text-center text-slate-500 font-bold uppercase text-[10px] tracking-widest">No audit history found in local node.</div>
                         )}
-                        {audits?.map((audit) => (
-                          <div key={audit.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
-                            <div className="flex justify-between items-start">
-                              <div className="space-y-1">
-                                <Badge variant="secondary" className="text-[10px] font-semibold">{audit.auditName.split(' ')[0]}</Badge>
-                                <h3 className="font-bold text-lg text-foreground">{audit.auditName}</h3>
-                                <p className="text-xs text-slate-500 flex items-center gap-2">
-                                  <Clock className="w-3 h-3" /> {audit.createdAt ? format(new Date(audit.createdAt), "PPP") : "N/A"}
+                        {audits?.map((audit, idx) => (
+                          <motion.div 
+                            key={audit.id} 
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                            className="p-8 hover:bg-slate-900/40 transition-all group relative overflow-hidden"
+                          >
+                            <div className="flex justify-between items-start relative z-10">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                   <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[8px] font-black uppercase text-primary py-0 px-2 h-4">{audit.auditType || 'SYSTEM'}</Badge>
+                                   <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest font-mono">ID: {audit.id?.toString().padStart(6, '0')}</span>
+                                </div>
+                                <h3 className="font-black text-xl text-slate-100 uppercase tracking-tighter italic">{audit.auditName}</h3>
+                                <p className="text-xs text-slate-500 flex items-center gap-2 font-medium">
+                                  <Clock className="w-3.5 h-3.5" /> {audit.createdAt ? format(new Date(audit.createdAt), "PPP · HH:mm:ss 'UTC'") : "Sync Pending"}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <div className={`text-2xl font-bold ${Number(audit.overallComplianceScore) > 85 ? 'text-emerald-500' : 'text-blue-500'}`}>{audit.overallComplianceScore}%</div>
-                                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Score</div>
+                                <div className={`text-3xl font-black italic tracking-tighter ${Number(audit.overallComplianceScore) > 85 ? 'text-emerald-500' : 'text-primary'}`}>{audit.overallComplianceScore}%</div>
+                                <div className="text-[9px] text-slate-600 font-black uppercase tracking-[0.2em] mt-1">Audit Score</div>
                               </div>
                             </div>
                             
                             {audit.complianceByStandard && (
-                              <div className="flex flex-wrap gap-2 mt-4">
+                              <div className="flex flex-wrap gap-2 mt-6">
                                 {Object.entries(audit.complianceByStandard).map(([std, score]) => (
-                                  <div key={std} className="bg-slate-100 dark:bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px] flex items-center gap-2">
-                                    <span className="font-semibold text-slate-500 uppercase">{std}</span>
-                                    <span className={`font-bold ${Number(score) < 80 ? 'text-rose-500' : 'text-emerald-500'}`}>{score}%</span>
+                                  <div key={std} className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-[9px] flex items-center gap-3 group/std hover:border-primary/30 transition-colors">
+                                    <span className="font-black text-slate-500 uppercase tracking-widest">{std}</span>
+                                    <div className="w-[2px] h-3 bg-slate-800" />
+                                    <span className={`font-black ${Number(score) < 80 ? 'text-rose-500' : 'text-emerald-400'}`}>{score}%</span>
                                   </div>
                                 ))}
                               </div>
                             )}
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     )}
@@ -173,167 +208,205 @@ export default function Compliance() {
             </Card>
         </div>
 
-        {/* Continuous Monitoring Section */}
+        {/* AI Remediation Insights */}
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                    <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-primary" /> Automated Monitoring Pipelines
+                    <h2 className="text-2xl font-black uppercase tracking-tighter italic text-slate-100 flex items-center gap-3">
+                        <Cpu className="w-6 h-6 text-primary" /> AI Remediation Insights
                     </h2>
-                    <p className="text-xs text-muted-foreground italic">Scheduled autonomous audits for high-risk vendors.</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Self-Healing Compliance Recommendations</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <AnimatePresence mode="popLayout">
+                    {isSuggestionsLoading ? (
+                        [1, 2, 3].map((i) => (
+                            <div key={i} className="h-48 rounded-[2rem] bg-slate-900/50 animate-pulse border border-slate-800" />
+                        ))
+                    ) : (!suggestions || (suggestions as any[]).filter((s: any) => s.status === 'pending').length === 0) ? (
+                        <Card className="col-span-full bg-slate-950 border-slate-800 p-12 text-center rounded-[2rem]">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Optimal: No pending remediation tasks detected.</p>
+                        </Card>
+                    ) : (
+                        (suggestions as any[]).filter((s: any) => s.status === 'pending').map((suggestion: any) => (
+                            <RemediationSuggestionItem 
+                                key={suggestion.id}
+                                suggestion={suggestion}
+                                onAccept={() => acceptRemediation(suggestion.id)}
+                                onDismiss={() => dismissRemediation(suggestion.id)}
+                            />
+                        ))
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
+
+        {/* Continuous Monitoring Section */}
+        <div className="space-y-6 pt-6">
+            <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <h2 className="text-2xl font-black uppercase tracking-tighter italic text-slate-100 flex items-center gap-3">
+                        <Cpu className="w-6 h-6 text-primary" /> Autonomous Monitoring Pipelines
+                    </h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Scheduled Real-time Jurisdictional Tracking</p>
                 </div>
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button className="rounded-lg h-9 px-4 gap-2 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20">
+                        <Button className="h-12 px-8 rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 font-black uppercase text-xs tracking-widest gap-2">
                             <Plus className="w-4 h-4" /> Create Pipeline
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-md rounded-2xl border-slate-200 dark:border-slate-800 shadow-2xl">
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-bold">New Monitoring Config</h3>
-                                <p className="text-xs text-slate-500">Configure real-time jurisdictional tracking.</p>
-                            </div>
-                            <Form {...form}>
-                                <form onSubmit={form.handleSubmit(onMonitoringSubmit)} className="space-y-6">
+                    <DialogContent className="max-w-md rounded-[2.5rem] border-slate-800 shadow-2xl bg-slate-950 p-8">
+                        <DialogHeader className="pb-4">
+                            <DialogTitle className="text-2xl font-black italic tracking-tighter uppercase flex items-center gap-3">
+                                <Plus className="w-6 h-6 text-primary" /> New Monitoring <span className="text-primary">Node</span>
+                            </DialogTitle>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Configure autonomic compliance pulse</p>
+                        </DialogHeader>
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onMonitoringSubmit)} className="space-y-6 pt-4">
+                                <FormField
+                                    control={form.control}
+                                    name="clientId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Target Infrastructure/Vendor</FormLabel>
+                                            <Select onValueChange={(v) => field.onChange(parseInt(v))} defaultValue={field.value.toString()}>
+                                                <FormControl>
+                                                    <SelectTrigger className="rounded-xl border-slate-800 h-12 bg-slate-900 focus:ring-primary/20">
+                                                        <SelectValue placeholder="Select target entity" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent className="bg-slate-950 border-slate-800">
+                                                    {clients?.map((c) => (
+                                                        <SelectItem key={c.id} value={c.id.toString()}>{c.companyName}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="rulesetId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Compliance Ruleset Protocol</FormLabel>
+                                            <Select onValueChange={(v) => field.onChange(parseInt(v))} defaultValue={field.value.toString()}>
+                                                <FormControl>
+                                                    <SelectTrigger className="rounded-xl border-slate-800 h-12 bg-slate-900 focus:ring-primary/20">
+                                                        <SelectValue placeholder="Select ruleset protocol" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent className="bg-slate-950 border-slate-800">
+                                                    {rulesets?.map((r) => (
+                                                        <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.standard})</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
-                                        name="clientId"
+                                        name="frequencyDays"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="text-xs uppercase font-bold text-slate-500 tracking-wider">Target Client/Vendor</FormLabel>
-                                                <Select onValueChange={(v) => field.onChange(parseInt(v))} defaultValue={field.value.toString()}>
-                                                    <FormControl>
-                                                        <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-800 h-11 bg-slate-50/50 dark:bg-slate-900/50 focus:ring-primary/20">
-                                                            <SelectValue placeholder="Select a vendor" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
-                                                        {clients?.map((c) => (
-                                                            <SelectItem key={c.id} value={c.id.toString()}>{c.companyName}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                                <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Frequency (Days)</FormLabel>
+                                                <FormControl>
+                                                    <Input 
+                                                        type="number" 
+                                                        {...field} 
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => field.onChange(parseInt(e.target.value))}
+                                                        className="h-12 bg-slate-900 border-slate-800 rounded-xl focus:border-primary/50 text-slate-200"
+                                                    />
+                                                </FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
                                     <FormField
                                         control={form.control}
-                                        name="rulesetId"
+                                        name="isActive"
                                         render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="text-xs uppercase font-bold text-slate-500 tracking-wider">Compliance Ruleset</FormLabel>
-                                                <Select onValueChange={(v) => field.onChange(parseInt(v))} defaultValue={field.value.toString()}>
+                                            <FormItem className="flex flex-col justify-end pb-3">
+                                                <div className="flex items-center gap-3">
                                                     <FormControl>
-                                                        <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-800 h-11 bg-slate-50/50 dark:bg-slate-900/50 focus:ring-primary/20">
-                                                            <SelectValue placeholder="Select a ruleset" />
-                                                        </SelectTrigger>
+                                                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                                                     </FormControl>
-                                                    <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
-                                                        {rulesets?.map((r) => (
-                                                            <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.standard})</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
+                                                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-0 cursor-pointer">Active Node</FormLabel>
+                                                </div>
                                             </FormItem>
                                         )}
                                     />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="frequencyDays"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-xs uppercase font-bold text-slate-500 tracking-wider">Frequency (Days)</FormLabel>
-                                                    <FormControl>
-                                                        <div className="relative">
-                                                            <input 
-                                                                type="number" 
-                                                                {...field} 
-                                                                onChange={(e) => field.onChange(parseInt(e.target.value))}
-                                                                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 h-11 bg-slate-50/50 dark:bg-slate-900/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                            />
-                                                        </div>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="isActive"
-                                            render={({ field }) => (
-                                                <FormItem className="flex flex-col justify-end pb-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <FormControl>
-                                                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                                        </FormControl>
-                                                        <FormLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-0 cursor-pointer">Active</FormLabel>
-                                                    </div>
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <Button type="submit" className="w-full rounded-xl h-11 font-bold shadow-lg shadow-primary/10">Deploy Monitor</Button>
-                                </form>
-                            </Form>
-                        </div>
+                                </div>
+                                <Button type="submit" className="w-full rounded-2xl h-14 bg-slate-100 hover:bg-white text-slate-950 font-black uppercase tracking-widest shadow-xl">Deploy Autonomous Monitor</Button>
+                            </form>
+                        </Form>
                     </DialogContent>
                 </Dialog>
             </div>
 
-            <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl overflow-hidden">
+            <Card className="bg-slate-950 border-slate-800 shadow-2xl rounded-[2.5rem] overflow-hidden border-b-4 border-b-primary/20">
                 <Table>
-                    <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
-                        <TableRow className="border-slate-100 dark:border-slate-800/60">
-                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-6">Vendor/Client</TableHead>
-                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-6">Standard</TableHead>
-                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-6 text-center">Frequency</TableHead>
-                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-6 text-center">Next Run</TableHead>
-                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-6 text-center">Status</TableHead>
-                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-6 text-right">Actions</TableHead>
+                    <TableHeader className="bg-slate-900/50">
+                        <TableRow className="border-slate-800 hover:bg-transparent">
+                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-8 h-14">Infrastructure Target</TableHead>
+                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-8">Standard protocol</TableHead>
+                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-8 text-center">Frequency</TableHead>
+                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-8 text-center">Next Run</TableHead>
+                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-8 text-center">Status</TableHead>
+                            <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-8 text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isMonitoringLoading ? (
-                            <TableRow><TableCell colSpan={6} className="h-32 text-center text-slate-400">Synchronizing monitoring state...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="h-40 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                         ) : monitoringConfigs?.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-32 text-center text-slate-400">No active monitoring pipelines detected.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="h-40 text-center text-slate-500 font-bold uppercase text-[10px] tracking-widest">No active monitoring pipelines detected in grid.</TableCell></TableRow>
                         ) : (
                             monitoringConfigs?.map((config) => {
                                 const client = clients?.find((c) => c.id === config.clientId);
                                 const ruleset = rulesets?.find((r) => r.id === config.rulesetId);
                                 return (
-                                    <TableRow key={config.id} className="border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
-                                        <TableCell className="px-6 py-4 font-bold text-foreground">{client?.companyName || 'Unknown Vendor'}</TableCell>
-                                        <TableCell className="px-6 py-4">
-                                            <Badge variant="outline" className="text-[10px] font-semibold border-primary/20 text-primary bg-primary/5 uppercase">
-                                                {ruleset?.standard || 'Custom'}
+                                    <TableRow key={config.id} className="border-slate-900 hover:bg-slate-900/30 transition-colors">
+                                        <TableCell className="px-8 py-6">
+                                           <div className="flex flex-col">
+                                             <span className="font-black text-slate-100 uppercase tracking-tight">{client?.companyName || 'Undefined_Entity'}</span>
+                                             <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">UID: {config.id?.toString().padStart(4, '0')}</span>
+                                           </div>
+                                        </TableCell>
+                                        <TableCell className="px-8">
+                                            <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 text-primary bg-primary/5 px-3 h-6">
+                                                {ruleset?.standard || 'CUSTOM_PROTOCOL'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="px-6 py-4 text-center font-semibold text-slate-500 text-xs">Every {config.frequencyDays} days</TableCell>
-                                        <TableCell className="px-6 py-4 text-center font-semibold text-slate-500 text-xs italic">
-                                            {config.nextRun ? format(new Date(config.nextRun), "MMM d, yyyy") : 'Pending Schedule'}
+                                        <TableCell className="px-8 text-center font-black text-slate-400 text-[10px] uppercase">Every {config.frequencyDays}D</TableCell>
+                                        <TableCell className="px-8 text-center font-black text-slate-500 text-[10px] uppercase italic">
+                                            {config.nextRun ? format(new Date(config.nextRun), "MMM dd, yyyy") : 'UNSCHEDULED'}
                                         </TableCell>
-                                        <TableCell className="px-6 py-4 text-center">
-                                            <Badge className={config.isActive ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-slate-100 text-slate-400 border-slate-200"}>
-                                                {config.isActive ? 'OPERATIONAL' : 'PAUSED'}
+                                        <TableCell className="px-8 text-center">
+                                            <Badge className={config.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-black text-[9px]" : "bg-slate-900 text-slate-600 border-slate-800 font-black text-[9px]"}>
+                                                {config.isActive ? 'OPERATIONAL' : 'OFFLINE'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="px-6 py-4 text-right">
-                                            <div className="flex justify-end gap-2">
+                                        <TableCell className="px-8 text-right">
+                                            <div className="flex justify-end gap-3">
                                                 <Switch 
                                                     checked={!!config.isActive} 
                                                     onCheckedChange={(v) => updateMonitoring({ id: config.id, updates: { isActive: v } })} 
                                                 />
                                                  <Button 
-                                                     variant="ghost" 
+                                                     variant="outline" 
                                                      size="icon" 
-                                                     className="h-8 w-8 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10"
+                                                     className="h-9 w-9 rounded-xl bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500 hover:border-rose-500/30"
                                                      onClick={() => {
-                                                         if (window.confirm("Are you sure you want to terminate this monitoring pipeline? This action cannot be undone.")) {
+                                                         if (window.confirm("CRITICAL: Terminate monitoring pipeline?")) {
                                                              deleteMonitoring(config.id);
                                                          }
                                                      }}
@@ -352,16 +425,16 @@ export default function Compliance() {
         </div>
 
         {/* TDF Visualizer */}
-        <Card className="border-slate-200 dark:border-slate-800 shadow-md rounded-2xl overflow-hidden border-b-4 border-b-primary/20">
-            <CardHeader className="pb-2">
+        <Card className="bg-slate-950 border-slate-800 shadow-2xl rounded-[2.5rem] overflow-hidden border-l-4 border-l-primary/30 group">
+            <CardHeader className="pb-4 border-b border-slate-900">
                 <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg font-bold flex items-center gap-3">
-                        <Globe className="w-5 h-5 text-primary" /> Transborder Data Flows
+                    <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-3">
+                        <Globe className="w-4 h-4 text-primary" /> Transborder Data Flow (TDF) Matrix
                     </CardTitle>
-                    <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 px-3 py-0.5 text-[10px] font-semibold">WHITELISTED</Badge>
+                    <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Global_Adequacy: Active</Badge>
                 </div>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <TDFNode 
                         origin="KSA (Riyadh)" 
@@ -391,38 +464,49 @@ export default function Compliance() {
 
 function TDFNode({ origin, destination, status, standard }: { origin: string, destination: string, status: 'compliant' | 'warning', standard: string }) {
     return (
-        <div className="bg-slate-50 dark:bg-slate-900/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800 group hover:border-primary/40 transition-all shadow-sm relative overflow-hidden">
-            <div className={`absolute top-0 right-0 w-1 h-full ${status === 'compliant' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Path</span>
-                <Badge variant="outline" className={`${status === 'compliant' ? 'text-emerald-500 border-emerald-500/20' : 'text-amber-500 border-amber-500/20'} font-bold uppercase text-[8px] h-4`}>
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl group hover:border-primary/40 transition-all shadow-xl relative overflow-hidden">
+            <div className={`absolute top-0 right-0 w-1 h-full ${status === 'compliant' ? 'bg-emerald-500/50' : 'bg-amber-500/50'}`} />
+            <div className="flex items-center justify-between mb-6">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-mono">NODE_ROUTE</span>
+                <Badge variant="outline" className={`${status === 'compliant' ? 'text-emerald-500 border-emerald-500/20' : 'text-amber-500 border-amber-500/20'} font-black uppercase text-[8px] h-4`}>
                     {status}
                 </Badge>
             </div>
-            <div className="flex items-center gap-2 justify-between">
-                <span className="text-sm font-bold text-foreground">{origin}</span>
-                <ArrowRight className="w-3 h-3 text-slate-400" />
-                <span className="text-sm font-bold text-foreground">{destination}</span>
+            <div className="flex items-center gap-3 justify-between">
+                <span className="text-sm font-black text-slate-100 uppercase tracking-tight">{origin}</span>
+                <div className="flex-1 border-b border-dashed border-slate-800 relative">
+                   <ArrowRight className="w-3 h-3 text-primary absolute left-1/2 -top-1.5 -translate-x-1/2" />
+                </div>
+                <span className="text-sm font-black text-slate-100 uppercase tracking-tight">{destination}</span>
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-500">
-                <span className="font-semibold uppercase">Standard:</span>
-                <span className="font-bold text-foreground">{standard}</span>
+            <div className="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center text-[9px]">
+                <span className="font-black text-slate-600 uppercase tracking-widest">Protocol:</span>
+                <span className="font-black text-primary uppercase">{standard}</span>
             </div>
         </div>
     );
 }
 
-function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType, label: string, value: string, color: string }) {
+function StatCard({ icon: Icon, label, value, color, trend }: { icon: any, label: string, value: string, color: string, trend?: string }) {
     return (
-        <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-6 rounded-xl flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg group-hover:scale-110 transition-transform">
-            <Icon className={`w-5 h-5 ${color}`} />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</div>
-            <div className="text-2xl font-bold tracking-tight text-foreground">{value}</div>
-          </div>
-        </div>
+        <Card className="bg-slate-950 border-slate-800 rounded-2xl shadow-xl overflow-hidden group hover:border-primary/20 transition-all">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-4">
+               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 group-hover:scale-110 transition-transform">
+                 <Icon className={`w-5 h-5 ${color}`} />
+               </div>
+               {trend && (
+                 <Badge variant="secondary" className="bg-slate-900 text-[8px] font-black uppercase text-slate-500 tracking-tighter">
+                   {trend}
+                 </Badge>
+               )}
+            </div>
+            <div>
+              <div className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] mb-1">{label}</div>
+              <div className="text-2xl font-black tracking-tighter text-slate-100 italic uppercase">{value}</div>
+            </div>
+          </CardContent>
+        </Card>
     );
 }
 
@@ -433,17 +517,69 @@ function DPOItem({ vendor, status, expiry, region }: { vendor: string, status: '
         missing: 'text-rose-500 bg-rose-500/10 border-rose-500/20'
     };
     return (
-        <div className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
-            <div className="flex items-center gap-3">
-                <Badge variant="outline" className="text-[9px] font-bold text-slate-400 border-slate-200 dark:border-slate-800 uppercase px-1.5 h-4">{region}</Badge>
+        <div className="p-5 flex items-center justify-between hover:bg-slate-900/40 transition-colors group">
+            <div className="flex items-center gap-4">
+                <Badge variant="outline" className="text-[8px] font-black text-slate-500 border-slate-800 uppercase px-2 h-4">{region}</Badge>
                 <div className="flex flex-col">
-                    <span className="text-sm font-bold text-foreground leading-tight">{vendor}</span>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase mt-0.5">Expiry: {expiry}</span>
+                    <span className="text-sm font-black text-slate-200 uppercase tracking-tight group-hover:text-primary transition-colors">{vendor}</span>
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mt-0.5">Exp: {expiry}</span>
                 </div>
             </div>
-            <Badge variant="outline" className={`${colors[status]} border font-bold uppercase text-[8px] h-4 px-2`}>
+            <Badge variant="outline" className={`${colors[status]} border font-black uppercase text-[8px] h-4 px-2`}>
                 {status}
             </Badge>
         </div>
+    );
+}
+
+function RemediationSuggestionItem({ suggestion, onAccept, onDismiss }: { suggestion: any, onAccept: () => void, onDismiss: () => void }) {
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="group relative"
+        >
+            <Card className="bg-slate-950 border-slate-800 rounded-[2rem] overflow-hidden hover:border-primary/40 transition-all shadow-2xl flex flex-col h-full border-b-4 border-b-primary/10">
+                <CardHeader className="pb-4">
+                    <div className="flex justify-between items-start">
+                        <Badge variant="outline" className="bg-slate-900 border-slate-800 text-primary text-[8px] font-black uppercase px-2 h-5 tracking-widest">
+                            {suggestion.category || "General Compliance"}
+                        </Badge>
+                        <Badge className={`text-[8px] font-black uppercase h-5 px-2 ${
+                            suggestion.severity === 'critical' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
+                            suggestion.severity === 'high' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                            'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                        }`}>
+                            {suggestion.severity || "Medium"}
+                        </Badge>
+                    </div>
+                    <CardTitle className="text-lg font-black italic tracking-tighter uppercase text-slate-100 mt-4 leading-tight">
+                        {suggestion.title || "Remediation Action Required"}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 pb-6">
+                    <p className="text-xs text-slate-400 font-medium line-clamp-3">
+                        {suggestion.description}
+                    </p>
+                </CardContent>
+                <CardFooter className="pt-4 border-t border-slate-900 grid grid-cols-2 gap-3 bg-slate-900/20">
+                    <Button 
+                        variant="ghost" 
+                        onClick={onDismiss}
+                        className="rounded-xl h-10 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-100 hover:bg-slate-800"
+                    >
+                        Dismiss
+                    </Button>
+                    <Button 
+                        onClick={onAccept}
+                        className="rounded-xl h-10 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 text-[10px] font-black uppercase tracking-widest gap-2"
+                    >
+                        <Zap className="w-3 h-3 fill-current" /> Apply Fix
+                    </Button>
+                </CardFooter>
+            </Card>
+        </motion.div>
     );
 }

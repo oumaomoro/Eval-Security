@@ -294,15 +294,71 @@ CREATE TABLE IF NOT EXISTS remediation_suggestions (
     accepted_at TIMESTAMPTZ
 );
 
+-- Contract Versions
+CREATE TABLE IF NOT EXISTS contract_versions (
+    id SERIAL PRIMARY KEY,
+    contract_id INTEGER NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    file_url TEXT NOT NULL,
+    changes_summary TEXT,
+    created_by UUID REFERENCES profiles(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Cloud Accounts
+CREATE TABLE IF NOT EXISTS cloud_accounts (
+    id SERIAL PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL, -- aws, azure, gcp, digitalocean, other
+    account_name TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    region TEXT,
+    status TEXT DEFAULT 'active',
+    last_sync_at TIMESTAMPTZ,
+    compliance_score INTEGER DEFAULT 100,
+    iam_policy_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Infrastructure Assets
+CREATE TABLE IF NOT EXISTS infrastructure_assets (
+    id SERIAL PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    cloud_account_id INTEGER REFERENCES cloud_accounts(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    asset_type TEXT NOT NULL, -- compute, storage, database, network, firewall, other
+    resource_id TEXT,
+    severity TEXT DEFAULT 'none',
+    exposure_type TEXT DEFAULT 'private',
+    tags JSONB,
+    last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+    vulnerability_count INTEGER DEFAULT 0,
+    misconfiguration_flags JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Playbooks
 CREATE TABLE IF NOT EXISTS playbooks (
     id SERIAL PRIMARY KEY,
     workspace_id INTEGER REFERENCES workspaces(id),
     name TEXT NOT NULL,
     description TEXT,
-    category TEXT NOT NULL,
-    rules JSONB NOT NULL,
-    is_active BOOLEAN DEFAULT true
+    category TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Playbook Rules
+CREATE TABLE IF NOT EXISTS playbook_rules (
+    id SERIAL PRIMARY KEY,
+    playbook_id INTEGER NOT NULL REFERENCES playbooks(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    condition JSONB NOT NULL,
+    action JSONB NOT NULL,
+    priority INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- User Playbooks
@@ -322,6 +378,30 @@ CREATE TABLE IF NOT EXISTS notification_channels (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Presence (Real-time collaboration)
+CREATE TABLE IF NOT EXISTS presence (
+    id SERIAL PRIMARY KEY,
+    workspace_id INTEGER REFERENCES workspaces(id),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    resource_type TEXT, -- contract, studio, etc.
+    resource_id TEXT,
+    last_seen_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Report Schedules
+CREATE TABLE IF NOT EXISTS report_schedules (
+    id SERIAL PRIMARY KEY,
+    workspace_id INTEGER REFERENCES workspaces(id),
+    title TEXT NOT NULL,
+    type TEXT NOT NULL,
+    frequency TEXT NOT NULL, -- daily, weekly, monthly, quarterly
+    regulatory_bodies JSONB DEFAULT '[]',
+    next_run TIMESTAMPTZ,
+    last_run TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Comments
@@ -696,7 +776,10 @@ CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members(
 CREATE INDEX IF NOT EXISTS idx_subscriptions_workspace ON subscriptions(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_remediation_tasks_workspace ON remediation_tasks(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_clause_library_workspace ON clause_library(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_cloud_accounts_workspace ON cloud_accounts(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_infrastructure_assets_workspace ON infrastructure_assets(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_playbook_rules_playbook ON playbook_rules(playbook_id);
+CREATE INDEX IF NOT EXISTS idx_report_schedules_workspace ON report_schedules(workspace_id);
 
 -- =========================================================
 SELECT 'Schema sync v3 complete — all tables and columns patched.' AS status;

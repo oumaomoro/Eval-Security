@@ -225,6 +225,29 @@ export const api = {
         })),
       },
     },
+    suggestions: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/remediation-suggestions' as const,
+        responses: {
+          200: z.array(z.any()),
+        },
+      },
+      accept: {
+        method: 'POST' as const,
+        path: '/api/remediation-suggestions/:id/accept' as const,
+        responses: {
+          200: z.any(),
+        },
+      },
+      dismiss: {
+        method: 'POST' as const,
+        path: '/api/remediation-suggestions/:id/dismiss' as const,
+        responses: {
+          200: z.any(),
+        },
+      },
+    },
   },
   auditRulesets: {
     list: {
@@ -791,6 +814,34 @@ export const api = {
           }),
           401: errorSchemas.validation,
           500: errorSchemas.internal,
+        },
+      },
+    },
+  },
+  admin: {
+    stats: {
+      method: 'GET' as const,
+      path: '/api/admin/stats' as const,
+      responses: {
+        200: z.any(),
+      },
+    },
+    users: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/admin/users' as const,
+        responses: {
+          200: z.array(z.any()),
+        },
+      },
+      updateTier: {
+        method: 'POST' as const,
+        path: '/api/admin/users/:userId/tier' as const,
+        input: z.object({
+          tier: z.enum(['free', 'starter', 'pro', 'enterprise']),
+        }),
+        responses: {
+          200: z.object({ success: z.boolean(), user: z.any() }),
         },
       },
     },

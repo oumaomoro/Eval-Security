@@ -185,7 +185,9 @@ app.use((req, res, next) => {
       }
 
       const timestamp = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
-      console.log(`${timestamp} [express] ${logLine}`);
+      if (process.env.NODE_ENV !== 'production' || res.statusCode >= 400) {
+        console.log(`${timestamp} [express] ${logLine}`);
+      }
     }
   });
 
@@ -196,9 +198,7 @@ const httpServer = createServer(app);
 
 (async () => {
   try {
-    console.log("[BOOTSTRAP] Registering routes...");
     await registerRoutes(httpServer, app);
-    console.log("[BOOTSTRAP] Routes registered.");
 
     // Sentry error handler must be before any other error middleware and after all controllers
     // Sentry v10 compatible error handler
@@ -219,10 +219,8 @@ const httpServer = createServer(app);
     if (process.env.NODE_ENV === "production") {
       serveStatic(app);
     } else {
-      console.log("[BOOTSTRAP] Starting Vite...");
       const { setupVite } = await import("./vite.js");
       await setupVite(httpServer, app);
-      console.log("[BOOTSTRAP] Vite ready.");
     }
 
     // Optimization: Skip heavyweight init on Vercel cold starts unless explicitly requested
@@ -233,20 +231,18 @@ const httpServer = createServer(app);
       if (!process.env.VERCEL) {
         const port = parseInt(process.env.PORT || "3200", 10);
         httpServer.listen(port, "0.0.0.0", () => {
-          console.log(`[SERVER] serving on port ${port}`);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[SERVER] serving on port ${port}`);
+          }
           setTimeout(() => {
-            console.log("[BOOTSTRAP] Starting background tasks...");
             seedDatabase().catch((e: any) => console.error("Seed failed:", e));
             AutonomicEngine.start();
           }, 1000);
         });
       } else {
-        console.log("[Vercel] Bootstrapping Vercel Serverless Execution (Init Enabled)...");
         seedDatabase().catch((e: any) => console.error("Seed failed:", e));
         AutonomicEngine.start();
       }
-    } else {
-      console.log("[Vercel] Skipping cold-start background tasks (Use FORCE_INIT=true to override)");
     }
   } catch (err: any) {
     console.error("CRITICAL STARTUP ERROR:", err);

@@ -78,6 +78,14 @@ router.post("/process-monitoring", async (req, res) => {
             details: `Continuous monitoring triggered automated audit for ${contractIds.length} contracts.`
           });
 
+          // E. Trigger the actual AI analysis execution
+          if (config.workspaceId) {
+            // We run this in the background to avoid blocking the main sweep
+            AuditService.runAudit(audit.id, config.workspaceId).catch(err => {
+              console.error(`[CRON] Background Audit Execution Failed for ${audit.id}:`, err.message);
+            });
+          }
+
           // D. (Phase 30) Auto-recalculate Vendor Scorecard
           const vendorName = contracts[0]?.vendorName;
           if (vendorName && config.workspaceId) {

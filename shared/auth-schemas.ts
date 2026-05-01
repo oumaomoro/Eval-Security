@@ -10,6 +10,10 @@ export const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters."),
 });
 
+export const magicLinkSchema = z.object({
+  email: z.string().email("A valid enterprise email is required."),
+});
+
 export const registrationSchema = z.object({
   email: z.string().email("A valid enterprise email is required."),
   password: z.string()

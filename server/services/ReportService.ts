@@ -15,7 +15,6 @@ export class ReportService {
    * Generates a new report artifact based on requested type and scope.
    */
   static async generateReport(workspaceId: number, type: string, filters: any = {}): Promise<Report> {
-    console.log(`[REPORTS] Generating ${type} report for Workspace ${workspaceId}`);
 
     // 1. Fetch relevant data clusters
     const [contracts, compliance, risks, savings] = await Promise.all([
@@ -46,8 +45,13 @@ export class ReportService {
         messages: [{ role: "user", content: aiPrompt }]
       });
       if (response) executiveSummary = response;
-    } catch (e) {
-      console.warn("[REPORT-SERVICE] AI Summary failed:", e);
+    } catch (e: any) {
+      await storage.createInfrastructureLog({
+        component: "ReportService",
+        event: "AI_SUMMARY_FAILURE",
+        status: "analyzing",
+        actionTaken: `AI Executive Summary failed for workspace ${workspaceId}: ${e.message}`
+      }).catch(() => {});
     }
 
     const summary = {
@@ -137,11 +141,23 @@ export class ReportService {
                    schedule.recipientEmail, 
                    report.id, 
                    report.title
-                ).catch(e => console.error(`[REPORTS] Email dispatch failed for schedule ${schedule.id}:`, e));
-             }
+                 ).catch(async e => {
+                    await storage.createInfrastructureLog({
+                       component: "ReportService",
+                       event: "REPORT_DISPATCH_FAILURE",
+                       status: "analyzing",
+                       actionTaken: `Email dispatch failed for schedule ${schedule.id}: ${e.message}`
+                    }).catch(() => {});
+                 });
+              }
 
-          } catch (err) {
-             console.error(`[REPORTS] Schedule processing failed for ID ${schedule.id}:`, err);
+          } catch (err: any) {
+             await storage.createInfrastructureLog({
+                component: "ReportService",
+                event: "SCHEDULE_EXECUTION_FAILURE",
+                status: "analyzing",
+                actionTaken: `Schedule processing failed for ID ${schedule.id}: ${err.message}`
+             }).catch(() => {});
           }
        }
     }
@@ -166,7 +182,14 @@ export class ReportService {
         schedule.recipientEmail, 
         report.id, 
         report.title
-      ).catch(e => console.error(`[REPORTS] Email dispatch failed for schedule ${schedule.id}:`, e));
+      ).catch(async e => {
+        await storage.createInfrastructureLog({
+           component: "ReportService",
+           event: "REPORT_MANUAL_DISPATCH_FAILURE",
+           status: "analyzing",
+           actionTaken: `Email dispatch failed for schedule ${schedule.id}: ${e.message}`
+        }).catch(() => {});
+      });
     }
 
     return report;

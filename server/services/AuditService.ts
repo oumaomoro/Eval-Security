@@ -1,5 +1,6 @@
 import { adminClient as supabase } from "./supabase.js";
 import { InsertAuditLog } from "../../shared/schema.js";
+import { storage } from "../storage";
 
 /**
  * Phase 17: Hardened Audit Service (Chain of Custody)
@@ -39,7 +40,13 @@ export class AuditService {
       // 🚨 CRITICAL FAULT TOLERANCE 🚨
       // Audit failures must never break the main request lifecycle in an enterprise deployment.
       // We trap the fault and escalate it silently for operational analysis.
-      console.error(`[AuditService - CHAIN OF CUSTODY INTEGRITY WARNING] Failed to persist telemetry for action [${logEntry.action}]:`, err.message);
+      const { storage } = await import("../storage.js");
+      await storage.createInfrastructureLog({
+        component: "AuditService",
+        event: "AUDIT_PERSISTENCE_FAILURE",
+        status: "analyzing",
+        actionTaken: `Failed to persist telemetry for action [${logEntry.action}]: ${err.message}`
+      }).catch(() => {});
     }
   }
 
@@ -96,6 +103,7 @@ export class AuditService {
         "findings": [
           {
             "id": "finding_1",
+            "vendor_name": "string (must match one of the provided vendors)",
             "requirement": "string",
             "description": "string",
             "status": "non_compliant|partial|compliant",
@@ -106,7 +114,22 @@ export class AuditService {
         ]
       }`;
       
-      let analysisResult = { 
+      interface AuditAnalysis {
+        overallScore: number;
+        executiveSummary: string;
+        findings: Array<{
+          id: string;
+          vendor_name?: string;
+          requirement: string;
+          description: string;
+          status: string;
+          severity: string;
+          remediation: string;
+          evidence: string;
+        }>;
+      }
+
+      let analysisResult: AuditAnalysis = { 
         overallScore: 85, 
         executiveSummary: `Automated audit completed for ${contracts.length} contracts. High-level analysis indicates stable posture with minor administrative gaps.`,
         findings: [] 
@@ -120,7 +143,12 @@ export class AuditService {
         });
         analysisResult = JSON.parse(response || "{}");
       } catch (aiErr: any) {
-        console.warn("[AuditService] Intelligence batch analysis failed:", aiErr.message);
+        await storage.createInfrastructureLog({
+          component: "AuditService",
+          event: "INTELLIGENCE_AUDIT_FAILURE",
+          status: "analyzing",
+          actionTaken: `Intelligence batch analysis failed: ${aiErr.message}`
+        });
       }
 
       // Update Audit with High-Fidelity Intelligence
@@ -128,25 +156,61 @@ export class AuditService {
         status: "completed",
         overallComplianceScore: analysisResult.overallScore || 85,
         executiveSummary: analysisResult.executiveSummary,
-        findings: analysisResult.findings || []
+        findings: (analysisResult.findings || []) as any
       });
+
+      // Phase 35: Auto-create remediation tasks for critical/high findings
+      if (analysisResult.findings && Array.isArray(analysisResult.findings)) {
+        for (const finding of analysisResult.findings) {
+          if (finding.severity === "critical" || finding.severity === "high") {
+            // Find the relevant contract for this finding (simplification: use the first if ambiguous)
+            const contractId = contracts.find(c => c.vendor_name === finding.vendor_name)?.id || contractIds[0];
+            
+            await storage.createRemediationTask({
+              workspaceId,
+              contractId,
+              findingId: finding.id,
+              title: finding.requirement || "Compliance Remediation Required",
+              description: finding.description,
+              severity: finding.severity,
+              status: "pending",
+              gapDescription: finding.description,
+              suggestedClauses: finding.remediation,
+              dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
+            }).catch(async e => {
+               await storage.createInfrastructureLog({
+                 component: "AuditService",
+                 event: "REMEDIATION_TASK_FAILURE",
+                 status: "analyzing",
+                 actionTaken: `Failed to create remediation task for finding ${finding.id}: ${e.message}`
+               });
+            });
+          }
+        }
+      }
 
       // Broadcast completion
       const { NotificationService } = await import("./NotificationService.js");
       await NotificationService.broadcastEvent(workspaceId, "audit.completed", {
           title: "Continuous Audit Completed",
-          message: `The continuous audit "${audit.audit_name}" has finished processing.`,
+          message: `The continuous audit "${audit.audit_name}" has finished processing and identified ${analysisResult.findings?.filter((f: any) => f.severity === 'critical' || f.severity === 'high').length || 0} priority remediation tasks.`,
           link: `/compliance/audits/${auditId}`,
           severity: "info"
       });
 
     } catch (err: any) {
-      console.error(`[AuditService - runAudit ERROR] Audit ID ${auditId}:`, err.message);
       const { storage } = await import("../storage.js");
+      await storage.createInfrastructureLog({
+        component: "AuditService",
+        event: "AUDIT_RUN_ERROR",
+        status: "analyzing",
+        actionTaken: `Audit ID ${auditId} failed: ${err.message}`
+      });
+      
       await storage.updateComplianceAudit(auditId, {
         status: "failed",
         executiveSummary: "Audit failed due to a system error: " + err.message
-      }).catch(e => console.error("Failed to update audit status to failed:", e));
+      }).catch(() => {});
     }
   }
 }

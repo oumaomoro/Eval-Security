@@ -101,37 +101,37 @@ export default function Dashboard() {
 
         {/* Enterprise Intelligence row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           <Card className="border-slate-200 dark:border-slate-800 shadow-sm bg-gradient-to-br from-blue-50/30 to-indigo-50/30 dark:from-blue-950/10 dark:to-indigo-950/10">
+           <Card className="nutanix-card bg-gradient-to-br from-blue-900/10 to-indigo-900/10">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                   <CardTitle className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                   <CardTitle className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Zap className="w-3 h-3" />
                     Intelligence Efficiency
                   </CardTitle>
-                  <Badge variant="outline" className="bg-blue-100/50 dark:bg-blue-900/30 text-[10px]">Optimized</Badge>
+                  <Badge variant="outline" className="bg-blue-900/30 border-blue-500/20 text-[8px] text-blue-400 uppercase font-black">Optimized</Badge>
                 </div>
               </CardHeader>
               <CardContent>
                  <div className="flex items-end justify-between">
                     <div>
-                      <p className="text-2xl font-bold text-foreground">
+                      <p className="text-3xl font-black text-white italic">
                         {stats?.intelligenceEfficiency?.totalCached || 0}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">Optimized Audit Checks</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Optimized Audit Checks</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-bold text-emerald-500 flex items-center gap-1 justify-end">
+                      <p className="text-sm font-black text-emerald-400 flex items-center gap-1 justify-end italic">
                         +${stats?.intelligenceEfficiency?.totalSavedUsd?.toFixed(2) || "0.00"}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">Efficiency Savings</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Efficiency Savings</p>
                     </div>
                  </div>
               </CardContent>
            </Card>
 
-           <Card className="border-slate-200 dark:border-slate-800 shadow-sm bg-gradient-to-br from-emerald-50/30 to-teal-50/30 dark:from-emerald-950/10 dark:teal-950/10">
+           <Card className="nutanix-card bg-gradient-to-br from-emerald-900/10 to-teal-900/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                <CardTitle className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] flex items-center gap-2">
                   <Activity className="w-3 h-3" />
                   Regional Distribution
                 </CardTitle>
@@ -140,22 +140,22 @@ export default function Dashboard() {
                  <div className="flex items-center gap-2">
                     {stats?.regionalDistribution?.map((d: RegionalSharding) => (
                       <div key={d.region} className="flex-1">
-                        <div className="h-1 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
                            <div 
-                             className="h-full bg-emerald-500 transition-all duration-1000" 
+                             className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000" 
                              style={{ width: `${(d.count / (stats.totalContracts || 1)) * 100}%` }}
                            />
                         </div>
-                        <p className="text-[9px] mt-1 text-muted-foreground uppercase font-mono">{d.region}</p>
+                        <p className="text-[8px] mt-2 text-slate-500 uppercase font-black tracking-widest">{d.region}</p>
                       </div>
                     ))}
                  </div>
               </CardContent>
            </Card>
 
-           <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
+           <Card className="nutanix-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <CardTitle className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                   <Users className="w-3 h-3" />
                   Live Collaborators
                 </CardTitle>
@@ -164,17 +164,17 @@ export default function Dashboard() {
                  <div className="flex items-center gap-2">
                     <div className="flex -space-x-2">
                        {[...Array(Math.min(stats?.collaborativeMetrics?.activeCollaborators || 1, 5))].map((_, i) => (
-                         <div key={i} className="w-6 h-6 rounded-full border-2 border-background bg-primary/10 flex items-center justify-center text-[10px] font-bold">
-                           U{i+1}
+                         <div key={i} className="w-7 h-7 rounded-full border-2 border-[#0a0a0a] bg-slate-900 flex items-center justify-center text-[10px] font-black text-slate-300">
+                           {String.fromCharCode(65 + i)}
                          </div>
                        ))}
                     </div>
-                    <p className="text-xs text-muted-foreground ml-1">
-                      {stats?.collaborativeMetrics?.activeCollaborators || 0} currently active
+                    <p className="text-[10px] text-slate-500 ml-1 font-bold">
+                      {stats?.collaborativeMetrics?.activeCollaborators || 0} active sessions
                     </p>
-                    <div className="ml-auto flex items-center gap-1">
+                    <div className="ml-auto flex items-center gap-2 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                       <span className="text-[10px] font-medium text-emerald-500">Live</span>
+                       <span className="text-[8px] font-black text-emerald-400 uppercase italic">Live Sync</span>
                     </div>
                  </div>
               </CardContent>

@@ -68,9 +68,10 @@ export class BenchmarkingService {
     
     if (benchmarks.length === 0) return [];
 
-    // 2. Use Intelligence to match the contract's service to the closest market benchmark
+    // 2. Use Intelligence to identify multiple savings opportunities
     const prompt = `
-      Analyze this contract and find the closest match in our market benchmark library.
+      You are an expert Procurement and Cost Optimization Analyst. 
+      Analyze this contract against market benchmarks and identify ALL possible savings opportunities.
       
       CONTRACT:
       Category: ${contract.category}
@@ -79,36 +80,51 @@ export class BenchmarkingService {
       Service: ${contract.productService}
       
       BENCHMARK LIBRARY:
-      ${benchmarks.map(b => `- ID: ${b.id}, Type: ${b.serviceType}, Market Savg Annual: $${b.marketAverageAnnual}`).join('\n')}
+      ${benchmarks.map(b => `- Type: ${b.serviceType}, Market Average: $${b.marketAverageAnnual}`).join('\n')}
+      
+      Identify opportunities in these categories:
+      - market_pricing_optimization (Price is above market average)
+      - vendor_consolidation (Similar services can be merged)
+      - license_optimization (Potential over-provisioning)
+      - alternative_vendor (Cheaper regional alternatives available)
       
       Respond in JSON format:
       {
-        "matchedBenchmarkId": number | null,
-        "matchConfidence": number (0-1),
-        "analysis": "string explaining why this is a match or mismatch",
-        "isAboveMarket": boolean,
-        "estimatedSavingsPotential": number
+        "opportunities": [
+          {
+            "type": "string",
+            "description": "string",
+            "estimatedSavings": number,
+            "confidence": number (0-1)
+          }
+        ]
       }
     `;
 
     try {
       const response = await IntelligenceGateway.generateAnalysis(prompt);
       const result = JSON.parse(typeof response === 'string' ? response : JSON.stringify(response));
+      const createdOps: SavingsOpportunity[] = [];
 
-      if (result.isAboveMarket && result.estimatedSavingsPotential > 0 && result.matchConfidence > 0.7) {
-        console.log(`[BENCHMARK] Savings detected: $${result.estimatedSavingsPotential} potential for ${contract.vendorName}`);
-        
-        const savingsObj = await storage.createSavingsOpportunity({
-          workspaceId: contract.workspaceId || 1,
-          contractId: contract.id,
-          description: `Identified potential annual savings of $${result.estimatedSavingsPotential} based on East African market benchmarks for ${contract.category}. Analysis: ${result.analysis}`,
-          type: "market_pricing_optimization",
-          estimatedSavings: result.estimatedSavingsPotential,
-          status: "identified"
-        });
-
-        return [savingsObj];
+      if (result.opportunities && Array.isArray(result.opportunities)) {
+        for (const op of result.opportunities) {
+          if (op.estimatedSavings > 0 && op.confidence > 0.6) {
+            console.log(`[BENCHMARK] Savings detected: $${op.estimatedSavings} (${op.type}) for ${contract.vendorName}`);
+            
+            const savingsObj = await storage.createSavingsOpportunity({
+              workspaceId: contract.workspaceId || 1,
+              contractId: contract.id,
+              description: op.description,
+              type: op.type,
+              estimatedSavings: op.estimatedSavings,
+              status: "identified"
+            });
+            createdOps.push(savingsObj);
+          }
+        }
       }
+
+      return createdOps;
     } catch (err: any) {
       console.error("[BENCHMARK] Intelligence Analysis failed:", err.message);
     }

@@ -22,8 +22,6 @@ export class RiskEngine {
     const contract = await storage.getContract(contractId);
     if (!contract) throw new Error("Contract not found for risk analysis");
 
-    console.log(`[RISK-ENGINE] Initiating deep analysis for ${contract.vendorName} (${contract.category})`);
-
     const prompt = `
       You are an expert Cybersecurity Risk Auditor. Conduct a comprehensive risk analysis for the following contract.
       
@@ -107,11 +105,15 @@ export class RiskEngine {
         }
       }
 
-      console.log(`[RISK-ENGINE] Successfully identified ${identifiedRisks.length} risks for ${contract.vendorName}`);
       return identifiedRisks;
 
     } catch (err: any) {
-      console.error("[RISK-ENGINE] Deep analysis failed:", err.message);
+      await storage.createInfrastructureLog({
+        component: "RiskEngine",
+        event: "RISK_ANALYSIS_ERROR",
+        status: "analyzing",
+        actionTaken: `Deep analysis failed for contract ${contractId}: ${err.message}`
+      });
       return [];
     }
   }

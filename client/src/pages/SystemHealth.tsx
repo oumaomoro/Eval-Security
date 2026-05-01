@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { 
     Activity, ShieldCheck, Zap, AlertCircle, Loader2, Server, 
-    Database, Cpu, Globe, RefreshCcw, TrendingUp, DollarSign 
+    Database, Cpu, Globe, RefreshCcw, TrendingUp, DollarSign,
+    PieChart, SignalHigh, ShieldAlert, Lock as LockIcon, Fingerprint
 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart as RePieChart, Pie, Cell } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardStats } from "@/hooks/use-dashboard";
-import { useInfrastructureLogs, useHealInfrastructure } from "@/hooks/use-infrastructure";
+import { useInfrastructureLogs, useHealInfrastructure, useAdminStats } from "@/hooks/use-infrastructure";
 import { useBillingTelemetry } from "@/hooks/use-billing";
 
 export default function SystemHealth() {
@@ -21,10 +22,10 @@ export default function SystemHealth() {
     
     const { data: stats, isLoading: loadingStats } = useDashboardStats();
     const { data: infraLogs, isLoading: loadingLogs } = useInfrastructureLogs();
-    const { data: billing, isLoading: loadingBilling } = useBillingTelemetry();
+    const { data: adminStats, isLoading: loadingAdmin } = useAdminStats();
     const heal = useHealInfrastructure();
 
-    if (loadingStats || loadingLogs || loadingBilling) {
+    if (loadingStats || loadingLogs || loadingAdmin) {
         return <Layout><div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
     }
 
@@ -34,29 +35,32 @@ export default function SystemHealth() {
     const usage = stats?.contractsCount || 0;
     const usagePercent = limit === 'Unlimited' ? 0 : Math.min((usage / parseInt(limit)) * 100, 100);
 
+    const revenue = adminStats?.revenue || 0;
+    const failedWebhooks = adminStats?.failedWebhooks || 0;
+
     return (
-        <Layout header={<h1 className="text-2xl font-bold flex items-center gap-2"><Server className="w-6 h-6 text-primary" /> Global Infrastructure Console</h1>}>
+        <Layout header={<h1 className="text-2xl font-bold flex items-center gap-2"><Server className="w-6 h-6 text-primary" /> Global Sovereignty Console</h1>}>
             <div className="space-y-8 pb-12">
                 
-                {/* Real-time Health Matrix */}
+                {/* High-Fidelity Health Matrix */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <HealthCard label="API Latency" value={`${technical.apiResponseTimeAvgMs}ms`} icon={Zap} trend="-12ms" color="text-cyan-500" />
-                    <HealthCard label="Intelligence Precision" value={`${technical.aiAccuracyRate}%`} icon={Cpu} trend="+0.2%" color="text-purple-500" />
-                    <HealthCard label="Global Uptime" value={`${technical.systemUptime}%`} icon={Globe} trend="Stable" color="text-emerald-500" />
-                    <HealthCard label="Error Rate" value={`${stats?.technicalMetrics?.errorRate || 0.1}%`} icon={AlertCircle} trend="Low" color="text-blue-500" />
+                    <HealthCard label="Platform MRR" value={`$${revenue.toLocaleString()}`} icon={DollarSign} trend="Live" color="text-emerald-500" />
+                    <HealthCard label="Global Uptime" value={`${technical.systemUptime}%`} icon={Globe} trend="Stable" color="text-primary" />
+                    <HealthCard label="Failed Hooks" value={failedWebhooks.toString()} icon={SignalHigh} trend={failedWebhooks > 0 ? "Critical" : "Stable"} color={failedWebhooks > 0 ? "text-red-500" : "text-blue-500"} />
                 </div>
 
-                {/* Infrastructure & Remediation */}
+                {/* Infrastructure & Intelligence Health */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <Card className="lg:col-span-2 bg-slate-950 border-slate-800 shadow-2xl">
                         <CardHeader className="border-b border-slate-900 pb-4">
                             <div className="flex justify-between items-center">
                                 <CardTitle className="text-lg flex items-center gap-2"><Activity className="w-5 h-5 text-primary" /> Autonomous Operations Ledger</CardTitle>
                                 <Button variant="outline" size="sm" className="h-8 border-slate-800 text-xs" onClick={() => queryClient.invalidateQueries({ queryKey: [api.infrastructure.logs.path] })}>
-                                    <RefreshCcw className="w-3 h-3 mr-2" /> Sync
+                                    <RefreshCcw className="w-3 h-3 mr-2" /> Sync Grid
                                 </Button>
                             </div>
-                            <CardDescription>Real-time monitoring and self-healing events across the Costloci grid.</CardDescription>
+                            <CardDescription>Real-time monitoring and self-healing events across the Cyber-Optimize sovereign grid.</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="space-y-4">
@@ -101,81 +105,154 @@ export default function SystemHealth() {
                     <div className="space-y-6">
                         <Card className="bg-slate-950 border-slate-800">
                             <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Resource & Plan Saturation</CardTitle>
+                                <CardTitle className="text-lg flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Saturation & Load</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <ResourceMetric label={`Contract Capacity (${tier})`} value={Math.round(usagePercent)} />
-                                <ResourceMetric label="CPU Usage (Vector Engine)" value={45} />
-                                <ResourceMetric label="Memory Consumption" value={62} />
+                                <ResourceMetric label="Intelligence Inference Load" value={45} />
+                                <ResourceMetric label="Vector Memory Index" value={62} />
                                 <ResourceMetric label="Database Connection Pool" value={28} />
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center font-black text-primary">ROI</div>
-                                    <div>
-                                        <h4 className="text-sm font-black uppercase tracking-tighter text-slate-100">Intelligence Efficiency Factor</h4>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Performance Intelligence</p>
-                                    </div>
+                        <Card className="bg-slate-950 border-slate-800">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2"><PieChart className="w-5 h-5 text-primary" /> Resource Allocation</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[180px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RePieChart>
+                                            <Pie
+                                                data={adminStats?.allocationData || []}
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {adminStats?.allocationData?.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={index === 0 ? '#06b6d4' : index === 1 ? '#3b82f6' : '#10b981'} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip 
+                                                contentStyle={{ backgroundColor: '#020617', border: '1px solid #1e293b', borderRadius: '8px' }}
+                                            />
+                                        </RePieChart>
+                                    </ResponsiveContainer>
                                 </div>
-                                <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800">
-                                    <div className="flex justify-between items-end">
-                                        <span className="text-[10px] font-black text-slate-500 uppercase">Cost per Intelligence Run</span>
-                                        <span className="text-lg font-black text-emerald-500 font-mono">$0.42</span>
-                                    </div>
-                                    <Progress value={85} className="h-1.5 mt-3" />
-                                    <p className="text-[9px] text-slate-500 font-bold font-semibold mt-3">Target Efficiency: 95%</p>
+                                <div className="flex justify-center gap-4 mt-2">
+                                    {adminStats?.allocationData?.map((entry: any, index: number) => (
+                                        <div key={entry.name} className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: index === 0 ? '#06b6d4' : index === 1 ? '#3b82f6' : '#10b981' }} />
+                                            <span className="text-[10px] font-black text-slate-500 uppercase">{entry.name}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
                 </div>
 
-                {/* Billing & Telemetry Heatmap Section */}
+                {/* Traffic Intelligence Chart */}
                 <Card className="bg-slate-950 border-slate-800">
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <div>
-                                <CardTitle className="text-lg flex items-center gap-2"><DollarSign className="w-5 h-5 text-emerald-500" /> Usage Telemetry & Operational Costs</CardTitle>
-                                <CardDescription>Correlating platform intelligence usage with financial overhead in real-time.</CardDescription>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-500" /><span className="text-[10px] font-black text-slate-400 uppercase">Usage</span></div>
-                                <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-[10px] font-black text-slate-400 uppercase">Cost</span></div>
+                                <CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Platform Traffic Intelligence</CardTitle>
+                                <CardDescription>Global request volume across all enterprise tenants.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent>
                         <div className="h-[300px] w-full mt-4">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={billing?.slice(0, 15).reverse().map((b: any) => ({ 
-                                    time: new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
-                                    usage: b.value, 
-                                    cost: b.cost 
-                                })) || []}>
+                                <AreaChart data={adminStats?.trafficData || []}>
                                     <defs>
-                                        <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                                        </linearGradient>
-                                        <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                    <XAxis dataKey="time" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                                    <XAxis dataKey="name" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
                                     <Tooltip 
                                         contentStyle={{ backgroundColor: '#020617', border: '1px solid #1e293b', borderRadius: '12px' }}
                                         labelStyle={{ color: '#94a3b8', fontWeight: 'bold' }}
                                     />
-                                    <Area type="monotone" dataKey="usage" stroke="#06b6d4" fillOpacity={1} fill="url(#colorUsage)" strokeWidth={2} />
-                                    <Area type="monotone" dataKey="cost" stroke="#10b981" fillOpacity={1} fill="url(#colorCost)" strokeWidth={2} />
+                                    <Area type="monotone" dataKey="requests" stroke="#3b82f6" fillOpacity={1} fill="url(#colorTraffic)" strokeWidth={2} />
                                 </AreaChart>
                             </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Administrative Command Center */}
+                <Card className="bg-slate-950 border-slate-800 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute -right-20 -top-20 w-64 h-64 bg-red-500/5 rounded-full blur-3xl group-hover:bg-red-500/10 transition-colors" />
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center">
+                              <ShieldAlert className="w-5 h-5 text-red-500" />
+                           </div>
+                           <div>
+                              <CardTitle className="text-lg font-black uppercase italic tracking-tighter">Sovereign Control Panel</CardTitle>
+                              <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Privileged Administrative Directives</CardDescription>
+                           </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Button 
+                                variant="outline" 
+                                className="h-16 rounded-2xl bg-slate-950 border-slate-800 hover:bg-primary/10 hover:border-primary/40 group transition-all"
+                                onClick={async () => {
+                                    const res = await fetch("/api/admin/system/resync", { method: "POST" });
+                                    if (res.ok) alert("Global infrastructure re-sync triggered.");
+                                }}
+                            >
+                                <div className="flex items-center gap-4 text-left w-full">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center group-hover:rotate-180 transition-transform duration-700">
+                                        <Activity className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black uppercase text-slate-200">Force Re-sync</p>
+                                        <p className="text-[9px] font-medium text-slate-500 uppercase">Refresh all telemetry nodes</p>
+                                    </div>
+                                </div>
+                            </Button>
+
+                            <Button 
+                                variant="outline" 
+                                className="h-16 rounded-2xl bg-slate-950 border-slate-800 hover:bg-red-500/10 hover:border-red-500/40 group transition-all"
+                                onClick={async () => {
+                                    if (confirm("CRITICAL: Are you sure you want to initiate a platform-wide emergency shutdown?")) {
+                                        const res = await fetch("/api/admin/system/shutdown", { method: "POST" });
+                                        if (res.ok) alert("Shutdown protocol initiated.");
+                                    }
+                                }}
+                            >
+                                <div className="flex items-center gap-4 text-left w-full">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+                                        <LockIcon className="w-5 h-5 text-red-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black uppercase text-slate-200">Emergency Shutdown</p>
+                                        <p className="text-[9px] font-medium text-slate-500 uppercase">Immediate platform isolation</p>
+                                    </div>
+                                </div>
+                            </Button>
+                        </div>
+                        
+                        <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                                    <Fingerprint className="w-4 h-4 text-slate-500" />
+                                </div>
+                                <p className="text-[10px] font-medium text-slate-500 leading-relaxed uppercase tracking-wider italic">
+                                    "Administrative actions performed via this console are cryptographically signed and logged in the immutable SOC-2 ledger. Unauthorized execution will trigger an automatic security lock of the operator's credentials."
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -194,7 +271,7 @@ function HealthCard({ label, value, icon: Icon, trend, color }: any) {
                         <Icon className="w-5 h-5" />
                     </div>
                     {trend && (
-                        <Badge variant="secondary" className="text-[9px] font-black font-semibold bg-slate-900 text-slate-400">
+                        <Badge variant="secondary" className="text-[9px] font-black font-semibold bg-slate-900 text-slate-400 uppercase tracking-tighter">
                             {trend}
                         </Badge>
                     )}

@@ -30,7 +30,9 @@ import vendorsRouter from "./routes/vendors.routes.js";
 import collaborationRouter from "./routes/collaboration.routes.js";
 import playbooksRouter from "./routes/playbooks.routes.js";
 import infrastructureRouter from "./routes/infrastructure.routes.js";
+import adminRouter from "./routes/admin.routes.js";
 import { telemetryMiddleware } from "./middleware/telemetry.js";
+import remediationRouter from "./routes/remediation.routes.js";
 
 import multer from "multer";
 import pdf from "pdf-parse";
@@ -73,11 +75,9 @@ const upload = multer({
 import { workspaceContextMiddleware } from "./middleware/workspace-context-middleware.js";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
-  console.log(`[ROUTES] API Key Rotate Path: ${api.auth.apiKey.rotate.path}`);
 
   // Phase 33: Real-time Collaboration Studio
   CollaborationService.init(httpServer);
-  console.log("[COLLAB] Real-time engine online.");
 
   // Real-time Telemetry Monitor - Hardened entry-point
   app.use(telemetryMiddleware);
@@ -92,14 +92,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Phase 34: Security Hardening - IP allow-listing for admin endpoints
   app.use('/api/admin', (req, res, next) => {
-    // In production, configure ADMIN_ALLOWED_IPS in the environment (e.g., '192.168.1.100,203.0.113.5')
     const allowedIpsStr = process.env.ADMIN_ALLOWED_IPS || '127.0.0.1,::1';
-    if (allowedIpsStr === '*') return next(); // wildcard escape hatch if needed
+    if (allowedIpsStr === '*') return next();
     
     const allowedIps = allowedIpsStr.split(',').map(ip => ip.trim());
     const clientIp = req.headers['x-forwarded-for'] as string || req.ip || req.socket.remoteAddress || '';
-    
-    // x-forwarded-for could be a comma separated list
     const ipToCheck = clientIp.split(',')[0].trim();
 
     if (!allowedIps.includes(ipToCheck) && process.env.NODE_ENV === 'production') {
@@ -109,16 +106,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     next();
   });
 
+  app.use(adminRouter);
+
   // Multi-tenant Workspace Context
   app.use(workspaceContextMiddleware);
 
   // Note: CSRF Protection is applied globally in index.ts for all /api routes
   
   await setupAuth(app);
-  console.log("[ROUTES] Auth setup complete.");
   
   registerAuthRoutes(app);
-  console.log("[ROUTES] Chat routes...");
   registerChatRoutes(app);
   app.use(organizationRouter);
   app.use(workspaceRouter);
@@ -136,6 +133,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use("/api", collaborationRouter);
   app.use("/api", insuranceRouter);
   app.use("/api", playbooksRouter);
+  app.use("/api", remediationRouter);
   app.use(infrastructureRouter);
   app.use("/api/v1", apiV1Router);
   
