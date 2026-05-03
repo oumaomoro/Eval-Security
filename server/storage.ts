@@ -80,6 +80,7 @@ export interface IStorage {
   getContract(id: number): Promise<(Contract & { client?: Client }) | undefined>;
   createContract(contract: InsertContract, userId?: string): Promise<Contract>;
   updateContract(id: number, updates: Partial<InsertContract> & { intelligenceAnalysis?: any }): Promise<Contract>;
+  deleteContract(id: number): Promise<void>;
   getContractVersions(contractId: number): Promise<ContractVersion[]>;
   createContractVersion(version: InsertContractVersion): Promise<ContractVersion>;
 
@@ -253,27 +254,48 @@ export class SupabaseRESTStorage implements IStorage {
     missingTables: []
   };
 
+  private async withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 10000): Promise<T> {
+    let timeoutId: any;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Database request timed out")), timeoutMs);
+    });
+    try {
+      const result = await Promise.race([promise, timeoutPromise]);
+      clearTimeout(timeoutId);
+      return result;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  }
+
   private async handleResponse<T>(promise: PromiseLike<{ data: T | null, error: any }>): Promise<T> {
-    const { data, error } = await promise;
-    if (error) {
-      console.error("[SUPABASE ERROR]", error);
-      if (error.message?.includes('schema cache') || error.message?.includes('not found')) {
-        this.healthStatus.mode = 'degraded';
-        const tableMatch = error.message.match(/table 'public\.(\w+)'/);
-        if (tableMatch && !this.healthStatus.missingTables.includes(tableMatch[1])) {
-          this.healthStatus.missingTables.push(tableMatch[1]);
+    try {
+      const { data, error } = await this.withTimeout(promise);
+      if (error) {
+        console.error("[SUPABASE ERROR]", error);
+        if (error.message?.includes('schema cache') || error.message?.includes('not found')) {
+          this.healthStatus.mode = 'degraded';
+          const tableMatch = error.message.match(/table 'public\.(\w+)'/);
+          if (tableMatch && !this.healthStatus.missingTables.includes(tableMatch[1])) {
+            this.healthStatus.missingTables.push(tableMatch[1]);
+          }
         }
+        throw new Error(error.message);
       }
-      throw new Error(error.message);
+      
+      if (this.healthStatus.mode === 'degraded' && this.healthStatus.missingTables.length === 0) {
+         this.healthStatus.mode = 'sovereign';
+      }
+      
+      return data as T;
+    } catch (err: any) {
+      if (err.message === "Database request timed out") {
+        this.healthStatus.mode = 'degraded';
+        console.error("[STORAGE CRITICAL] DB TIMEOUT DETECTED");
+      }
+      throw err;
     }
-    
-    // Recovery: If we hit a successful response, ensure we clear any stale degraded markers
-    // unless there are still confirmed missing tables known.
-    if (this.healthStatus.mode === 'degraded' && this.healthStatus.missingTables.length === 0) {
-       this.healthStatus.mode = 'sovereign';
-    }
-    
-    return data as T;
   }
 
   private mapContract(d: any): Contract & { client?: Client } {
@@ -353,6 +375,8 @@ export class SupabaseRESTStorage implements IStorage {
       webauthnId: row.webauthn_id,
       webauthnCredential: row.webauthn_credential,
       mfaEnabled: row.mfa_enabled,
+      paypalSubscriptionId: row.paypal_subscription_id,
+      lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at) : undefined,
       apiKey: row.api_key ? (row.api_key.includes('|') ? `${row.api_key.split('|')[0]}...${row.api_key.slice(-4)}` : row.api_key) : null,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
@@ -495,6 +519,32 @@ export class SupabaseRESTStorage implements IStorage {
     return { ...contract, client };
   }
 
+  async getExpiringContracts(daysLimit: number = 30): Promise<Contract[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const now = new Date();
+    const limitDate = new Date();
+    limitDate.setDate(now.getDate() + daysLimit);
+
+    let query = supabase.from("contracts")
+      .select("*")
+      .gte("renewal_date", now.toISOString().split('T')[0])
+      .lte("renewal_date", limitDate.toISOString().split('T')[0]);
+
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
+    const data = await this.handleResponse<any[]>(query);
+    return (data || []).map(d => this.mapContract(d));
+  }
+
+  async getContractsByStatus(status: string): Promise<Contract[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("contracts").select("*").eq("status", status);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
+    const data = await this.handleResponse<any[]>(query);
+    return (data || []).map(d => this.mapContract(d));
+  }
+
   async createContract(contract: InsertContract, userId?: string): Promise<Contract> {
     let workspaceId = storageContext.getStore()?.workspaceId || contract.workspaceId;
     
@@ -588,6 +638,13 @@ export class SupabaseRESTStorage implements IStorage {
       query.select("*").single()
     );
     return this.mapContract(data);
+  }
+
+  async deleteContract(id: number): Promise<void> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("contracts").delete().eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    await this.handleResponse(query);
   }
 
   // --- COMPLIANCE ---
@@ -793,39 +850,6 @@ export class SupabaseRESTStorage implements IStorage {
     await this.handleResponse(supabase.from("playbook_rules").delete().eq("id", id));
   }
 
-  // --- NOTIFICATION CHANNELS (Enterprise Webhooks Option C) --- //
-  async getNotificationChannels(workspaceId?: number): Promise<any[]> {
-    let query = supabase.from("notification_channels").select("*");
-    if (workspaceId) query = query.eq("workspace_id", workspaceId);
-    return this.handleResponse<any[]>(query);
-  }
-
-  async createNotificationChannel(channel: any): Promise<any> {
-    const data = await this.handleResponse<any[]>(supabase.from("notification_channels").insert({
-      workspace_id: storageContext.getStore()?.workspaceId || channel.workspaceId,
-      client_id: channel.clientId, // keeping for legacy
-      provider: channel.provider,
-      webhook_url: channel.webhookUrl,
-      events: channel.events,
-      is_active: channel.isActive ?? true
-    }).select());
-    return data[0];
-  }
-
-  async updateNotificationChannel(id: number, updates: any): Promise<any> {
-    const payload: any = {};
-    if (updates.webhookUrl !== undefined) payload.webhook_url = updates.webhookUrl;
-    if (updates.isActive !== undefined) payload.is_active = updates.isActive;
-    if (updates.events !== undefined) payload.events = updates.events;
-    if (updates.provider !== undefined) payload.provider = updates.provider;
-
-    const data = await this.handleResponse<any[]>(supabase.from("notification_channels").update(payload).eq("id", id).select());
-    return data[0];
-  }
-
-  async deleteNotificationChannel(id: number): Promise<void> {
-    await this.handleResponse(supabase.from("notification_channels").delete().eq("id", id));
-  }
 
   async getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]> {
     const workspaceId = storageContext.getStore()?.workspaceId;
@@ -1863,6 +1887,8 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.clientId !== undefined) payload.client_id = updates.clientId;
     if (updates.profileImageUrl !== undefined) payload.profile_image_url = updates.profileImageUrl;
     if (updates.subscriptionTier !== undefined) payload.subscription_tier = updates.subscriptionTier;
+    if (updates.paypalSubscriptionId !== undefined) payload.paypal_subscription_id = updates.paypalSubscriptionId;
+    if (updates.lastSyncAt !== undefined) payload.last_sync_at = updates.lastSyncAt;
     if (updates.contractsCount !== undefined) payload.contracts_count = updates.contractsCount;
     
     if (updates.apiKey !== undefined) {
@@ -2984,12 +3010,74 @@ export class SupabaseRESTStorage implements IStorage {
       webauthnCredential: d.webauthn_credential,
       mfaEnabled: d.mfa_enabled,
       subscriptionTier: d.subscription_tier,
+      paypalSubscriptionId: d.paypal_subscription_id,
+      lastSyncAt: d.last_sync_at ? new Date(d.last_sync_at) : null,
       contractsCount: d.contracts_count,
       apiKey: d.api_key,
       createdAt: d.created_at ? new Date(d.created_at) : new Date(),
       updatedAt: d.updated_at ? new Date(d.updated_at) : null
     }));
   }
+
+  // --- NOTIFICATIONS ---
+  async getNotificationChannels(workspaceId?: number): Promise<any[]> {
+    const targetWorkspaceId = workspaceId || storageContext.getStore()?.workspaceId;
+    if (!targetWorkspaceId) return [];
+
+    const data = await this.handleResponse<any[]>(
+      supabase.from("notification_channels")
+        .select("*")
+        .eq("workspace_id", targetWorkspaceId)
+    );
+
+    return (data || []).map(d => ({
+      ...d,
+      workspaceId: d.workspace_id,
+      webhookUrl: d.webhook_url,
+      channelType: d.channel_type,
+      isEnabled: d.is_enabled,
+      createdAt: d.created_at ? new Date(d.created_at) : null
+    }));
+  }
+
+  async createNotificationChannel(channel: any): Promise<any> {
+    const data = await this.handleResponse<any>(
+      supabase.from("notification_channels")
+        .insert({
+          workspace_id: channel.workspaceId,
+          channel_type: channel.channelType,
+          webhook_url: channel.webhookUrl,
+          is_enabled: channel.isEnabled ?? true,
+          metadata: channel.metadata
+        })
+        .select()
+        .single()
+    );
+    return data;
+  }
+
+  async updateNotificationChannel(id: number, updates: any): Promise<any> {
+    const payload: any = {};
+    if (updates.webhookUrl !== undefined) payload.webhook_url = updates.webhookUrl;
+    if (updates.isEnabled !== undefined) payload.is_enabled = updates.isEnabled;
+    if (updates.metadata !== undefined) payload.metadata = updates.metadata;
+
+    const data = await this.handleResponse<any>(
+      supabase.from("notification_channels")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+    );
+    return data;
+  }
+
+  async deleteNotificationChannel(id: number): Promise<void> {
+    await this.handleResponse(
+      supabase.from("notification_channels").delete().eq("id", id)
+    );
+  }
+
 }
 
 export const storage = new SupabaseRESTStorage();

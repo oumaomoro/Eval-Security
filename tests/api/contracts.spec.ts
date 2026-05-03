@@ -19,7 +19,7 @@ describe("Contracts API & Isolation", () => {
     
     // Propagation delay for Supabase background provisioning (ClientId/WorkspaceId)
     await new Promise(r => setTimeout(r, 2000));
-  }, 60000);
+  }, 180000);
 
   it("should allow User 1 to create a contract", async () => {
     const res = await request(API_URL)

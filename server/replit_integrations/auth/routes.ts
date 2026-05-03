@@ -39,6 +39,16 @@ export function registerAuthRoutes(app: Express): void {
         user = await healUserIdentity(req.user, user);
       }
 
+      // ── AUTO-SYNC: Proactive PayPal Status Check (Phase 37 Live Sync) ──
+      if (user && user.paypalSubscriptionId && (!user.lastSyncAt || Date.now() - new Date(user.lastSyncAt).getTime() > 24 * 60 * 60 * 1000)) {
+         // Background Sync to avoid blocking the response
+         fetch(`${req.protocol}://${req.get("host")}/api/billing/sync-subscription`, {
+           method: "POST",
+           headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+           body: JSON.stringify({ subscriptionId: user.paypalSubscriptionId })
+         }).catch(e => console.error("[AUTH SYNC] Background sync failed:", e.message));
+      }
+
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
@@ -149,7 +159,7 @@ export function registerAuthRoutes(app: Express): void {
           lastName,
           clientId: client.id,
           role: "admin",
-          subscriptionTier: "starter"
+          subscriptionTier: "free"
         });
 
         await storage.createInfrastructureLog({
@@ -664,7 +674,7 @@ async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
       lastName,
       clientId,
       role: "admin", // Explicitly force admin role for enterprise pivot
-      subscriptionTier: "starter"
+      subscriptionTier: "free"
     });
 
     await storage.createInfrastructureLog({

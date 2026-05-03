@@ -26,7 +26,9 @@ export const users = pgTable("profiles", {
   webauthnId: varchar("webauthn_id"),
   webauthnCredential: text("webauthn_credential"),
   mfaEnabled: boolean("mfa_enabled").default(false),
-  subscriptionTier: varchar("subscription_tier").default("starter"), // starter, pro, enterprise
+  subscriptionTier: varchar("subscription_tier").default("free"), // free, pro, enterprise
+  paypalSubscriptionId: varchar("paypal_subscription_id"),
+  lastSyncAt: timestamp("last_sync_at"),
   contractsCount: integer("contracts_count").default(0),
   apiKey: text("api_key"),
   createdAt: timestamp("created_at").defaultNow(),

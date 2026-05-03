@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Zap, Crown, Rocket, Loader2, Shield, TrendingUp, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Zap, Crown, Rocket, Loader2, Shield, TrendingUp, AlertTriangle, ShieldCheck, Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -59,7 +59,6 @@ export default function Billing() {
         title: "Payment Successful",
         description: "Your account has been upgraded. It may take a moment for the status to reflect.",
       });
-      // Clear the URL parameters
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("canceled") === "true") {
       toast({
@@ -75,12 +74,19 @@ export default function Billing() {
     queryKey: ["/api/billing/telemetry"],
   });
 
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const isAfricanTZ = tz.startsWith('Africa/');
+  
+  const [selectedGateway, setSelectedGateway] = useState<'paystack' | 'paypal' | 'stripe'>(
+    isAfricanTZ ? 'paystack' : 'paypal'
+  );
+
   const subscribeMutation = useMutation({
     mutationFn: async (planType: string) => {
       const res = await fetch("/api/billing/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planType }),
+        body: JSON.stringify({ planType, gateway: selectedGateway }),
       });
       if (!res.ok) throw new Error((await res.json()).message || "Subscription failed");
       return res.json();
@@ -129,40 +135,69 @@ export default function Billing() {
     <Layout header={<h1 className="text-2xl font-bold flex items-center gap-2"><Shield className="w-6 h-6 text-primary" /> Billing Hub</h1>}>
       <div className="space-y-8 pb-12">
 
-        {/* Usage Summary */}
-        <Card className="bg-slate-950 border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold text-slate-300 flex items-center justify-between">
-              <span className="flex items-center gap-2">
+        {/* Payment Provider Selector & Usage */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Card className="bg-slate-950 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" /> Contract Usage
-              </span>
-              <Badge variant="outline" className="text-primary border-primary/30 text-xs">
-                {currentPlan.name}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">
-                {contractsUsed} / {currentPlan.contractLimit === Infinity ? "∞" : currentPlan.contractLimit} contracts
-              </span>
-              {nearLimit && (
-                <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
-                  <AlertTriangle className="w-3 h-3" /> Approaching limit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">
+                  {contractsUsed} / {currentPlan.contractLimit === Infinity ? "∞" : currentPlan.contractLimit} contracts
                 </span>
+                {nearLimit && (
+                  <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
+                    <AlertTriangle className="w-3 h-3" /> Approaching limit
+                  </span>
+                )}
+              </div>
+              {currentPlan.contractLimit !== Infinity && (
+                <Progress
+                  value={usagePercent}
+                  className={`h-2 ${nearLimit ? "[&>div]:bg-amber-500" : "[&>div]:bg-primary"}`}
+                />
               )}
-            </div>
-            {currentPlan.contractLimit !== Infinity && (
-              <Progress
-                value={usagePercent}
-                className={`h-2 ${nearLimit ? "[&>div]:bg-amber-500" : "[&>div]:bg-primary"}`}
-              />
-            )}
-            {loadingTelemetry ? null : (
-              <p className="text-xs text-slate-500">Billing cycle spend: <span className="text-white font-semibold">${totalSpend.toFixed(2)}</span></p>
-            )}
-          </CardContent>
-        </Card>
+              {loadingTelemetry ? null : (
+                <p className="text-xs text-slate-500">Tier: <span className="text-white font-semibold capitalize">{currentPlan.name}</span></p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-950 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-primary" /> Preferred Payment Provider
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                {[
+                  { id: 'paystack', name: 'Paystack', region: 'Africa' },
+                  { id: 'paypal', name: 'PayPal', region: 'Global' },
+                  { id: 'stripe', name: 'Stripe', region: 'Cards' }
+                ].map((gate) => (
+                  <Button
+                    key={gate.id}
+                    variant={selectedGateway === gate.id ? "default" : "outline"}
+                    className="flex-1 text-[10px] h-9 gap-1.5"
+                    onClick={() => setSelectedGateway(gate.id as any)}
+                  >
+                    {gate.name}
+                    <Badge variant="outline" className={`text-[8px] h-3 px-1 ${selectedGateway === gate.id ? "border-white/30 text-white" : "border-slate-800 text-slate-500"}`}>
+                      {gate.region}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-3 text-center">
+                {isAfricanTZ ? "Detected African region: Defaulting to localized Paystack processing." : "Global region detected: Defaulting to PayPal/Stripe."}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Plan Grid */}
         <div>
@@ -207,7 +242,7 @@ export default function Billing() {
                   </CardHeader>
                   <CardContent className="flex-grow pt-0">
                     <ul className="space-y-2">
-                      {plan.features.map((f, i) => (
+                      {plan.features.map((f: string, i: number) => (
                         <li key={i} className="flex items-center gap-2 text-xs text-slate-400">
                           <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
                           {f}
@@ -235,6 +270,70 @@ export default function Billing() {
               );
             })}
           </div>
+        </div>
+
+        {/* Billing History */}
+        <div>
+          <h2 className="text-lg font-semibold text-slate-200 mb-5 flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-500" /> Billing History
+          </h2>
+          <Card className="bg-slate-950 border-slate-800 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900/50 border-b border-slate-800">
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Item</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {telemetry?.filter(t => t.metricType.includes("mrr") || t.metricType.includes("capture")).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-10 text-center text-slate-500 text-sm">
+                          No transaction history found.
+                        </td>
+                      </tr>
+                    ) : (
+                      telemetry?.filter(t => t.metricType.includes("mrr") || t.metricType.includes("capture")).map((item) => (
+                        <tr key={item.id} className="hover:bg-slate-900/30 transition-colors">
+                          <td className="px-6 py-4 text-xs text-slate-300 font-medium">
+                            {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : "N/A"}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge variant="outline" className="bg-slate-900 border-slate-800 text-[10px] font-bold text-slate-400 capitalize">
+                              {item.metricType.replace(/_/g, ' ')}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-bold text-white">
+                            ${item.value.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-500 uppercase">
+                              <CheckCircle2 className="w-3 h-3" /> Paid
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 px-3 text-xs text-primary hover:text-white hover:bg-primary/20 gap-1.5"
+                              onClick={() => window.open(`/api/billing/invoice/${item.id}`, "_blank")}
+                            >
+                              <Download className="w-3 h-3" /> Invoice
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Compliance Badges */}

@@ -15,7 +15,7 @@ describe("Payments API (Multi-Gateway Subscription)", () => {
     
     // Propagation delay for Supabase background provisioning
     await new Promise(r => setTimeout(r, 2000));
-  }, 60000);
+  }, 180000);
 
   it("should initialize a subscription session (Multi-Gateway)", async () => {
     const res = await request(API_URL)

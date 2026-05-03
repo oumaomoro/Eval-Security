@@ -2,11 +2,36 @@ import { Router } from "express";
 import { storage } from "../storage.js";
 import { Resend } from "resend";
 import { SOC2Logger } from "../services/SOC2Logger.js";
+import { AutonomicEngine } from "../services/AutonomicEngine.js";
 
 const router = Router();
 
 // Ensure Resend falls back to missing if not provided so it doesn't crash on init
 const resend = new Resend(process.env.RESEND_API_KEY || "missing");
+
+/**
+ * Autonomic Heartbeat Pulse Cron
+ * Triggered externally by Vercel Cron / System Scheduler.
+ */
+router.post("/pulse", async (req, res) => {
+  try {
+    const cronSecret = process.env.CRON_SECRET || "dev_cron_secret";
+    const authHeader = req.headers.authorization;
+
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      console.warn("[CRON] Unauthorized attempt to trigger autonomic pulse.");
+      return res.status(401).json({ message: "Unauthorized Trigger" });
+    }
+
+    // Trigger the autonomic heartbeat
+    await AutonomicEngine.pulse();
+
+    res.json({ success: true, message: "Autonomic pulse executed successfully." });
+  } catch (error: any) {
+    console.error("[CRON] Autonomic Pulse Failure:", error);
+    res.status(500).json({ message: "Autonomic pulse failed.", error: error.message });
+  }
+});
 
 /**
  * Enterprise Report Scheduler Cron

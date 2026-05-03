@@ -26,9 +26,7 @@ export class IntelligenceGateway {
     requestInProgress: boolean;
   }> = {
     deepseek: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
-    gemini: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
     openai: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
-    anthropic: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
     huggingface: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
     ollama: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false }
   };
@@ -154,9 +152,9 @@ export class IntelligenceGateway {
   }
 
   /**
-   * Helper for robust API execution
+   * Helper for robust API execution with Exponential Backoff (Phase 38 Hardening)
    */
-  private static async withRetryAndTimeout<T>(fn: () => Promise<T>, timeoutMs = 15000, maxRetries = 2): Promise<T> {
+  private static async withRetryAndTimeout<T>(fn: () => Promise<T>, timeoutMs = 25000, maxRetries = 3): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       let timeoutId: any;
       try {
@@ -171,12 +169,18 @@ export class IntelligenceGateway {
         if (attempt === maxRetries) {
            throw error;
         }
+
+        const backoffMs = 1000 * Math.pow(2, attempt - 1);
+        console.warn(`[INTELLIGENCE-GATEWAY] Attempt ${attempt} failed: ${error.message}. Backing off for ${backoffMs}ms...`);
+        
         await storage.createInfrastructureLog({
           component: "IntelligenceGateway",
           event: "REQUEST_RETRY",
           status: "analyzing",
-          actionTaken: `Attempt ${attempt} failed: ${error.message}. Retrying...`
+          actionTaken: `Attempt ${attempt} failed: ${error.message}. Exponential backoff: ${backoffMs}ms.`
         }).catch(() => {});
+
+        await new Promise(res => setTimeout(res, backoffMs));
       }
     }
     throw new Error("Maximum retries exhausted");
@@ -220,7 +224,7 @@ export class IntelligenceGateway {
     let usedProvider = "deepseek";
     let usedModel = "deepseek-chat";
 
-    // 3. Provider Cascade (Enterprise Priority: DeepSeek -> OpenAI -> Anthropic -> Local)
+    // 3. Provider Cascade (Enterprise Priority: DeepSeek -> OpenAI -> HF -> Ollama -> Sovereign)
     
     // 3.1. DeepSeek Primary (Sovereign Excellence)
     if (!responseContent && this.deepseekKey !== "missing" && this.isProviderAvailable("deepseek")) {
@@ -228,60 +232,44 @@ export class IntelligenceGateway {
         const dsParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
         const response: any = await this.withRetryAndTimeout(() => this.getDeepSeek().chat.completions.create(dsParams as any));
         responseContent = response.choices[0]?.message?.content || "";
-        if (responseContent) { usedProvider = "deepseek"; usedModel = dsParams.model; this.recordSuccess("deepseek"); }
-      } catch (error: any) { this.recordFailure("deepseek"); }
+        if (responseContent) { 
+          usedProvider = "deepseek"; 
+          usedModel = dsParams.model; 
+          this.recordSuccess("deepseek"); 
+        }
+      } catch (error: any) { 
+        this.recordFailure("deepseek");
+        await storage.createInfrastructureLog({
+          component: "IntelligenceGateway",
+          event: "AI_FALLBACK_TRIGGERED",
+          status: "analyzing",
+          actionTaken: `DeepSeek failed. Falling back to OpenAI. Error: ${error.message}`
+        }).catch(() => {});
+      }
     }
 
-    // 3.2. Gemini Pro (Sovereign Multimodal Expert)
-    if (!responseContent && this.geminiKey !== "missing" && this.isProviderAvailable("gemini")) {
-      try {
-        const genAI = this.getGemini();
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-        const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
-        const response: any = await this.withRetryAndTimeout(() => model.generateContent(prompt));
-        responseContent = response.response.text() || "";
-        if (responseContent) { usedProvider = "gemini"; usedModel = "gemini-1.5-pro"; this.recordSuccess("gemini"); }
-      } catch (error: any) { this.recordFailure("gemini"); }
-    }
-
-    // 3.3. OpenAI Secondary (Industry Standard)
+    // 3.2. OpenAI Secondary (Industry Standard)
     if (!responseContent && this.openaiKey !== "missing" && this.isProviderAvailable("openai")) {
       try {
         const response: any = await this.withRetryAndTimeout(() => this.getOpenAI().chat.completions.create(params));
         responseContent = response.choices[0]?.message?.content || "";
-        if (responseContent) { usedProvider = "openai"; usedModel = params.model; this.recordSuccess("openai"); }
-      } catch (error: any) { this.recordFailure("openai"); }
-    }
-
-    // 3.4. Anthropic (Specialized Reasoning)
-    if (!responseContent && this.anthropicKey !== "missing" && this.isProviderAvailable("anthropic")) {
-      try {
-        const prompt = params.messages.map(m => `${m.role}: ${m.content}`).join("\n");
-        const response = await this.getAnthropic().messages.create({
-          model: "claude-3-5-sonnet-20241022", max_tokens: 1024, messages: [{ role: "user", content: prompt }]
-        });
-        const content = response.content[0];
-        if (content.type === 'text') { 
-          responseContent = content.text; 
-          usedProvider = "anthropic"; 
-          usedModel = "claude-3-5-sonnet"; 
-          this.recordSuccess("anthropic"); 
+        if (responseContent) { 
+          usedProvider = "openai"; 
+          usedModel = params.model; 
+          this.recordSuccess("openai"); 
         }
-      } catch (error: any) { this.recordFailure("anthropic"); }
+      } catch (error: any) { 
+        this.recordFailure("openai");
+        await storage.createInfrastructureLog({
+          component: "IntelligenceGateway",
+          event: "AI_FALLBACK_TRIGGERED",
+          status: "analyzing",
+          actionTaken: `OpenAI failed. Falling back to Hugging Face. Error: ${error.message}`
+        }).catch(() => {});
+      }
     }
 
-    // 3.5. Local Ollama (Internal Sovereign Privacy)
-    if (!responseContent && this.isProviderAvailable("ollama")) {
-      try {
-        const localBase = process.env.LOCAL_INTELLIGENCE_BASE_URL || process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
-        const localOpenAI = new OpenAI({ apiKey: "ollama", baseURL: localBase });
-        const response: any = await localOpenAI.chat.completions.create({ ...params, model: 'deepseek-r1:1.5b' } as any);
-        responseContent = response.choices[0]?.message?.content || "";
-        if (responseContent) { usedProvider = "ollama"; usedModel = "deepseek-r1:1.5b"; this.recordSuccess("ollama"); }
-      } catch (error: any) { this.recordFailure("ollama"); }
-    }
-
-    // 3.6. Hugging Face Fine-Tuned (Specific Domain Knowledge)
+    // 3.3. Hugging Face Fine-Tuned (Specific Domain Knowledge - KDPA/CBK)
     if (!responseContent && this.hfToken !== "missing" && this.isProviderAvailable("huggingface")) {
       try {
         const hfModelId = process.env.HF_MODEL_ID || "your-username/costloci-kdpa-llama3";
@@ -298,12 +286,56 @@ export class IntelligenceGateway {
           const data = await res.json();
           return data[0]?.generated_text || "";
         }, 30000);
-        if (response) { responseContent = response; usedProvider = "huggingface"; usedModel = hfModelId; this.recordSuccess("huggingface"); }
-      } catch (error: any) { this.recordFailure("huggingface"); }
+        if (response) { 
+          responseContent = response; 
+          usedProvider = "huggingface"; 
+          usedModel = hfModelId; 
+          this.recordSuccess("huggingface"); 
+        }
+      } catch (error: any) { 
+        this.recordFailure("huggingface");
+        await storage.createInfrastructureLog({
+          component: "IntelligenceGateway",
+          event: "AI_FALLBACK_TRIGGERED",
+          status: "analyzing",
+          actionTaken: `Hugging Face failed. Falling back to Local Ollama. Error: ${error.message}`
+        }).catch(() => {});
+      }
+    }
+
+    // 3.4. Local Ollama (Internal Sovereign Privacy / Enterprise On-Prem)
+    if (!responseContent && this.isProviderAvailable("ollama")) {
+      try {
+        const localBase = process.env.LOCAL_INTELLIGENCE_BASE_URL || process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
+        const localOpenAI = new OpenAI({ apiKey: "ollama", baseURL: localBase });
+        const response: any = await localOpenAI.chat.completions.create({ ...params, model: 'deepseek-r1:1.5b' } as any);
+        responseContent = response.choices[0]?.message?.content || "";
+        if (responseContent) { 
+          usedProvider = "ollama"; 
+          usedModel = "deepseek-r1:1.5b"; 
+          this.recordSuccess("ollama"); 
+        }
+      } catch (error: any) { 
+        this.recordFailure("ollama");
+        await storage.createInfrastructureLog({
+          component: "IntelligenceGateway",
+          event: "AI_FALLBACK_TRIGGERED",
+          status: "critical",
+          actionTaken: `Local Ollama failed. Initiating final Sovereign Fallback. Error: ${error.message}`
+        }).catch(() => {});
+      }
     }
 
     // 4. Final Fallback or Success
-    if (!responseContent) return this.executeSovereignFallback(params);
+    if (!responseContent) {
+      await storage.createInfrastructureLog({
+        component: "IntelligenceGateway",
+        event: "SOVEREIGN_FALLBACK_ACTIVATED",
+        status: "critical",
+        actionTaken: "All intelligence providers exhausted. Activating hardcoded sovereign ruleset."
+      }).catch(() => {});
+      return this.executeSovereignFallback(params);
+    }
 
     try {
       await storage.createIntelligenceCache({ promptHash, response: JSON.stringify(responseContent), provider: usedProvider, model: usedModel });

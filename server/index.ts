@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { doubleCsrf } from "csrf-csrf";
 import { registerRoutes, seedDatabase } from "./routes.js";
+import { storage } from "./storage.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { serveStatic } from "./static.js";
 import { sanitizeRequest } from "./middleware/sanitizer.js";
@@ -187,6 +188,18 @@ app.use((req, res, next) => {
       const timestamp = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
       if (process.env.NODE_ENV !== 'production' || res.statusCode >= 400) {
         console.log(`${timestamp} [express] ${logLine}`);
+      }
+
+      // --- AUTONOMIC TELEMETRY: Feed the Heartbeat (Phase 37) ---
+      // We skip telemetry routes to avoid feedback loops
+      if (!path.includes("/billing/telemetry") && !path.includes("/infrastructure/logs")) {
+        storage.createBillingTelemetry({
+          workspaceId: (req as any).headers["x-workspace-id"] ? parseInt((req as any).headers["x-workspace-id"] as string) : undefined,
+          clientId: (req as any).user?.clientId || 0,
+          metricType: "api_call",
+          value: 1,
+          cost: 0
+        }).catch(() => {}); // Fire and forget to minimize latency
       }
     }
   });

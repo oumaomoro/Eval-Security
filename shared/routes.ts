@@ -497,6 +497,10 @@ export const api = {
             systemUptime: z.number(),
             errorRate: z.number(),
             userEngagement: z.number(),
+            cpuLoad: z.number().optional(),
+            memoryUsed: z.string().optional(),
+            aiWorkerLoad: z.number().optional(),
+            dbPoolSaturation: z.number().optional(),
           }).optional(),
           businessMetrics: z.object({
             mrr: z.number(),

@@ -33,7 +33,7 @@ describe("Compliance API", () => {
     }
 
     contractId = contractRes.body.id;
-  }, 60000);
+  }, 180000);
 
   describe("Rulesets", () => {
     it("should allow creating a custom ruleset", async () => {

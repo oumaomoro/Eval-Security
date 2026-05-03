@@ -32,23 +32,36 @@ export async function apiRequest(
     }
   }
 
-  const res = await fetch(fullUrl, {
-    method,
-    credentials: "include",
-    headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
-      "X-Requested-With": "XMLHttpRequest",
-      ...csrfHeader
-    },
-    body: data ? JSON.stringify(data) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-  if (res.status === 401 || res.status === 403) {
-      // Optional: Trigger re-auth flow if needed
+  try {
+    const res = await fetch(fullUrl, {
+      method,
+      credentials: "include",
+      headers: {
+        ...(data ? { "Content-Type": "application/json" } : {}),
+        "X-Requested-With": "XMLHttpRequest",
+        ...csrfHeader
+      },
+      body: data ? JSON.stringify(data) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.status === 401 || res.status === 403) {
+        // Optional: Trigger re-auth flow if needed
+    }
+
+    await throwIfResNotOk(res);
+    return res;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error("Request timed out after 15 seconds");
+    }
+    throw err;
   }
-
-  await throwIfResNotOk(res);
-  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -62,19 +75,32 @@ export const getQueryFn: <T>(options: {
     const path = queryKey.join("/");
     const fullUrl = path.startsWith("http") ? path : `${apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
-    const res = await fetch(fullUrl, {
-      credentials: "include",
-      headers: {
-        "X-Requested-With": "XMLHttpRequest"
-      },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (res.status === 401 || res.status === 403) {
-      if (unauthorizedBehavior === "returnNull") return null;
+    try {
+      const res = await fetch(fullUrl, {
+        credentials: "include",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.status === 401 || res.status === 403) {
+        if (unauthorizedBehavior === "returnNull") return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error("Query timed out after 15 seconds");
+      }
+      throw err;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
@@ -83,11 +109,17 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes by default
+      retry: (failureCount, error: any) => {
+        if (failureCount >= 3) return false;
+        // Don't retry on 4xx errors except 429
+        if (error.message?.startsWith('4') && !error.message?.startsWith('429')) return false;
+        return true;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
     mutations: {
-      retry: false,
+      retry: false, // Standard practice: don't auto-retry mutations to avoid duplicate side effects
     },
   },
 });

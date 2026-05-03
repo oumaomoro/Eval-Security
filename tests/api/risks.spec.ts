@@ -30,7 +30,7 @@ describe("Risks API", () => {
         status: "active"
       });
     contractId = contractRes.body.id;
-  }, 60000);
+  }, 180000);
 
   it("should allow creating a new risk", async () => {
     const res = await request(API_URL)

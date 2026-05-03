@@ -6,13 +6,27 @@ import { SOC2Logger } from "../services/SOC2Logger";
 import { IaCScanner } from "../services/IaCScanner";
 import { SelfHealingEngine } from "../services/SelfHealingEngine";
 import { CloudSyncService } from "../services/CloudSyncService";
+import { AutonomicEngine } from "../services/AutonomicEngine.js";
 
 const infrastructureRouter = Router();
 
 /**
+ * GET /api/infrastructure/health
+ * Returns high-fidelity technical metrics for the Sovereign Engine.
+ */
+infrastructureRouter.get("/infrastructure/health", isAuthenticated, async (req: any, res) => {
+  try {
+    const metrics = AutonomicEngine.getHealthMetrics();
+    res.json(metrics);
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to fetch engine metrics." });
+  }
+});
+
+/**
  * List all cloud accounts for the workspace.
  */
-infrastructureRouter.get("/api/infrastructure/accounts", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.get("/infrastructure/accounts", isAuthenticated, async (req: any, res) => {
   try {
     const accounts = await (storage as any).getCloudAccounts(req.user.workspaceId);
     res.json(accounts);
@@ -24,7 +38,7 @@ infrastructureRouter.get("/api/infrastructure/accounts", isAuthenticated, async 
 /**
  * Register a new cloud account.
  */
-infrastructureRouter.post("/api/infrastructure/accounts", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.post("/infrastructure/accounts", isAuthenticated, async (req: any, res) => {
   try {
     const account = await (storage as any).createCloudAccount({
       ...req.body,
@@ -49,7 +63,7 @@ infrastructureRouter.post("/api/infrastructure/accounts", isAuthenticated, async
 /**
  * Force a sync for a specific account.
  */
-infrastructureRouter.post("/api/infrastructure/accounts/:id/sync", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.post("/infrastructure/accounts/:id/sync", isAuthenticated, async (req: any, res) => {
   try {
     const result = await CloudSyncService.syncAccount(parseInt(req.params.id));
     res.json(result);
@@ -61,7 +75,7 @@ infrastructureRouter.post("/api/infrastructure/accounts/:id/sync", isAuthenticat
 /**
  * List all assets for the workspace.
  */
-infrastructureRouter.get("/api/infrastructure/assets", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.get("/infrastructure/assets", isAuthenticated, async (req: any, res) => {
   try {
     const assets = await (storage as any).getInfrastructureAssets(req.user.workspaceId);
     res.json(assets);
@@ -73,7 +87,7 @@ infrastructureRouter.get("/api/infrastructure/assets", isAuthenticated, async (r
 /**
  * Analyze a specific asset.
  */
-infrastructureRouter.post("/api/infrastructure/assets/:id/analyze", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.post("/infrastructure/assets/:id/analyze", isAuthenticated, async (req: any, res) => {
   try {
     const analysis = await InfrastructureIntelligence.analyzeAsset(parseInt(req.params.id));
     res.json({ analysis });
@@ -85,7 +99,7 @@ infrastructureRouter.post("/api/infrastructure/assets/:id/analyze", isAuthentica
 /**
  * Scan IaC (Terraform/CloudFormation).
  */
-infrastructureRouter.post("/api/infrastructure/scan-iac", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.post("/infrastructure/scan-iac", isAuthenticated, async (req: any, res) => {
   try {
     const { content, fileName } = req.body;
     if (!content) return res.status(400).json({ error: "No content provided" });
@@ -109,11 +123,47 @@ infrastructureRouter.post("/api/infrastructure/scan-iac", isAuthenticated, async
 /**
  * Generate remediation fix for an asset.
  */
-infrastructureRouter.post("/api/infrastructure/remediate", isAuthenticated, async (req: any, res) => {
+infrastructureRouter.post("/infrastructure/remediate", isAuthenticated, async (req: any, res) => {
   try {
     const { assetName, assetType, issue } = req.body;
     const fix = await SelfHealingEngine.generateFix(assetName, assetType, issue);
     res.json(fix);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+/**
+ * GET /api/infrastructure/logs
+ * List recent autonomic infrastructure events.
+ */
+infrastructureRouter.get("/infrastructure/logs", isAuthenticated, async (req: any, res) => {
+  try {
+    const logs = await storage.getInfrastructureLogs();
+    res.json({ data: logs });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+/**
+ * POST /api/infrastructure/heal
+ * Manually initiate a self-healing action for a specific event.
+ */
+infrastructureRouter.post("/infrastructure/heal", isAuthenticated, async (req: any, res) => {
+  try {
+    const { logId } = req.body;
+    if (!logId) return res.status(400).json({ message: "Log ID required" });
+
+    const log = await storage.updateInfrastructureLog(logId, { status: "healed" });
+
+    await SOC2Logger.logEvent(req, {
+      action: "MANUAL_SELF_HEALING",
+      userId: req.user.id,
+      details: `Admin manually healed infrastructure anomaly: ${log.event}`
+    });
+
+    res.json({ data: log });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }

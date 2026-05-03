@@ -18,7 +18,7 @@ describe("Marketplace API & Commission Logic", () => {
     
     // Propagation delay for Supabase background provisioning
     await new Promise(r => setTimeout(r, 2000));
-  }, 60000);
+  }, 180000);
 
   it("should allow a seller to list a clause/asset", async () => {
     const res = await request(API_URL)

@@ -15,6 +15,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { useClients } from "@/hooks/use-clients";
 import { useComplianceAudits } from "@/hooks/use-compliance";
+import { SovereignTelemetry } from "@/components/SovereignTelemetry";
 
 interface RegionalSharding {
   region: string;
@@ -96,7 +97,6 @@ export default function Dashboard() {
           <MetricCard label={t("dashboard.analyzed_contracts")} value={stats?.totalContracts || 0} icon={<FileCheck className="w-5 h-5 text-blue-500" />} />
           <MetricCard label={t("dashboard.critical_risks")} value={stats?.criticalRisks || 0} icon={<ShieldCheck className="w-5 h-5 text-rose-500" />} />
           <MetricCard label="Active Pipelines" value={stats?.activePipelinesCount || 0} icon={<Activity className="w-5 h-5 text-indigo-500" />} />
-          <MetricCard label="Infrastructure Health" value="94%" icon={<Server className="w-5 h-5 text-cyan-500" />} />
         </div>
 
         {/* Enterprise Intelligence row */}
@@ -153,32 +153,7 @@ export default function Dashboard() {
               </CardContent>
            </Card>
 
-           <Card className="nutanix-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <Users className="w-3 h-3" />
-                  Live Collaborators
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                 <div className="flex items-center gap-2">
-                    <div className="flex -space-x-2">
-                       {[...Array(Math.min(stats?.collaborativeMetrics?.activeCollaborators || 1, 5))].map((_, i) => (
-                         <div key={i} className="w-7 h-7 rounded-full border-2 border-[#0a0a0a] bg-slate-900 flex items-center justify-center text-[10px] font-black text-slate-300">
-                           {String.fromCharCode(65 + i)}
-                         </div>
-                       ))}
-                    </div>
-                    <p className="text-[10px] text-slate-500 ml-1 font-bold">
-                      {stats?.collaborativeMetrics?.activeCollaborators || 0} active sessions
-                    </p>
-                    <div className="ml-auto flex items-center gap-2 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                       <span className="text-[8px] font-black text-emerald-400 uppercase italic">Live Sync</span>
-                    </div>
-                 </div>
-              </CardContent>
-           </Card>
+           <SovereignTelemetry />
         </div>
 
         {stats?.totalContracts === 0 ? (

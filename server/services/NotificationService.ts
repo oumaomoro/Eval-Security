@@ -1,4 +1,5 @@
 import { storage } from "../storage.js";
+import { QueueService } from "./QueueService.js";
 
 /**
  * SOVEREIGN NOTIFICATION SERVICE - Phase 26 Enterprise Gateway
@@ -20,16 +21,22 @@ export class NotificationService {
 
       if (!workspaceChannels.length) return;
 
-      const promises = workspaceChannels.map(channel => {
+      workspaceChannels.forEach(channel => {
         // Only send if the event type is subscribed or subscription is empty (all)
         if (channel.events && channel.events.length > 0 && !channel.events.includes(eventType)) {
-          return Promise.resolve();
+          return;
         }
 
-        return this.sendToWebhook(channel.webhook_url, channel.provider, payload);
+        // Enqueue the webhook delivery for asynchronous processing with retries
+        QueueService.enqueue(
+          () => this.sendToWebhook(channel.webhook_url, channel.provider, payload),
+          {
+            label: `webhook::${channel.provider}::${eventType}`,
+            retries: 3,
+            minTimeout: 2000
+          }
+        );
       });
-
-      await Promise.allSettled(promises);
     } catch (error: any) {
       console.error(`[NOTIFICATION SERVICE] Broadcast failed for workspace ${workspaceId}:`, error.message);
     }

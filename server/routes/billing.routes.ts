@@ -4,25 +4,15 @@ import { storage } from "../storage.js";
 import crypto from "crypto";
 import { SOC2Logger } from "../services/SOC2Logger.js";
 import { stripe } from "../services/stripe.js";
+import { PAYPAL_API_BASE, PLANS, getPayPalAccessToken } from "../services/BillingService.js";
 import type Stripe from "stripe";
 
 const billingRouter = Router();
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
-const PAYPAL_API_BASE = "https://api-m.paypal.com";
-
-const PLANS = {
-  starter: process.env.PAYPAL_STARTER_PLAN_ID,
-  pro: process.env.PAYPAL_PRO_PLAN_ID,
-  enterprise: process.env.PAYPAL_ENTERPRISE_PLAN_ID
-};
-
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-const PAYSTACK_API_BASE = "https://api.paystack.co";
 
-if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
-  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_SECRET not set — PayPal checkout will fail.");
+if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET not set — PayPal checkout will fail.");
 }
 if (!PAYSTACK_SECRET_KEY) {
   console.info("[BILLING] INFO: PAYSTACK_SECRET_KEY not set — Paystack gateway skipped.");
@@ -30,7 +20,7 @@ if (!PAYSTACK_SECRET_KEY) {
 if (!process.env.STRIPE_SECRET_KEY) {
   console.info("[BILLING] INFO: STRIPE_SECRET_KEY not set — Stripe gateway skipped. Active gateway: PayPal.");
 }
-if (!PLANS.starter || !PLANS.pro || !PLANS.enterprise) {
+if (!process.env.PAYPAL_STARTER_PLAN_ID || !process.env.PAYPAL_PRO_PLAN_ID || !process.env.PAYPAL_ENTERPRISE_PLAN_ID) {
   console.warn("[BILLING] WARNING: One or more PAYPAL_*_PLAN_ID env vars not set — PayPal subscription creation will fail.");
 }
 
@@ -39,25 +29,6 @@ const STRIPE_PLANS = {
   pro: process.env.STRIPE_PRO_PRICE_ID,
   enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID,
 };
-
-/**
- * Generate a PayPal access token
- */
-async function getPayPalAccessToken() {
-  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64");
-  const response = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: "grant_type=client_credentials"
-  });
-  
-  if (!response.ok) throw new Error("Failed to get PayPal Access Token");
-  const data = await response.json();
-  return data.access_token;
-}
 
 /**
  * Create a subscription checkout session for the user
@@ -77,6 +48,14 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
     const monthlyPrice = basePrices[planType as keyof typeof basePrices] || (planType === "free" ? 0 : 99);
     const finalAmount = isAnnual ? (monthlyPrice * 12 * 0.8) : monthlyPrice; // 20% discount
 
+    // REGIONAL DETECTION & PRIORITIZATION (Phase 38)
+    const africanCountries = ['KE', 'NG', 'GH', 'ZA', 'TZ', 'UG', 'RW'];
+    const userCountry = req.headers['x-vercel-ip-country'] as string;
+    const isAfrican = africanCountries.includes(userCountry);
+    
+    // Explicit selection or implicit regional prioritization
+    const selectedGateway = req.body.gateway || (isAfrican ? 'paystack' : 'paypal');
+
     // 0. FREE TIER BYPASS
     if (planType === "free" || finalAmount === 0) {
       await storage.updateUser(req.user.id, { subscriptionTier: "free" });
@@ -85,7 +64,7 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
           userId: req.user.id,
           details: "Free Trial activated via Billing Hub."
       });
-      return res.json({ success: true, message: "Free plan activated" });
+      return res.json({ success: true, message: "Free plan activated", tier: "free" });
     }
 
     // Mock response for tests to avoid external gateway calls
@@ -93,101 +72,79 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
       return res.json({ 
         approvalUrl: "https://mock-gateway.costloci.local/approve", 
         subscriptionId: "sub_test_mock_123",
-        reference: "ref_test_mock_123"
+        reference: "ref_test_mock_123",
+        gateway: selectedGateway
       });
     }
 
-    // 1. PAYSTACK ENTERPRISE PATH
-    if (PAYSTACK_SECRET_KEY) {
-      const response = await fetch(`${PAYSTACK_API_BASE}/transaction/initialize`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${PAYSTACK_SECRET_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email: req.user.email,
-          amount: Math.round(finalAmount * 100), 
-          callback_url: `${req.protocol}://${req.get("host")}/billing?success=true`,
-          metadata: {
+    // ─── GATEWAY EXECUTION CHAIN (Priority: Paystack > PayPal > Stripe) ───
+
+    // 1. PAYSTACK (Primary for African regions / explicitly selected)
+    const { BillingService } = await import("../services/BillingService.js");
+    if ((selectedGateway === 'paystack' || isAfrican) && PAYSTACK_SECRET_KEY) {
+      try {
+        const result = await BillingService.initializePaystackTransaction(
+          req.user.email,
+          finalAmount,
+          `${req.protocol}://${req.get("host")}/billing?success=true`,
+          {
             userId: req.user.id,
             planType,
             billingInterval,
             finalAmount
           }
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Paystack initialization failed");
-      
-      return res.json({ 
-        approvalUrl: data.data.authorization_url, 
-        reference: data.data.reference
-      });
+        );
+        return res.json({ 
+          ...result,
+          gateway: 'paystack'
+        });
+      } catch (err) {
+        console.error("[BILLING] Paystack error, falling back:", err);
+      }
     }
 
-    // 2. STRIPE ENTERPRISE PATH
+    // 2. PAYPAL (Primary Global Fallback)
+    if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET) {
+      try {
+        const result = await BillingService.createPayPalSubscription(
+          req.user.id,
+          planType,
+          req.user.email
+        );
+        return res.json({ 
+          ...result,
+          gateway: 'paypal'
+        });
+      } catch (err: any) {
+        console.error("[BILLING] PayPal error, falling back:", err.message);
+      }
+    }
+
+    // 3. STRIPE (Last Resort)
     if (process.env.STRIPE_SECRET_KEY) {
-      const priceId = STRIPE_PLANS[planType as keyof typeof STRIPE_PLANS];
-      if (!priceId) return res.status(400).json({ message: "Invalid plan selected for Stripe" });
-
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        mode: 'subscription',
-        line_items: [{ price: priceId, quantity: 1 }],
-        // In a real scenario, we'd use Stripe Coupons for the 20% annual discount if not pre-configured in Price IDs
-        discounts: isAnnual ? [{ coupon: process.env.STRIPE_ANNUAL_COUPON_ID }] : [],
-        success_url: `${req.protocol}://${req.get("host")}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.protocol}://${req.get("host")}/settings?canceled=true`,
-        client_reference_id: req.user.id,
-        metadata: { userId: req.user.id, planType, billingInterval }
-      });
-
-      return res.json({ approvalUrl: session.url, sessionId: session.id });
+      try {
+        const priceId = STRIPE_PLANS[planType as keyof typeof STRIPE_PLANS];
+        if (priceId) {
+          const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            mode: 'subscription',
+            line_items: [{ price: priceId, quantity: 1 }],
+            discounts: isAnnual ? [{ coupon: process.env.STRIPE_ANNUAL_COUPON_ID }] : [],
+            success_url: `${req.protocol}://${req.get("host")}/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${req.protocol}://${req.get("host")}/billing?canceled=true`,
+            client_reference_id: req.user.id,
+            metadata: { userId: req.user.id, planType, billingInterval }
+          });
+          return res.json({ approvalUrl: session.url, sessionId: session.id, gateway: 'stripe' });
+        }
+      } catch (err) {
+        console.error("[BILLING] Stripe error:", err);
+      }
     }
 
-    // 3. PAYPAL FALLBACK
-    const planId = PLANS[planType as keyof typeof PLANS];
-    if (!planId) return res.status(400).json({ message: "Invalid plan selected" });
-    
-    const accessToken = await getPayPalAccessToken();
-
-    const response = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Prefer": "return=representation"
-      },
-      body: JSON.stringify({
-        plan_id: planId,
-        custom_id: req.user.id,
-        application_context: {
-          brand_name: "Costloci",
-          locale: "en-US",
-          shipping_preference: "NO_SHIPPING",
-          user_action: "SUBSCRIBE_NOW",
-          return_url: `${req.protocol}://${req.get("host")}/settings?success=true`,
-          cancel_url: `${req.protocol}://${req.get("host")}/settings?canceled=true`
-        }
-      })
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Failed to create subscription");
-
-    const approvalLink = data.links.find((link: any) => link.rel === "approve")?.href;
-    
-    await SOC2Logger.logEvent(req, {
-        action: "SUBSCRIPTION_INITIATED",
-        userId: req.user.id,
-        details: `Checkout session created for ${planType} (${billingInterval}) via PayPal.`
-    });
-
-    res.json({ approvalUrl: approvalLink, subscriptionId: data.id });
+    throw new Error("No active payment gateways available. Please contact enterprise support.");
   } catch (err: any) {
+    console.error("[BILLING CRITICAL] Subscribe Endpoint Failed:", err.message);
     res.status(500).json({ message: err.message });
   }
 });
@@ -367,6 +324,111 @@ billingRouter.post("/api/billing/stripe-webhook", async (req, res) => {
   } catch (err: any) {
     console.error("[Costloci Billing] Stripe Webhook Processing Error:", err.message);
     res.status(500).send("Webhook Error");
+  }
+});
+
+/**
+ * MANUAL SYNC: Force a status check for a PayPal subscription
+ * (Phase 37 Live Synchronization Hardening)
+ */
+billingRouter.post("/api/billing/sync-subscription", isAuthenticated, async (req: any, res) => {
+  try {
+    const { subscriptionId } = req.body;
+    if (!subscriptionId) return res.status(400).json({ message: "Subscription ID is required" });
+
+    const { BillingService } = await import("../services/BillingService.js");
+    const result = await BillingService.syncPayPalSubscription(req.user.id, subscriptionId);
+
+    if (result.success) {
+      await SOC2Logger.logEvent(req, {
+        action: "SUBSCRIPTION_SYNC_SUCCESS",
+        userId: req.user.id,
+        details: `Manual sync successful. Tier upgraded to ${result.tier}.`
+      });
+      return res.json(result);
+    } else {
+      return res.json({ success: false, status: result.status, message: `Subscription is currently ${result.status}` });
+    }
+  } catch (err: any) {
+    console.error("[BILLING SYNC ERROR]", err.message);
+    res.status(500).json({ message: "Sync failed: " + err.message });
+  }
+});
+
+/**
+ * Get Billing History
+ */
+billingRouter.get("/api/billing/history", isAuthenticated, async (req: any, res) => {
+  try {
+    const history = await storage.getBillingTelemetry();
+    res.json(history);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+/**
+ * Generate PDF Invoice
+ */
+billingRouter.get("/api/billing/invoice/:id", isAuthenticated, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const history = await storage.getBillingTelemetry();
+    const item = history.find(h => h.id === parseInt(id));
+    
+    if (!item) return res.status(404).json({ message: "Invoice not found" });
+
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+
+    // Add Logo / Header
+    doc.setFontSize(22);
+    doc.text("Costloci Enterprise", 20, 20);
+    doc.setFontSize(10);
+    doc.text("Cybersecurity Contract Optimization Platform", 20, 27);
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 35, 190, 35);
+
+    // Invoice Details
+    doc.setFontSize(16);
+    doc.text(`INVOICE #${item.id.toString().padStart(6, '0')}`, 20, 50);
+    
+    doc.setFontSize(10);
+    doc.text(`Date: ${item.timestamp ? new Date(item.timestamp).toLocaleDateString() : 'N/A'}`, 20, 60);
+    doc.text(`User: ${req.user.email}`, 20, 65);
+    doc.text(`Status: Paid`, 20, 70);
+
+    // Table Header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, 85, 170, 10, "F");
+    doc.text("Description", 25, 92);
+    doc.text("Amount", 160, 92);
+
+    // Item Row
+    doc.text(item.metricType.replace(/_/g, ' ').toUpperCase(), 25, 105);
+    doc.text(`$${item.value.toFixed(2)}`, 160, 105);
+
+    doc.line(20, 115, 190, 115);
+
+    // Total
+    doc.setFontSize(12);
+    doc.text("Total Paid:", 130, 130);
+    doc.text(`$${item.value.toFixed(2)}`, 160, 130);
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Thank you for choosing Costloci for your cybersecurity compliance needs.", 20, 280);
+
+    const pdfBuffer = doc.output("arraybuffer");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=invoice-${item.id}.pdf`);
+    res.send(Buffer.from(pdfBuffer));
+
+  } catch (err: any) {
+    console.error("[INVOICE ERROR]", err);
+    res.status(500).json({ message: "Failed to generate invoice" });
   }
 });
 

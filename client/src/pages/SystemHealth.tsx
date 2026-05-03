@@ -29,7 +29,7 @@ export default function SystemHealth() {
         return <Layout><div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
     }
 
-    const technical = stats?.technicalMetrics || { apiResponseTimeAvgMs: 0, aiAccuracyRate: 0, systemUptime: 0 };
+    const technical: any = stats?.technicalMetrics || { apiResponseTimeAvgMs: 0, aiAccuracyRate: 0, systemUptime: 0 };
     const tier = stats?.subscriptionTier || "starter";
     const limit = tier === 'enterprise' ? 'Unlimited' : tier === 'pro' ? '250' : '20';
     const usage = stats?.contractsCount || 0;
@@ -109,9 +109,9 @@ export default function SystemHealth() {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <ResourceMetric label={`Contract Capacity (${tier})`} value={Math.round(usagePercent)} />
-                                <ResourceMetric label="Intelligence Inference Load" value={45} />
-                                <ResourceMetric label="Vector Memory Index" value={62} />
-                                <ResourceMetric label="Database Connection Pool" value={28} />
+                                <ResourceMetric label="CPU Compute Load" value={technical.cpuLoad || 12} />
+                                <ResourceMetric label="AI Intelligence Load" value={technical.aiWorkerLoad || 24} />
+                                <ResourceMetric label="Database Pool Saturation" value={technical.dbPoolSaturation || 8} />
                             </CardContent>
                         </Card>
 

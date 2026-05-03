@@ -47,6 +47,9 @@ import { IntelligenceGateway } from "./services/IntelligenceGateway.js";
 import { cachedCompletion } from "./services/openai.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { CollaborationService } from "./services/CollaborationService.js";
+import { EmailService } from "./services/EmailService.js";
+import { QueueService } from "./services/QueueService.js";
+import pLimit from "p-limit";
 
 // Export the centralized openai router instance
 const openai = IntelligenceGateway.openai;
@@ -86,6 +89,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use('/api/', apiLimiter);
   app.use('/api/auth/', authLimiter);
   app.use('/api/contracts/upload', uploadLimiter);
+  app.use('/api/contracts/bulk-upload', uploadLimiter);
   app.use('/api/insurance/upload', uploadLimiter);
   app.use('/api/intelligence/', intelligenceLimiter);
   app.use('/api/cron/', cronLimiter);
@@ -154,11 +158,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const metrics = await AutonomicEngine.getHealthMetrics();
       res.json({
+        ...metrics,
         status: "operational",
         dbStatus: "connected",
-        postgresLatency: Math.floor(Math.random() * 40) + 10,
         pulseAgeMs: 120,
-        version: metrics?.version || "4.0.0-sovereign",
         storageMode: (storage as any).healthStatus?.mode || "sovereign",
       });
     } catch (err: any) {
@@ -263,14 +266,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
    * Centralized check for subscription tier limits.
    */
   const checkContractLimit = (req: any, res: any) => {
-    const tier = req.user?.subscriptionTier || "starter";
+    const tier = req.user?.subscriptionTier || "free";
     const limit = tier === "enterprise" ? Infinity : tier === "pro" ? 250 : 20;
     const currentCount = req.user?.contractsCount || 0;
 
     console.log(`[PAYWALL DEBUG] User: ${req.user?.id}, Tier: ${tier}, Limit: ${limit}, Current Count: ${currentCount}`);
 
     if (currentCount >= limit) {
-
       res.status(402).json({ 
         message: `Capacity Limit Reached: Your current ${tier.toUpperCase()} plan allows up to ${limit} contract analyses. Please upgrade in the Billing Hub to continue.`,
         limit,
@@ -336,6 +338,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       res.json(contract);
     } catch { res.status(500).json({ message: "Failed to fetch contract" }); }
+  });
+
+  // DELETE contract — admin only or contract owner's workspace
+  app.delete("/api/contracts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const contractId = Number(req.params.id);
+      if (isNaN(contractId)) return res.status(400).json({ message: "Invalid contract ID" });
+
+      const contract = await storage.getContract(contractId);
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+
+      // RBAC: only admins or users whose client owns the contract may delete
+      if (req.user.role !== "admin" && contract.clientId !== req.user.clientId) {
+        return res.status(403).json({ message: "Access denied to this contract resource." });
+      }
+
+      await storage.deleteContract(contractId);
+
+      await SOC2Logger.logEvent(req, {
+        action: "CONTRACT_DELETED",
+        userId: req.user.id,
+        resourceType: "Contract",
+        resourceId: String(contractId),
+        details: `Contract deleted: ${contract.vendorName}`,
+      });
+
+      return res.status(200).json({ message: "Contract deleted successfully", id: contractId });
+    } catch (err: any) {
+      console.error("[DELETE CONTRACT ERROR]", err.message);
+      res.status(500).json({ message: "Failed to delete contract" });
+    }
   });
 
   app.post(api.contracts.upload.path, isAuthenticated, upload.single("file"), async (req: any, res) => {
@@ -514,6 +547,22 @@ Analyze the contract text and return JSON with exactly these fields:
               severity: "info"
           });
 
+          // NOTIFY USER VIA EMAIL (Phase 37: Async Email Queue)
+          const userEmail = req.user?.email;
+          if (userEmail) {
+            QueueService.enqueueEmail(
+              () => EmailService.sendContractAnalysisComplete(
+                userEmail,
+                contract.id,
+                analysis.vendorName || "Unknown Vendor",
+                Number(analysis.riskScore) || 50,
+                analysis.complianceGrade || "Unrated"
+              ),
+              userEmail,
+              `[Analysis Complete] ${analysis.vendorName}`
+            );
+          }
+
           // TRIGGER REDLINES & PLAYBOOK RULES ENGINE
           const { RulesEngine } = await import("./services/RulesEngine.js");
           await RulesEngine.evaluateContract(contract.id, workspaceId).catch((err: any) => {
@@ -550,6 +599,215 @@ Analyze the contract text and return JSON with exactly these fields:
       res.status(500).json({ message: "File ingestion failed: " + err.message });
     }
   });
+
+
+  // ─── BULK CONTRACT UPLOAD ─────────────────────────────────────────────────
+  // Phase 37: Accepts up to 20 files in a single multipart request.
+  // Each file is processed in parallel with a concurrency limit of 3
+  // to respect OpenAI rate limits. Results are returned per-file.
+  app.post(
+    "/api/contracts/bulk-upload",
+    isAuthenticated,
+    upload.array("files", 20),
+    async (req: any, res) => {
+      try {
+        const files = req.files as Express.Multer.File[] | undefined;
+        if (!files || files.length === 0) {
+          return res.status(400).json({ message: "No files uploaded" });
+        }
+
+        const clientId = req.user?.clientId;
+        const store = storageContext.getStore();
+        const workspaceId = store?.workspaceId;
+        const userEmail: string | undefined = req.user?.email;
+        const userId: string = req.user?.id || "SYSTEM";
+
+        if (!clientId || !workspaceId) {
+          return res.status(400).json({
+            message: "Account provisioning incomplete — workspace context missing.",
+          });
+        }
+
+        // Limit: enforce per-user contract quota across the whole batch
+        const tier = req.user?.subscriptionTier || "starter";
+        const limit = tier === "enterprise" ? Infinity : tier === "pro" ? 250 : 20;
+        const currentCount = req.user?.contractsCount || 0;
+        const remaining = Math.max(0, limit - currentCount);
+        if (remaining === 0) {
+          return res.status(402).json({
+            message: `Capacity limit reached. Your ${tier.toUpperCase()} plan allows ${limit} contracts. Please upgrade.`,
+          });
+        }
+        const filesToProcess = files.slice(0, remaining);
+        const skippedCount = files.length - filesToProcess.length;
+
+        // ── Concurrency limiter: max 3 parallel AI calls ────────────────────
+        const limiter = pLimit(3);
+        const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
+
+        const processFile = async (file: Express.Multer.File) => {
+          const filename = file.originalname;
+          try {
+            // 1. Upload to Supabase Storage
+            const storagePath = `contracts/${clientId}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            const { error: storageError } = await supabaseAdmin.storage
+              .from("contracts")
+              .upload(storagePath, file.buffer, {
+                contentType: file.mimetype || "application/pdf",
+                upsert: false,
+              });
+            if (storageError) throw new Error(`Storage: ${storageError.message}`);
+
+            const { data: pubUrl } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
+            const fileUrl = pubUrl.publicUrl;
+
+            // 2. Create pending contract record immediately
+            const contract = await storage.createContract({
+              workspaceId,
+              clientId,
+              vendorName: "Pending AI Review",
+              productService: "Pending Analysis",
+              category: "Pending Analysis",
+              annualCost: 0,
+              status: "pending",
+              fileUrl,
+              intelligenceAnalysis: { riskScore: 50, riskFlags: [], summary: "Pending" },
+            }, userId);
+
+            // 3. Background AI analysis (fire-and-forget per file)
+            (async () => {
+              try {
+                const pdfData = await pdf(file.buffer);
+                const extractedText = pdfData.text.substring(0, 15000);
+
+                let analysis: any = {};
+                try {
+                  const response = await cachedCompletion({
+                    model: "gpt-4o",
+                    messages: [
+                      {
+                        role: "system",
+                        content: `You are a Legal AI Auditor specializing in MEA (KDPA/POPIA/CBK) regulations.
+Analyze the contract text and return JSON with exactly these fields:
+{ "vendorName": string, "productService": string, "category": string, "annualCost": number, "riskScore": number, "riskFlags": string[], "complianceGrade": string }`,
+                      },
+                      { role: "user", content: `Contract Text:\n${extractedText}` },
+                    ],
+                    response_format: { type: "json_object" },
+                  });
+                  analysis = JSON.parse(response || "{}");
+                } catch {
+                  analysis = {
+                    vendorName: `Unknown (${filename})`,
+                    productService: "Unknown Service",
+                    category: "General",
+                    annualCost: 0,
+                    riskScore: 50,
+                    riskFlags: ["AI analysis unavailable"],
+                    complianceGrade: "Unrated",
+                  };
+                }
+
+                await storage.updateContract(contract.id, {
+                  vendorName: analysis.vendorName || "Unknown Vendor",
+                  productService: analysis.productService || "Enterprise Service",
+                  category: analysis.category || "General Provider",
+                  annualCost: analysis.annualCost || 0,
+                  status: "active",
+                  intelligenceAnalysis: {
+                    riskScore: analysis.riskScore,
+                    riskFlags: analysis.riskFlags || [],
+                    summary: `Compliance Grade: ${analysis.complianceGrade}`,
+                  },
+                });
+
+                // Persist risk flags
+                if (analysis.riskFlags?.length) {
+                  for (const flag of analysis.riskFlags) {
+                    await storage.createRisk({
+                      workspaceId,
+                      contractId: contract.id,
+                      riskTitle: "AI Detected Flag",
+                      riskCategory: "Compliance",
+                      riskDescription: flag,
+                      severity: "high",
+                      likelihood: "likely",
+                      impact: "major",
+                      riskScore: Number(analysis.riskScore) || 65,
+                      mitigationStatus: "identified",
+                    });
+                  }
+                }
+
+                await SOC2Logger.logEvent({ user: { id: userId, clientId } } as any, {
+                  action: "CONTRACT_BULK_UPLOADED",
+                  userId,
+                  resourceType: "Contract",
+                  resourceId: String(contract.id),
+                  details: `Bulk ingested: ${filename} → ${analysis.vendorName}`,
+                });
+
+                // Trigger downstream engines
+                const { RulesEngine } = await import("./services/RulesEngine.js");
+                await RulesEngine.evaluateContract(contract.id, workspaceId).catch(() => {});
+                const { RiskEngine } = await import("./services/RiskEngine.js");
+                await RiskEngine.identifyRisks(contract.id).catch(() => {});
+                const { BenchmarkingService } = await import("./services/BenchmarkingService.js");
+                await BenchmarkingService.analyzeForSavings(contract.id).catch(() => {});
+
+                // Email notification via QueueService
+                if (userEmail) {
+                  QueueService.enqueueEmail(
+                    () => EmailService.sendContractAnalysisComplete(
+                      userEmail,
+                      contract.id,
+                      analysis.vendorName || "Unknown Vendor",
+                      Number(analysis.riskScore) || 50,
+                      analysis.complianceGrade || "Unrated"
+                    ),
+                    userEmail,
+                    `[Bulk Analysis] ${analysis.vendorName}`
+                  );
+                }
+              } catch (bgErr: any) {
+                console.error(`[BULK QUEUE ERROR] ${filename}:`, bgErr.message);
+                await storage.updateContract(contract.id, {
+                  status: "flagged",
+                  intelligenceAnalysis: {
+                    riskScore: 100,
+                    riskFlags: ["System fault during bulk AI extraction"],
+                    summary: "Error",
+                  },
+                });
+              }
+            })();
+
+            return { filename, contractId: contract.id, status: "pending", error: null };
+          } catch (err: any) {
+            console.error(`[BULK UPLOAD ERROR] ${filename}:`, err.message);
+            return { filename, contractId: null, status: "failed", error: err.message };
+          }
+        };
+
+        // Run with concurrency cap of 3
+        const results = await Promise.all(
+          filesToProcess.map((file) => limiter(() => processFile(file)))
+        );
+
+        const succeeded = results.filter((r) => r.status === "pending").length;
+        const failed = results.filter((r) => r.status === "failed").length;
+
+        return res.status(207).json({
+          message: `Bulk upload processed: ${succeeded} accepted, ${failed} failed${skippedCount > 0 ? `, ${skippedCount} skipped (quota)` : ""}.`,
+          results,
+          summary: { total: files.length, accepted: succeeded, failed, skipped: skippedCount },
+        });
+      } catch (err: any) {
+        console.error("[BULK UPLOAD FATAL ERROR]", err.message);
+        res.status(500).json({ message: "Bulk file ingestion failed: " + err.message });
+      }
+    }
+  );
 
 
   // ─── COMPLIANCE REMEDIATION ────────────────────────────────────────────────

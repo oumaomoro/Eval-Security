@@ -185,7 +185,13 @@ export class RulesEngine {
           break;
 
         case "sendNotification":
-          // To be wired to standard websocket/webhook integrations later
+          const { NotificationService } = await import("./NotificationService.js");
+          await NotificationService.broadcastEvent(contract.workspaceId!, "rule.triggered", {
+            title: `Playbook Rule Triggered: ${rule.name}`,
+            message: action.message || `The contract for ${contract.vendorName} has triggered a governance rule.`,
+            link: `${process.env.FRONTEND_URL}/contracts/${contract.id}`,
+            severity: action.severity === "high" || action.severity === "critical" ? "critical" : "info"
+          });
           break;
 
         default:
