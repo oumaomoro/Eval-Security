@@ -1,3 +1,6 @@
-/assets/* /assets/:splat 200
-/api/* https://api.costloci.com/api/:splat 200
+/* Cloudflare Pages _redirects
+ * SPA fallback: all routes serve index.html for React Router
+ * Docs: https://developers.cloudflare.com/pages/configuration/redirects/
+ */
+
 /* /index.html 200

@@ -1,0 +1,20 @@
+# Cloudflare Pages - Costloci Frontend
+# Docs: https://developers.cloudflare.com/pages/configuration/
+
+name = "costloci-frontend"
+pages_build_output_dir = "dist/public"
+
+[build]
+command = "npm run build:client"
+
+[build.environment_variables]
+NODE_VERSION = "20"
+
+# Environment-specific settings
+[env.production.vars]
+VITE_API_URL = "https://api.costloci.com"
+NODE_ENV = "production"
+
+[env.preview.vars]
+VITE_API_URL = "https://api.costloci.com"
+NODE_ENV = "production"

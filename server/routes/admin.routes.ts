@@ -12,8 +12,11 @@ const adminRouter = Router();
  */
 adminRouter.get("/api/admin/stats", isAuthenticated, requireRole(['admin']), async (req, res) => {
   try {
-    // In production, you would check req.user.role === 'admin'
-    // For now, we allow authenticated users to see the health for visibility
+    // Sovereign Admin Guard — double-verify role even after middleware (defense-in-depth)
+    const user = (req as any).user;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: "forbidden", message: "Admin role required." });
+    }
     const stats = await storage.getInfrastructureStats();
     const integrationHealth = IntelligenceGateway.getHealthStatus();
     const { AutonomicEngine } = await import("../services/AutonomicEngine.js");
