@@ -9,7 +9,7 @@ import { SEO } from "@/components/SEO";
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
-      <SEO title="Intelligence Contract Governance & Regional Compliance Software | Costloci" description="Costloci provides Intelligence-driven contract governance, risk mapping, and automated compliance (KDPA, POPIA, GDPR) for MSPs and global enterprises." />
+      <SEO title="Intelligence Contract Governance & Regional Compliance Software" description="Costloci provides Intelligence-driven contract governance, risk mapping, and automated compliance (KDPA, POPIA, GDPR) for MSPs and global enterprises." />
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
@@ -44,14 +44,14 @@ export default function LandingPage() {
             transition={{ duration: 0.6 }}
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8">
-              <Zap className="w-3 h-3 animate-pulse" /> Now with Automated Compliance Monitoring
+              <Zap className="w-3 h-3 animate-pulse" /> The Pioneer in Zero-Touch Legal SecOps
             </div>
             <h1 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter mb-6 max-w-5xl mx-auto">
-              Intelligence Contract Governance & <br />
-              <span className="text-emerald-500 italic drop-shadow-[0_0_30px_rgba(16,185,129,0.4)]">Regional Compliance</span>
+              Zero-Touch Legal SecOps for <br />
+              <span className="text-emerald-500 italic drop-shadow-[0_0_30px_rgba(16,185,129,0.4)]">CISOs & DPOs</span>
             </h1>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed mb-10 font-medium">
-              The Professional Intelligence Standard for identifying contract risks, streamlining KDPA & POPIA compliance, and maximizing enterprise vendor ROI. Built for MSPs and Global 2000 DPOs.
+              Discover hidden financial liabilities in vendor contracts without a legal background. Costloci automatically correlates cybersecurity risks with KDPA, POPIA, and GDPR compliance to maximize your ROI.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/auth">
@@ -336,6 +336,10 @@ export default function LandingPage() {
                   <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
                   <span className="text-xs font-bold leading-relaxed">Nairobi, Kenya<br/>10100</span>
                 </li>
+                 <li className="flex items-start gap-3 text-slate-500">
+                   <div className="w-4 h-4 text-emerald-500 shrink-0 flex items-center justify-center font-bold">☏</div>
+                   <span className="text-xs font-bold leading-relaxed">+254 746 995 312</span>
+                 </li>
              </ul>
               <div className="flex items-center gap-4">
                 <a href="https://twitter.com/costloci" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-emerald-500/20 hover:scale-110 text-slate-500 hover:text-emerald-400 transition-all">

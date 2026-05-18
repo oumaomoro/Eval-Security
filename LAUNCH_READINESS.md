@@ -6,7 +6,7 @@ Ensure all items are checked before running `./scripts/deploy_all.ps1`.
 - [x] `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` (Database access)
 - [x] `OPENAI_API_KEY` (AI Analysis & Redlining)
 - [x] `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` (Core Subscriptions)
-- [x] `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` (Marketplace Payouts)
+- [x] `PAYPAL_CLIENT_ID` / `PAYPAL_SECRET` (Marketplace Payouts)
 - [x] `RESEND_API_KEY` (Strategic Pack & Invoice emails)
 
 ## 2. Database State (Track 1)

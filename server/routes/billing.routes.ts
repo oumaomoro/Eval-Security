@@ -11,8 +11,8 @@ const billingRouter = Router();
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
-if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
-  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET not set — PayPal checkout will fail.");
+if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_SECRET) {
+  console.warn("[BILLING] WARNING: PAYPAL_CLIENT_ID / PAYPAL_SECRET not set — PayPal checkout will fail.");
 }
 if (!PAYSTACK_SECRET_KEY) {
   console.info("[BILLING] INFO: PAYSTACK_SECRET_KEY not set — Paystack gateway skipped.");
@@ -104,7 +104,7 @@ billingRouter.post("/api/billing/subscribe", isAuthenticated, async (req: any, r
     }
 
     // 2. PAYPAL (Primary Global Fallback)
-    if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET) {
+    if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_SECRET) {
       try {
         const result = await BillingService.createPayPalSubscription(
           req.user.id,
@@ -162,6 +162,17 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
     if (process.env.NODE_ENV === "test") {
       isVerified = true; // Mock verification for tests
     } else {
+      const authAlgo = req.headers['paypal-auth-algo'];
+      const certUrl = req.headers['paypal-cert-url'];
+      const transmissionId = req.headers['paypal-transmission-id'];
+      const transmissionSig = req.headers['paypal-transmission-sig'];
+      const transmissionTime = req.headers['paypal-transmission-time'];
+
+      if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) {
+        console.warn("[Costloci Billing] Webhook Rejected: Missing PayPal security headers.");
+        return res.status(400).json({ message: "Missing security headers" });
+      }
+
       const accessToken = await getPayPalAccessToken();
       const verifyResponse = await fetch(`${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`, {
         method: "POST",
@@ -170,11 +181,11 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          auth_algo: req.headers['paypal-auth-algo'] as string,
-          cert_url: req.headers['paypal-cert-url'] as string,
-          transmission_id: req.headers['paypal-transmission-id'] as string,
-          transmission_sig: req.headers['paypal-transmission-sig'] as string,
-          transmission_time: req.headers['paypal-transmission-time'] as string,
+          auth_algo: authAlgo as string,
+          cert_url: certUrl as string,
+          transmission_id: transmissionId as string,
+          transmission_sig: transmissionSig as string,
+          transmission_time: transmissionTime as string,
           webhook_id: process.env.PAYPAL_WEBHOOK_ID || "LIVE_WEBHOOK_ID",
           webhook_event: req.body
         })
@@ -189,7 +200,7 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
       return res.status(403).json({ message: "Invalid Signature" });
     }
     
-    if (event_type === "BILLING.SUBSCRIPTION.ACTIVATED" || event_type === "PAYMENT.SALE.COMPLETED") {
+    if (event_type === "BILLING.SUBSCRIPTION.ACTIVATED" || event_type === "BILLING.SUBSCRIPTION.UPDATED") {
       const customId = resource.custom_id;
       const planId = resource.plan_id;
       
@@ -218,6 +229,12 @@ billingRouter.post("/api/billing/paypal-webhook", async (req, res) => {
           cost: 0,
         });
       }
+    } else if (event_type === "BILLING.SUBSCRIPTION.CANCELLED" || event_type === "BILLING.SUBSCRIPTION.EXPIRED") {
+      const customId = resource.custom_id;
+      if (customId) {
+        await storage.updateUser(customId, { subscriptionTier: "free" });
+        console.log(`[Costloci Billing] Downgraded user ${customId} due to cancellation.`);
+      }
     }
 
     res.status(200).send("OK");
@@ -235,7 +252,7 @@ billingRouter.post("/api/billing/paystack-webhook", async (req, res) => {
     const secret = process.env.PAYSTACK_SECRET_KEY;
     if (!secret) return res.sendStatus(500);
 
-    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+    const hash = crypto.createHmac('sha512', secret).update((req as any).rawBody).digest('hex');
     if (hash !== req.headers['x-paystack-signature']) {
       console.warn("[Costloci Billing] SECURITY ALERT: Invalid Paystack Webhook Signature!");
       return res.sendStatus(400);
@@ -284,7 +301,7 @@ billingRouter.post("/api/billing/stripe-webhook", async (req, res) => {
     // If you use body parser with raw body, pass the raw buffer here
     // For now we assume req.body is already parsed, or handled via middleware
     event = stripe.webhooks.constructEvent(
-      req.body, 
+      (req as any).rawBody, 
       sig as string, 
       process.env.STRIPE_WEBHOOK_SECRET || ""
     );

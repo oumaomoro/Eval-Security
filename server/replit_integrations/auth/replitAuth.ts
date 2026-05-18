@@ -44,6 +44,9 @@ export async function setupAuth(app: Express) {
   }));
 
   app.use(async (req: Request, res: Response, next: NextFunction) => {
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`[AUTH-DEBUG] ${req.method} ${req.url} - Test Header: ${req.headers["x-test-user-id"]}`);
+    }
     // ── TEST-MODE BYPASS ────────────────────────────────────────────────────
     // When NODE_ENV=test and x-test-user-id header is present, inject a
     // pre-resolved identity using a direct Postgres query (bypasses Supabase
@@ -51,7 +54,31 @@ export async function setupAuth(app: Express) {
     // This bypass is NEVER active in production or development.
     if (process.env.NODE_ENV === "test" && req.headers["x-test-user-id"]) {
       const testUserId = req.headers["x-test-user-id"] as string;
-      console.log(`[AUTH-TEST] Bypass attempt for ${testUserId}. Pool available: ${!!pool}`);
+      const testWorkspaceId = req.headers["x-workspace-id"] ? parseInt(req.headers["x-workspace-id"] as string) : undefined;
+      
+      console.log(`[AUTH-TEST] Bypass attempt for ${testUserId}. Workspace Header: ${testWorkspaceId}`);
+
+      // ──────────────────────────────────────────────────────────────────────
+      // SHALLOW BYPASS (DNS-RESILIENT)
+      // If we have both, we avoid DB query entirely to bypass EAI_AGAIN issues.
+      // ──────────────────────────────────────────────────────────────────────
+      if (testUserId && testWorkspaceId) {
+        (req as any).user = {
+          id: testUserId,
+          email: "test@costloci.test",
+          firstName: "Test",
+          lastName: "User",
+          role: "admin",
+          workspaceId: testWorkspaceId
+        };
+        console.log(`[AUTH-TEST] Shallow bypass success. Workspace: ${testWorkspaceId}`);
+        return storageContext.run({ client: supabase, workspaceId: testWorkspaceId }, () => next());
+      }
+
+      // ──────────────────────────────────────────────────────────────────────
+      // DEEP BYPASS (DB-DEPENDENT)
+      // Fallback if workspace header is missing.
+      // ──────────────────────────────────────────────────────────────────────
       try {
         let localUser: any = null;
         if (pool) {
@@ -61,7 +88,6 @@ export async function setupAuth(app: Express) {
             [testUserId]
           );
           localUser = result.rows[0] ?? null;
-          console.log(`[AUTH-TEST] Local user found: ${!!localUser}`);
         }
         if (localUser) {
           (req as any).user = {
@@ -69,8 +95,8 @@ export async function setupAuth(app: Express) {
             email: localUser.email,
             firstName: localUser.first_name ?? "Test",
             lastName: localUser.last_name ?? "User",
-            clientId: localUser.client_id ?? null,
             role: localUser.role ?? "admin",
+            clientId: localUser.client_id ?? null,
             subscriptionTier: localUser.subscription_tier ?? "starter",
             contractsCount: localUser.contracts_count ?? 0,
             profileImageUrl: null,
@@ -78,16 +104,16 @@ export async function setupAuth(app: Express) {
             userAgent: "test-agent"
           };
           // Resolve workspace via direct pool query too
-          let workspaceId: number | undefined;
-          if (pool) {
+          let workspaceId = testWorkspaceId;
+          if (!workspaceId && pool) {
             const wsResult = await pool.query(
               `SELECT workspace_id FROM workspace_members WHERE user_id = $1 LIMIT 1`,
               [testUserId]
             );
             workspaceId = wsResult.rows[0]?.workspace_id;
           }
-          console.log(`[AUTH-TEST] Bypass success. Workspace: ${workspaceId}`);
-          return storageContext.run({ client: null as any, workspaceId }, () => next());
+          console.log(`[AUTH-TEST] Deep bypass success. Workspace: ${workspaceId}`);
+          return storageContext.run({ client: supabase, workspaceId }, () => next());
         } else {
           console.warn(`[AUTH-TEST] Bypass failed: user ${testUserId} not found in profiles table.`);
         }
@@ -155,8 +181,9 @@ export async function setupAuth(app: Express) {
       const defaultWorkspace = await storage.getDefaultWorkspace(user.id).catch(() => null);
       const workspaceId = defaultWorkspace?.id;
 
-      const userClient = createUserClient(token);
+      (req as any).user.workspaceId = workspaceId;
 
+      const userClient = createUserClient(token);
       return storageContext.run({ client: userClient, workspaceId }, () => next());
     } catch (err: any) {
       console.error("[AUTH] Identification failed:", err.message);

@@ -55,7 +55,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  // Debug endpoint for tests to fetch userId by email
+  // Debug endpoint for tests to fetch userId and workspaceId by email
   app.get("/api/auth/debug/user-id", async (req, res) => {
     if (process.env.NODE_ENV === "production") return res.status(403).json({ message: "Forbidden" });
     const { email } = req.query;
@@ -64,7 +64,20 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const user = await storage.getUserByEmail(email as string);
       if (!user) return res.status(404).json({ message: "User not found" });
-      res.json({ userId: user.id });
+
+      // Also look up the workspace this user belongs to
+      let workspaceId: number | null = null;
+      try {
+        const { data: membership } = await adminClient
+          .from("workspace_members")
+          .select("workspace_id")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        workspaceId = membership?.workspace_id ?? null;
+      } catch (_) { /* non-fatal */ }
+
+      res.json({ userId: user.id, workspaceId });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user id" });
     }
@@ -73,6 +86,7 @@ export function registerAuthRoutes(app: Express): void {
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {
+      let workspace: any;
       const { email, password, firstName, lastName } = registrationSchema.parse(req.body);
       // 1. Supabase Auth Secure Admin Provisioning (Verification Required)
       let registrationResult = await adminClient.auth.admin.createUser({
@@ -135,7 +149,7 @@ export function registerAuthRoutes(app: Express): void {
         });
 
         console.log(`[AUTH-DIAG] Provisioning Workspace...`);
-        const workspace = await storage.createWorkspace({
+        workspace = await storage.createWorkspace({
           name: "Main Workspace",
           ownerId: data.user.id,
           plan: "starter"
@@ -188,7 +202,8 @@ export function registerAuthRoutes(app: Express): void {
 
       res.status(201).json({ 
         message: "Costloci Hub provisioned. Please check your email to verify and activate your dashboard.",
-        userId: data.user.id 
+        userId: data.user.id,
+        workspaceId: (workspace as any)?.id
       });
     } catch (err: any) {
       if (err instanceof z.ZodError) {

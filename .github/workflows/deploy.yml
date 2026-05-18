@@ -16,6 +16,14 @@ jobs:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+      PAYPAL_SECRET: ${{ secrets.PAYPAL_SECRET }}
+      PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      SIGNNOW_API_KEY: ${{ secrets.SIGNNOW_API_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,19 +34,25 @@ jobs:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       
       - name: Build Check (Frontend & Backend)
         run: npm run build
       
+      - name: Run Unit Tests
+        run: npm run test:unit
+      
+      - name: Run API Tests
+        run: |
+          npx cross-env NODE_ENV=test tsx server/index.ts &
+          npx wait-on http://localhost:3200
+          npm run test:api
+      
+      - name: Run Security Tests
+        run: npm run test:security
+      
       - name: System Health Check
         run: npx tsx scripts/verify-health.ts
-      
-      - name: Install Playwright
-        run: npx playwright install --with-deps
-      
-      - name: E2E Tests
-        run: npx playwright test
 
   deploy-production:
     needs: validate
@@ -71,7 +85,7 @@ jobs:
         with:
           apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy client/dist --project-name=costloci-frontend --branch=main
+          command: pages deploy dist/public --project-name=costloci-frontend --branch=main
 
   notify:
     needs: [validate, deploy-production]
@@ -82,8 +96,8 @@ jobs:
         if: needs.deploy-production.result == 'success'
         run: |
           echo "🚀 DEPLOYMENT SUCCESSFUL"
-          echo "Costloci Sovereign Instance is live at https://costloci.com"
-          echo "API Endpoint: https://api.costloci.com"
+          echo "Frontend is live at https://costloci-frontend.pages.dev"
+          echo "Backend API is live at https://cyberoptimize-frontend.vercel.app"
       - name: Failure Notification
         if: needs.validate.result == 'failure' || needs.deploy-production.result == 'failure'
         run: |

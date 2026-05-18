@@ -13,12 +13,12 @@ test.describe('Enterprise Runtime Reliability', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('/auth');
-    await page.click('button[role="tab"]:has-text("Initialize Agent")');
+    await page.click('button[role="tab"]:has-text("Create Account")');
     await page.fill('input[placeholder="John"]', 'Reliability');
     await page.fill('input[placeholder="Doe"]', 'Tester');
-    await page.fill('input[placeholder="j.doe@enterprise.com"]', testEmail);
-    await page.fill('input[placeholder="Minimum 12 characters"]', testPassword);
-    await page.click('button:has-text("Deploy Enterprise Identity")');
+    await page.fill('input[placeholder="you@company.com"]', testEmail);
+    await page.fill('input[placeholder="Create a strong password"]', testPassword);
+    await page.click('button:has-text("Create My Account")');
     await expect(page).toHaveURL('/', { timeout: 15000 });
     await context.close();
   });
@@ -28,8 +28,9 @@ test.describe('Enterprise Runtime Reliability', () => {
     await page.goto('/auth');
     await page.fill('input[type="email"]', testEmail);
     await page.fill('input[type="password"]', testPassword);
-    await page.click('button:has-text("Enter Enterprise")');
-    await expect(page).toHaveURL('/');
+    // Use the submit button, not the tab
+    await page.locator('button:not([role="tab"])').filter({ hasText: /^Sign In$/i }).click();
+    await expect(page).toHaveURL('/', { timeout: 10000 });
   });
 
   test('3.1 AI Fallback Runtime Test (Mocked)', async ({ page }) => {
@@ -84,15 +85,15 @@ test.describe('Enterprise Runtime Reliability', () => {
     await expect(page.locator('text=Analyzed')).toHaveCount(6, { timeout: 90000 });
   });
 
-  test('3.4 Rate Limiting enforcement', async ({ page }) => {
+  test('Stage 3.4: Rate Limiting enforcement', async ({ page }) => {
     await page.goto('/settings');
-    await page.click('button:has-text("Logout")');
+    await page.click('button:has-text("Sign Out")');
 
     // Force rate limit
     for (let i = 0; i < 12; i++) {
       await page.fill('input[type="email"]', 'rate-limit@test.com');
       await page.fill('input[type="password"]', 'any-password');
-      await page.click('button:has-text("Enter Enterprise")');
+      await page.locator('button:not([role="tab"])').filter({ hasText: /^Sign In$/i }).click();
     }
 
     await expect(page.locator('text=Too many requests')).toBeVisible();

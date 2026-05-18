@@ -80,7 +80,7 @@ export default function Dashboard() {
          </div>
       </div>
     }>
-      <SEO title="Dashboard | Costloci" description="Monitor your enterprise posture and contract ROI." />
+      <SEO title="Dashboard" description="Monitor your enterprise posture and contract ROI." />
 
       <div className="space-y-8 pb-12 pt-4 animate-slide-up">
         {/* Onboarding Wizard */}

@@ -23,13 +23,23 @@ export async function runBillingSync() {
 
         if (sub.stripeSubscriptionId && sub.stripePriceId) {
           // 2. Report overage to Stripe (Metered Billing)
-          // Note: In a real scenario, we'd lookup the subscription item ID
-          // For now we assume a direct mapping or mock it.
-          await StripeService.reportUsage(
-            sub.stripeSubscriptionId, 
-            "item_mock_usage_id", 
-            overage
-          );
+          // Fetch the actual subscription item ID from Stripe
+          try {
+            const stripeSub = await StripeService.getSubscription(sub.stripeSubscriptionId);
+            if (stripeSub && stripeSub.items.data.length > 0) {
+              const subscriptionItemId = stripeSub.items.data[0].id;
+              
+              await StripeService.reportUsage(
+                sub.stripeSubscriptionId, 
+                subscriptionItemId, 
+                overage
+              );
+            } else {
+              console.warn(`[BILL_CRON] No active items found for Stripe subscription ${sub.stripeSubscriptionId}`);
+            }
+          } catch (stripeErr: any) {
+             console.error(`[BILL_CRON] Stripe fetch failed for ${sub.stripeSubscriptionId}:`, stripeErr.message);
+          }
 
           await SOC2Logger.logEvent({ 
               headers: {},

@@ -17,11 +17,12 @@ export class ReportService {
   static async generateReport(workspaceId: number, type: string, filters: any = {}): Promise<Report> {
 
     // 1. Fetch relevant data clusters
-    const [contracts, compliance, risks, savings] = await Promise.all([
+    const [contracts, compliance, risks, savings, scorecards] = await Promise.all([
       storage.getContracts({}),
       storage.getComplianceAudits(), // Filtered later
       storage.getRisks(),
-      storage.getSavingsOpportunities()
+      storage.getSavingsOpportunities(),
+      storage.getVendorScorecards()
     ]);
 
     // 3. Synthesize Intelligence Payload with AI Executive Summary
@@ -34,6 +35,7 @@ export class ReportService {
     - Compliance Health: ${this.calculateComplianceHealth(compliance, workspaceId)}%
     - Critical Risks: ${risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length}
     - Savings Identified: $${savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0)}
+    - Vendor Performance (Avg Score): ${scorecards.length > 0 ? (scorecards.reduce((sum, s) => sum + (s.complianceScore || 0), 0) / scorecards.length).toFixed(1) : 'N/A'}
     
     Write a 2-paragraph professional assessment. Paragraph 1: Strategic Posture. Paragraph 2: Priority Actions.
     Return only the summary text.`;
@@ -61,6 +63,7 @@ export class ReportService {
       complianceHealth: this.calculateComplianceHealth(compliance, workspaceId),
       criticalRiskCount: risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length,
       identifiedSavings: savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0),
+      averageVendorScore: scorecards.length > 0 ? scorecards.reduce((sum, s) => sum + (s.complianceScore || 0), 0) / scorecards.length : 0,
       topRecommendations: this.extractTopRecommendations(risks, savings),
       executiveSummary: executiveSummary
     };

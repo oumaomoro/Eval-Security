@@ -27,8 +27,9 @@ export class IntelligenceGateway {
   }> = {
     deepseek: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
     openai: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
+    anthropic: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
     huggingface: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false },
-    ollama: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false }
+    local: { failures: 0, state: 'CLOSED', nextAttempt: 0, requestInProgress: false }
   };
 
   // Lazy Key Accessors
@@ -269,7 +270,40 @@ export class IntelligenceGateway {
       }
     }
 
-    // 3.3. Hugging Face Fine-Tuned (Specific Domain Knowledge - KDPA/CBK)
+    // 3.3. Anthropic Tertiary (Expert Legal Reasoning)
+    if (!responseContent && this.anthropicKey !== "missing" && this.isProviderAvailable("anthropic")) {
+      try {
+        const systemPrompt = params.messages.find(m => m.role === 'system')?.content || "";
+        const userMessages = params.messages.filter(m => m.role !== 'system').map(m => ({
+          role: m.role as "user" | "assistant",
+          content: m.content as string
+        }));
+
+        const response = await this.withRetryAndTimeout(() => this.getAnthropic().messages.create({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: params.max_tokens || 4096,
+          system: systemPrompt as string,
+          messages: userMessages
+        }));
+
+        responseContent = (response.content[0] as any)?.text || "";
+        if (responseContent) { 
+          usedProvider = "anthropic"; 
+          usedModel = "claude-3-5-sonnet-20241022"; 
+          this.recordSuccess("anthropic"); 
+        }
+      } catch (error: any) { 
+        this.recordFailure("anthropic");
+        await storage.createInfrastructureLog({
+          component: "IntelligenceGateway",
+          event: "AI_FALLBACK_TRIGGERED",
+          status: "analyzing",
+          actionTaken: `Anthropic failed. Falling back to Hugging Face. Error: ${error.message}`
+        }).catch(() => {});
+      }
+    }
+
+    // 3.4. Hugging Face Fine-Tuned (Specific Domain Knowledge - KDPA/CBK)
     if (!responseContent && this.hfToken !== "missing" && this.isProviderAvailable("huggingface")) {
       try {
         const hfModelId = process.env.HF_MODEL_ID || "your-username/costloci-kdpa-llama3";
@@ -298,30 +332,35 @@ export class IntelligenceGateway {
           component: "IntelligenceGateway",
           event: "AI_FALLBACK_TRIGGERED",
           status: "analyzing",
-          actionTaken: `Hugging Face failed. Falling back to Local Ollama. Error: ${error.message}`
+          actionTaken: `Hugging Face failed. Falling back to Local AI. Error: ${error.message}`
         }).catch(() => {});
       }
     }
 
-    // 3.4. Local Ollama (Internal Sovereign Privacy / Enterprise On-Prem)
-    if (!responseContent && this.isProviderAvailable("ollama")) {
+    // 3.5. Local AI (Ollama / LlamaEdge / vLLM - Sovereign Privacy & Enterprise On-Prem)
+    if (!responseContent && this.isProviderAvailable("local")) {
       try {
-        const localBase = process.env.LOCAL_INTELLIGENCE_BASE_URL || process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
-        const localOpenAI = new OpenAI({ apiKey: "ollama", baseURL: localBase });
-        const response: any = await localOpenAI.chat.completions.create({ ...params, model: 'deepseek-r1:1.5b' } as any);
+        const localBase = process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1";
+        const localOpenAI = new OpenAI({ apiKey: "local-bypass", baseURL: localBase });
+        
+        // Use deepseek-r1 locally if available, else fallback to a standard llama model
+        const localModel = process.env.LOCAL_AI_MODEL || "deepseek-r1:1.5b";
+        
+        const response: any = await localOpenAI.chat.completions.create({ ...params, model: localModel } as any);
         responseContent = response.choices[0]?.message?.content || "";
+        
         if (responseContent) { 
-          usedProvider = "ollama"; 
-          usedModel = "deepseek-r1:1.5b"; 
-          this.recordSuccess("ollama"); 
+          usedProvider = "local"; 
+          usedModel = localModel; 
+          this.recordSuccess("local"); 
         }
       } catch (error: any) { 
-        this.recordFailure("ollama");
+        this.recordFailure("local");
         await storage.createInfrastructureLog({
           component: "IntelligenceGateway",
           event: "AI_FALLBACK_TRIGGERED",
           status: "critical",
-          actionTaken: `Local Ollama failed. Initiating final Sovereign Fallback. Error: ${error.message}`
+          actionTaken: `Local AI failed at ${process.env.LOCAL_AI_BASE_URL || "http://127.0.0.1:11434/v1"}. Initiating final Sovereign Fallback. Error: ${error.message}`
         }).catch(() => {});
       }
     }

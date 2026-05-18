@@ -10,7 +10,7 @@ export class ScorecardEngine {
     console.log(`[SCORECARD] Recalculating score for vendor: ${vendorName}`);
 
     // 1. Fetch relevant data
-    const contracts = await storage.getContracts();
+    const contracts = await storage.getContracts({ workspaceId });
     const vendorContracts = contracts.filter(c => c.vendorName === vendorName);
     
     if (vendorContracts.length === 0) {
@@ -19,10 +19,10 @@ export class ScorecardEngine {
     }
 
     const contractIds = vendorContracts.map(c => c.id);
-    const audits = await storage.getComplianceAudits();
+    const audits = await storage.getComplianceAudits(undefined, workspaceId);
     const vendorAudits = audits.filter(a => a.scope?.contractIds?.some((id: number) => contractIds.includes(id)));
     
-    const risks = await storage.getRisks();
+    const risks = await storage.getRisks(undefined, workspaceId);
     const vendorRisks = risks.filter(r => contractIds.includes(r.contractId));
 
     // 2. Calculate Dimensions
@@ -43,15 +43,20 @@ export class ScorecardEngine {
     }, 0);
     const riskScore = Math.max(0, 100 - riskDeductions);
 
-    // Security Score: Based on Intelligence analysis flags (simplified)
-    const securityScore = 85; // Placeholder for deep Intelligence flag analysis
+    // Security Score: Based on Intelligence analysis flags
+    const intelligenceScores = vendorContracts.map(c => (c.intelligenceAnalysis as any)?.riskScore || 50);
+    const avgIntelligenceRisk = intelligenceScores.length > 0 
+      ? intelligenceScores.reduce((sum, s) => sum + s, 0) / intelligenceScores.length 
+      : 50;
+    const securityScore = Math.round(100 - avgIntelligenceRisk);
 
-    // SLA Performance: (simplified)
-    const slaPerformance = 95; 
+    // SLA Performance: Derive from actual risk register entries related to SLA
+    const slaRisks = vendorRisks.filter(r => r.riskCategory === 'operational' || r.riskTitle.toLowerCase().includes('sla'));
+    const slaPerformance = Math.max(0, 100 - (slaRisks.length * 10)); 
 
     // 5. Pricing Competitiveness
     // Deduct points if savings opportunities exist (meaning current pricing is high)
-    const pricingOptimization = await storage.getSavingsOpportunities().then(ops => 
+    const pricingOptimization = await storage.getSavingsOpportunities(undefined, workspaceId).then(ops => 
       ops.filter(o => contractIds.includes(o.contractId) && o.type === 'market_pricing_optimization')
     );
     
@@ -83,6 +88,7 @@ export class ScorecardEngine {
       riskScore: Math.round(riskScore),
       securityScore: Math.round(securityScore),
       slaPerformance: Math.round(slaPerformance),
+      pricingScore: Math.round(pricingScore),
       overallGrade: grade,
       lastAssessmentDate: new Date()
     });

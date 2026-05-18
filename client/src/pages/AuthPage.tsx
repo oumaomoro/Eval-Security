@@ -112,7 +112,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-950 font-sans">
-      <SEO title="Sign In | Costloci" description="Sign in to your Costloci account." />
+      <SEO title="Sign In" description="Sign in to your Costloci account." />
 
       {/* Left: Branding */}
       <div className="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden border-r border-slate-800/60">

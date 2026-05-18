@@ -14,13 +14,16 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 export async function cleanupDatabase() {
-  const testEmailDomain = "@costloci.test";
+  // Match BOTH historical and current test email domains
+  const testEmailDomains = ["@cyberoptimize.test", "@costloci.test"];
   
   // 1. Fetch test users
   const { data: users, error: userError } = await supabaseAdmin.auth.admin.listUsers();
   if (userError) throw userError;
 
-  const testUsers = users.users.filter(u => u.email?.endsWith(testEmailDomain));
+  const testUsers = users.users.filter(u =>
+    testEmailDomains.some(domain => u.email?.endsWith(domain))
+  );
   console.log(`[CLEANUP] Found ${users.users.length} total users, ${testUsers.length} test users to delete.`);
 
   // 2. Delete test users (and cascading data)
@@ -30,14 +33,15 @@ export async function cleanupDatabase() {
   }
 
   // 3. Truncate tables that might not cascade fully or need explicit clearing
-  // Use raw SQL if necessary, but here we'll use the API for common tables
   const tables = [
-    'audit_logs', 'infrastructure_logs', 'intelligence_cache', 
-    'remediation_tasks', 'risks', 'contracts', 'clients', 'workspaces', 'profiles'
+    'audit_logs', 'playbook_rules', 'playbooks', 'workspace_members',
+    'infrastructure_logs', 'intelligence_cache', 'remediation_tasks',
+    'risks', 'contracts', 'clients', 'workspaces', 'profiles'
   ];
 
   for (const table of tables) {
-    // Note: We only delete if they aren't protected by RLS or if we use service role
-    await supabaseAdmin.from(table).delete().neq('id', -1); 
+    const { error } = await supabaseAdmin.from(table).delete().neq('id', -1);
+    if (error) console.warn(`[CLEANUP] Warning: could not truncate ${table}:`, error.message);
   }
 }
+

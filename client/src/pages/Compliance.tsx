@@ -83,6 +83,9 @@ export default function Compliance() {
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tighter italic flex items-center gap-2">
             <Scale className="w-6 h-6 text-primary" /> Governance Hub
+            <Badge variant="outline" className="ml-4 h-6 border-emerald-500/30 bg-emerald-500/5 text-emerald-500 text-[8px] font-black uppercase tracking-[0.2em] animate-pulse">
+              Live Sovereign Monitor Active
+            </Badge>
           </h1>
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sovereign Jurisdictional Intelligence & Audit Monitoring</p>
         </div>

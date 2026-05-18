@@ -1,6 +1,6 @@
 import { adminClient as supabase } from "./supabase.js";
 import { InsertAuditLog } from "../../shared/schema.js";
-import { storage } from "../storage";
+import { storage } from "../storage.js";
 
 /**
  * Phase 17: Hardened Audit Service (Chain of Custody)
@@ -16,6 +16,7 @@ export class AuditService {
   static async logAuditAction(logEntry: InsertAuditLog): Promise<void> {
     try {
       const payload: any = {
+        workspace_id: logEntry.workspaceId,
         client_id: logEntry.clientId,
         user_id: logEntry.userId,
         action: logEntry.action,
@@ -46,7 +47,9 @@ export class AuditService {
         event: "AUDIT_PERSISTENCE_FAILURE",
         status: "analyzing",
         actionTaken: `Failed to persist telemetry for action [${logEntry.action}]: ${err.message}`
-      }).catch(() => {});
+      }).catch((e) => {
+        console.error("[FATAL AUDIT ERROR] Failed to log audit:", err.message);
+      });
     }
   }
 

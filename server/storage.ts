@@ -1,9 +1,9 @@
 import { randomUUID, createHash } from "crypto";
 import bcrypt from "bcryptjs";
-import { ROIService } from "./services/ROIService";
-import { AuditService } from "./services/AuditService";
-import { adminClient } from "./services/supabase";
-import { storageContext } from "./services/storageContext";
+import { ROIService } from "./services/ROIService.js";
+import { AuditService } from "./services/AuditService.js";
+import { adminClient } from "./services/supabase.js";
+import { storageContext } from "./services/storageContext.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   RemediationTask, InsertRemediationTask,
@@ -27,10 +27,16 @@ export interface UsageEvent {
 
 // RLS HARDENING: Dynamically resolve the Supabase Client from the current AsyncLocalStorage context.
 // This seamlessly enforces enterprise RLS by using the authenticated user's client instead of the sovereign bypass.
-const supabase = new Proxy(adminClient, {
+const supabase = new Proxy({} as SupabaseClient, {
   get(target, prop: keyof SupabaseClient) {
     const store = storageContext.getStore();
+    // Resilient resolution: prioritize store client, fallback to supabase.
+    // If adminClient is somehow undefined due to circularity, we attempt to re-import or throw descriptive error.
     const activeClient = (store?.client as SupabaseClient) || adminClient;
+
+    if (!activeClient) {
+      throw new ReferenceError("Supabase adminClient is not defined in storage scope. Check module initialization order.");
+    }
 
     const value = activeClient[prop];
     if (typeof value === "function") {
@@ -91,6 +97,7 @@ export interface IStorage {
   updateAuditRuleset(id: number, updates: Partial<AuditRuleset>): Promise<AuditRuleset>;
   deleteAuditRuleset(id: number): Promise<void>;
   getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]>;
+  getComplianceAudit(id: number): Promise<ComplianceAudit | undefined>;
   createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit>;
   updateComplianceAudit(id: number, updates: Partial<ComplianceAudit>): Promise<ComplianceAudit>;
   getClauseLibrary(): Promise<Clause[]>;
@@ -144,6 +151,7 @@ export interface IStorage {
   getComments(contractId?: number, auditId?: number): Promise<(Comment & { user: any })[]>;
   createComment(comment: InsertComment): Promise<Comment>;
   getWorkspaces(): Promise<Workspace[]>;
+  getWorkspace(id: number): Promise<Workspace | undefined>;
   createWorkspace(workspace: InsertWorkspace): Promise<Workspace>;
   getWorkspaceMembers(workspaceId: number): Promise<(User & { workspaceRole: WorkspaceRole })[]>;
   addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember>;
@@ -221,11 +229,18 @@ export interface IStorage {
   updateContinuousMonitoringConfig(id: number, updates: Partial<ContinuousMonitoring>): Promise<ContinuousMonitoring>;
   deleteContinuousMonitoringConfig(id: number): Promise<void>;
 
-  // Insurance Policies
+  // Insurance
   getInsurancePolicies(clientId?: number): Promise<InsurancePolicy[]>;
   getInsurancePolicy(id: number): Promise<InsurancePolicy | undefined>;
   createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy>;
   updateInsurancePolicy(id: number, updates: Partial<InsurancePolicy>): Promise<InsurancePolicy>;
+
+  // Persistent Jobs (Phase 40 Scaling)
+  getJobs(): Promise<any[]>;
+  getJob(id: number): Promise<any | undefined>;
+  createJob(job: any): Promise<any>;
+  updateJob(id: number, updates: any): Promise<any>;
+  claimNextJob(): Promise<any | undefined>;
 
   // Intelligence Cache
   getIntelligenceCache(promptHash: string): Promise<any | undefined>;
@@ -246,6 +261,7 @@ export interface IStorage {
   getInfrastructureAsset(id: number): Promise<InfrastructureAsset | undefined>;
 
   getHealth(): { mode: 'sovereign' | 'degraded', missingTables: string[] };
+  getRiskHeatmap(clientId?: number): Promise<any[]>;
 }
 
 export class SupabaseRESTStorage implements IStorage {
@@ -408,7 +424,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createClient(client: InsertClient): Promise<Client> {
     const data = await this.handleResponse<any>(
-      adminClient.from("clients")
+      supabase.from("clients")
         .insert({
           workspace_id: storageContext.getStore()?.workspaceId || client.workspaceId,
           company_name: client.companyName,
@@ -485,8 +501,9 @@ export class SupabaseRESTStorage implements IStorage {
 
 
   // --- CONTRACTS ---
-  async getContracts(filters?: { clientId?: number, status?: string, ids?: number[] }): Promise<(Contract & { client?: Client })[]> {
-    const workspaceId = storageContext.getStore()?.workspaceId;
+  async getContracts(filters?: { clientId?: number, status?: string, ids?: number[], workspaceId?: number }): Promise<(Contract & { client?: Client })[]> {
+    const contextWorkspaceId = storageContext.getStore()?.workspaceId;
+    const workspaceId = filters?.workspaceId || contextWorkspaceId;
     let query = supabase.from("contracts").select("*");
     if (filters?.clientId) query = query.eq("client_id", filters.clientId);
     if (filters?.status) query = query.eq("status", filters.status);
@@ -800,6 +817,12 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async createPlaybookRule(rule: InsertPlaybookRule): Promise<PlaybookRule> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    if (workspaceId) {
+      const { data: playbook } = await supabase.from("playbooks").select("workspace_id").eq("id", rule.playbookId).single();
+      if (!playbook || playbook.workspace_id !== workspaceId) throw new Error("Unauthorized");
+    }
+
     const data = await this.handleResponse<any>(
       supabase.from("playbook_rules")
         .insert({
@@ -833,6 +856,15 @@ export class SupabaseRESTStorage implements IStorage {
      if (updates.priority !== undefined) payload.priority = updates.priority;
      if (updates.isActive !== undefined) payload.is_active = updates.isActive;
 
+     const workspaceId = storageContext.getStore()?.workspaceId;
+     if (workspaceId) {
+       const { data: rule } = await supabase.from("playbook_rules").select("playbook_id").eq("id", id).single();
+       if (rule) {
+         const { data: playbook } = await supabase.from("playbooks").select("workspace_id").eq("id", rule.playbook_id).single();
+         if (playbook?.workspace_id && playbook.workspace_id !== workspaceId) throw new Error("Unauthorized");
+       }
+     }
+
      const data = await this.handleResponse<any>(supabase.from("playbook_rules").update(payload).eq("id", id).select().single());
      return {
        id: data.id,
@@ -847,18 +879,35 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async deletePlaybookRule(id: number): Promise<void> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    if (workspaceId) {
+      const { data: rule } = await supabase.from("playbook_rules").select("playbook_id").eq("id", id).single();
+      if (rule) {
+        const { data: playbook } = await supabase.from("playbooks").select("workspace_id").eq("id", rule.playbook_id).single();
+        if (playbook?.workspace_id && playbook.workspace_id !== workspaceId) throw new Error("Unauthorized");
+      }
+    }
     await this.handleResponse(supabase.from("playbook_rules").delete().eq("id", id));
   }
 
 
-  async getComplianceAudits(contractId?: number): Promise<ComplianceAudit[]> {
-    const workspaceId = storageContext.getStore()?.workspaceId;
+  async getComplianceAudits(contractId?: number, workspaceIdOverride?: number): Promise<ComplianceAudit[]> {
+    const workspaceId = workspaceIdOverride || storageContext.getStore()?.workspaceId;
     let query = supabase.from("compliance_audits").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
     
     const data = await this.handleResponse<any[]>(query.order("created_at", { ascending: false }));
     return (data || []).map(d => this.mapComplianceAudit(d));
+  }
+
+  async getComplianceAudit(id: number): Promise<ComplianceAudit | undefined> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("compliance_audits").select("*").eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any | null>(query.maybeSingle());
+    return data ? this.mapComplianceAudit(data) : undefined;
   }
 
   async createComplianceAudit(audit: InsertComplianceAudit): Promise<ComplianceAudit> {
@@ -926,8 +975,8 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   // --- RISKS ---
-  async getRisks(contractId?: number): Promise<Risk[]> {
-    const workspaceId = storageContext.getStore()?.workspaceId;
+  async getRisks(contractId?: number, workspaceIdOverride?: number): Promise<Risk[]> {
+    const workspaceId = workspaceIdOverride || storageContext.getStore()?.workspaceId;
     let query = supabase.from("risks").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
@@ -1033,8 +1082,8 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   // --- SAVINGS ---
-  async getSavingsOpportunities(contractId?: number): Promise<SavingsOpportunity[]> {
-    const workspaceId = storageContext.getStore()?.workspaceId;
+  async getSavingsOpportunities(contractId?: number, workspaceIdOverride?: number): Promise<SavingsOpportunity[]> {
+    const workspaceId = workspaceIdOverride || storageContext.getStore()?.workspaceId;
     let query = supabase.from("savings_opportunities").select("*");
     if (contractId) query = query.eq("contract_id", contractId);
     if (workspaceId) query = query.eq("workspace_id", workspaceId);
@@ -1225,12 +1274,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.nextRun !== undefined) payload.next_run = updates.nextRun?.toISOString();
     if (updates.lastRun !== undefined) payload.last_run = updates.lastRun?.toISOString();
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("report_schedules").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("report_schedules")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single()
+      query.select().single()
     );
     return {
       ...data,
@@ -1244,7 +1293,10 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async deleteReportSchedule(id: number): Promise<void> {
-    await this.handleResponse(supabase.from("report_schedules").delete().eq("id", id));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("report_schedules").delete().eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    await this.handleResponse(query);
   }
 
   // --- SCORECARDS ---
@@ -1265,6 +1317,7 @@ export class SupabaseRESTStorage implements IStorage {
       riskScore: d.risk_score,
       securityScore: d.security_score,
       slaPerformance: d.sla_performance,
+      pricingScore: d.pricing_score || 0,
       overallGrade: d.overall_grade,
       lastAssessmentDate: d.last_assessment_date ? new Date(d.last_assessment_date) : null,
       createdAt: d.created_at ? new Date(d.created_at) : null
@@ -1293,15 +1346,24 @@ export class SupabaseRESTStorage implements IStorage {
 
   // --- DASHBOARD & ANALYTICS ---
   async getDashboardStats(clientId?: number, userId?: string): Promise<any> {
-    const [contracts, risks, savings, users, logs, infraLogs, workspace, monitoringConfigs] = await Promise.all([
+    const contextWorkspaceId = storageContext.getStore()?.workspaceId;
+    let workspaceId = contextWorkspaceId;
+    
+    if (clientId && !workspaceId) {
+      const client = await this.getClient(clientId);
+      if (client && client.workspaceId) workspaceId = client.workspaceId as number;
+    }
+
+    const [contracts, risks, savings, users, logs, infraLogs, workspace, monitoringConfigs, complianceAudits] = await Promise.all([
       this.getContracts({ clientId }),
       this.getRisks(),
       this.getSavingsOpportunities(),
       supabase.from("profiles").select("*").then(r => (r.data || []).map(p => this.mapProfileToUser(p))),
       this.getAuditLogs(clientId),
       this.getInfrastructureLogs(),
-      clientId ? this.getWorkspace(clientId) : Promise.resolve(null),
-      this.getContinuousMonitoringConfigs()
+      workspaceId ? this.getWorkspace(workspaceId) : Promise.resolve(null),
+      this.getContinuousMonitoringConfigs(),
+      this.getComplianceAudits()
     ]);
 
     const activeStandards = Array.isArray(workspace?.activeStandards) ? workspace.activeStandards : [];
@@ -1337,7 +1399,7 @@ export class SupabaseRESTStorage implements IStorage {
     });
 
     // ── Phase 16: Executive ROI Component ──
-    const assets = await this.getInfrastructureAssets(clientId!);
+    const assets = workspaceId ? await this.getInfrastructureAssets(workspaceId) : [];
     const roiMetrics = ROIService.calculateEconomicImpact(contracts, risks, assets, 'enterprise', savings);
 
     const currentUser = userId ? users.find(u => u.id === userId) : (users[0] || {});
@@ -1385,6 +1447,8 @@ export class SupabaseRESTStorage implements IStorage {
         mitigated_exposure: roiMetrics.mitigatedExposure,
         roi_ratio: roiMetrics.roiRatio
       },
+      totalAudits: complianceAudits.length,
+      failedAudits: complianceAudits.filter(a => a.status === "failed").length,
       userMetrics: { 
         contractsAnalyzedPerMonth: totalContracts, 
         complianceScoreImprovement: 0, 
@@ -1563,7 +1627,7 @@ export class SupabaseRESTStorage implements IStorage {
   async createInfrastructureLog(log: InsertInfrastructureLog): Promise<InfrastructureLog> {
     try {
       const data = await this.handleResponse<any>(
-        adminClient.from("infrastructure_logs")
+        supabase.from("infrastructure_logs")
           .insert({
             workspace_id: log.workspaceId,
             component: log.component,
@@ -1933,7 +1997,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async getWorkspace(id: number): Promise<Workspace | undefined> {
     const data = await this.handleResponse<any>(
-      supabase.from("workspaces").select("*").eq("id", id).single()
+      supabase.from("workspaces").select("*").eq("id", id).maybeSingle()
     );
     return data ? this.mapWorkspace(data) : undefined;
   }
@@ -1964,7 +2028,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createWorkspace(workspace: InsertWorkspace): Promise<Workspace> {
     const data = await this.handleResponse<any>(
-      adminClient.from("workspaces")
+      supabase.from("workspaces")
         .insert({
           name: workspace.name,
           owner_id: workspace.ownerId,
@@ -2007,7 +2071,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async addWorkspaceMember(member: InsertWorkspaceMember): Promise<WorkspaceMember> {
     const data = await this.handleResponse<any>(
-      adminClient.from("workspace_members")
+      supabase.from("workspace_members")
         .insert({
           user_id: member.userId,
           workspace_id: member.workspaceId,
@@ -2047,7 +2111,7 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getUserWorkspaces(userId: string): Promise<Workspace[]> {
-    const { data, error } = await adminClient
+    const { data, error } = await supabase
       .from("workspace_members")
       .select("workspace:workspaces(*)")
       .eq("user_id", userId);
@@ -2149,12 +2213,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.suggestedClauses !== undefined) payload.suggested_clauses = updates.suggestedClauses;
     if (updates.remediationNotes !== undefined) payload.remediation_notes = updates.remediationNotes;
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("remediation_tasks").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("remediation_tasks")
-        .update(payload)
-        .eq("id", id)
-        .select("*")
-        .single()
+      query.select("*").single()
     );
     return {
       id: data.id,
@@ -2188,9 +2252,11 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async getRemediationSuggestion(id: number): Promise<RemediationSuggestion | undefined> {
-    const data = await this.handleResponse<any>(
-      supabase.from("remediation_suggestions").select("*").eq("id", id).maybeSingle()
-    );
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("remediation_suggestions").select("*").eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    
+    const data = await this.handleResponse<any>(query.maybeSingle());
     return data ? this.mapRemediationSuggestion(data) : undefined;
   }
 
@@ -2223,12 +2289,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.acceptedAt !== undefined) payload.accepted_at = updates.acceptedAt instanceof Date ? updates.acceptedAt.toISOString() : updates.acceptedAt;
     if (updates.userId !== undefined) payload.user_id = updates.userId;
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("remediation_suggestions").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("remediation_suggestions")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single()
+      query.select().single()
     );
     return this.mapRemediationSuggestion(data);
   }
@@ -2350,12 +2416,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.lastRun !== undefined) payload.last_run = updates.lastRun;
     if (updates.nextRun !== undefined) payload.next_run = updates.nextRun;
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("continuous_monitoring").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("continuous_monitoring")
-        .update(payload)
-        .eq("id", id)
-        .select("*")
-        .single()
+      query.select("*").single()
     );
     return {
       id: data.id,
@@ -2371,7 +2437,10 @@ export class SupabaseRESTStorage implements IStorage {
   }
   
   async deleteContinuousMonitoringConfig(id: number): Promise<void> {
-    await this.handleResponse(supabase.from("continuous_monitoring").delete().eq("id", id));
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("continuous_monitoring").delete().eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    await this.handleResponse(query);
   }
   // --- INSURANCE POLICIES ---
   async createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy> {
@@ -2434,12 +2503,12 @@ export class SupabaseRESTStorage implements IStorage {
     if (updates.claimRiskScore !== undefined) payload.claim_risk_score = updates.claimRiskScore;
     if (updates.intelligenceAnalysisSummary !== undefined) payload.ai_analysis_summary = updates.intelligenceAnalysisSummary;
 
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    let query = supabase.from("insurance_policies").update(payload).eq("id", id);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+
     const data = await this.handleResponse<any>(
-      supabase.from("insurance_policies")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single()
+      query.select().single()
     );
     return {
       ...data,
@@ -2762,7 +2831,7 @@ export class SupabaseRESTStorage implements IStorage {
     );
     if (data) {
       // Update last_used_at in the background
-      adminClient.from("ai_cache")
+      supabase.from("ai_cache")
         .update({ last_used_at: new Date().toISOString() })
         .eq("id", data.id)
         .then(() => {});
@@ -2773,7 +2842,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async createIntelligenceCache(cache: { promptHash: string, response: string, provider?: string, model?: string }): Promise<void> {
     await this.handleResponse(
-      adminClient.from("ai_cache")
+      supabase.from("ai_cache")
         .insert({
           prompt_hash: cache.promptHash,
           response: cache.response,
@@ -2785,10 +2854,10 @@ export class SupabaseRESTStorage implements IStorage {
 
   async invalidateIntelligenceCache(): Promise<void> {
     // Purges the intelligence cache to force fresh analysis when core rulesets/clauses change
-    await adminClient.from("ai_cache").delete().gte('id', 0);
+    await supabase.from("ai_cache").delete().gte('id', 0);
   }
   async upsertPresence(presence: { workspaceId: number; userId: string; resourceType: string; resourceId: string }): Promise<void> {
-    await adminClient
+    await supabase
       .from("presence")
       .upsert({
         workspace_id: presence.workspaceId,
@@ -2801,7 +2870,7 @@ export class SupabaseRESTStorage implements IStorage {
 
   async getActivePresence(workspaceId: number, resourceType: string, resourceId: string): Promise<any[]> {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data } = await adminClient
+    const { data } = await supabase
       .from("presence")
       .select("user_id, last_seen_at, profiles(username)")
       .eq("workspace_id", workspaceId)
@@ -2811,6 +2880,12 @@ export class SupabaseRESTStorage implements IStorage {
     return data || [];
   }
   async getContractVersions(contractId: number): Promise<ContractVersion[]> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    if (workspaceId) {
+      const contract = await this.getContract(contractId);
+      if (!contract) return []; // Prevent access if contract doesn't exist or isn't in workspace
+    }
+
     const data = await this.handleResponse<any[]>(
       supabase.from("contract_versions")
         .select("*")
@@ -2829,6 +2904,12 @@ export class SupabaseRESTStorage implements IStorage {
   }
 
   async createContractVersion(version: InsertContractVersion): Promise<ContractVersion> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    if (workspaceId) {
+      const contract = await this.getContract(version.contractId);
+      if (!contract) throw new Error("Unauthorized to add version to this contract");
+    }
+
     const data = await this.handleResponse<any>(
       supabase.from("contract_versions")
         .insert({
@@ -2959,6 +3040,81 @@ export class SupabaseRESTStorage implements IStorage {
 
     const data = await this.handleResponse<any>(supabase.from("cloud_accounts").update(payload).eq("id", id).select().single());
     return this.mapCloudAccount(data);
+  }
+
+  // ─── JOB QUEUE (PHASE 40) ──────────────────────────────────────────────────
+  
+  async getJobs(): Promise<any[]> {
+    const data = await this.handleResponse<any[]>(
+      supabase.from("jobs").select("*").order("priority", { ascending: false })
+    );
+    return data;
+  }
+
+  async getJob(id: number): Promise<any | undefined> {
+    const data = await this.handleResponse<any>(
+      supabase.from("jobs").select("*").eq("id", id).maybeSingle()
+    );
+    return data || undefined;
+  }
+
+  async createJob(job: any): Promise<any> {
+    const data = await this.handleResponse<any>(
+      supabase.from("jobs").insert({
+        workspace_id: storageContext.getStore()?.workspaceId || job.workspaceId,
+        type: job.type,
+        payload: job.payload,
+        status: job.status || "pending",
+        priority: job.priority || 0,
+        max_attempts: job.maxAttempts || 3
+      }).select().single()
+    );
+    return data;
+  }
+
+  async updateJob(id: number, updates: any): Promise<any> {
+    const data = await this.handleResponse<any>(
+      supabase.from("jobs").update({
+        status: updates.status,
+        attempts: updates.attempts,
+        last_error: updates.lastError,
+        locked_at: updates.lockedAt,
+        completed_at: updates.completedAt
+      }).eq("id", id).select().single()
+    );
+    return data;
+  }
+
+  /**
+   * Enterprise Atomicity: Claim the next pending job and lock it
+   * to prevent concurrent worker overlaps.
+   */
+  async claimNextJob(): Promise<any | undefined> {
+    // 1. Find a pending job
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("status", "pending")
+      .order("priority", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!job) return undefined;
+
+    // 2. Atomically lock it
+    const { data: lockedJob } = await supabase
+      .from("jobs")
+      .update({ 
+        status: "processing", 
+        locked_at: new Date().toISOString() 
+      })
+      .eq("id", job.id)
+      .eq("status", "pending") // Double-check it hasn't been claimed in the last millisecond
+      .select()
+      .maybeSingle();
+
+    return lockedJob || undefined;
   }
 
   async getInfrastructureAssets(workspaceId: number): Promise<InfrastructureAsset[]> {

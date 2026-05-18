@@ -192,8 +192,10 @@ export default function Billing() {
                   </Button>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-500 mt-3 text-center">
-                {isAfricanTZ ? "Detected African region: Defaulting to localized Paystack processing." : "Global region detected: Defaulting to PayPal/Stripe."}
+              <p className="text-[10px] text-slate-500 mt-3 text-center leading-relaxed">
+                {isAfricanTZ 
+                  ? "Detected African region: Paystack is configured for Kenya (M-Pesa, Card). Bank transfer channel is currently limited to payout disbursements." 
+                  : "Global region detected: Defaulting to PayPal/Stripe processing for international credit/debit cards."}
               </p>
             </CardContent>
           </Card>

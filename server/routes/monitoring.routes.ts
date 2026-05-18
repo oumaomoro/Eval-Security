@@ -12,7 +12,7 @@ const router = Router();
  */
 router.get("/compliance/monitoring", isAuthenticated, async (req: any, res) => {
   try {
-    const workspaceId = req.workspaceId;
+    const workspaceId = req.user.workspaceId;
     if (!workspaceId) return res.status(400).json({ message: "Workspace context missing" });
 
     const configs = await storage.getContinuousMonitoringConfigs();
@@ -30,7 +30,7 @@ router.get("/compliance/monitoring", isAuthenticated, async (req: any, res) => {
  */
 router.post("/compliance/monitoring", isAuthenticated, async (req: any, res) => {
   try {
-    const workspaceId = req.workspaceId;
+    const workspaceId = req.user.workspaceId;
     if (!workspaceId) return res.status(400).json({ message: "Workspace context missing" });
 
     const result = insertContinuousMonitoringSchema.safeParse(req.body);

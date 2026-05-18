@@ -141,6 +141,13 @@ router.post("/marketplace/purchase", isAuthenticated, async (req: any, res) => {
 router.get("/marketplace/benchmark/:contractId", isAuthenticated, async (req: any, res) => {
   try {
     const contractId = parseInt(req.params.contractId);
+    
+    // Security Guard: Verify ownership
+    const contract = await storage.getContract(contractId);
+    if (!contract || contract.workspaceId !== req.user.workspaceId) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
     const benchmark = await MarketplaceService.benchmarkAgainstMarketplace(contractId);
     res.json(benchmark);
   } catch (error: any) {
@@ -155,6 +162,13 @@ router.get("/marketplace/benchmark/:contractId", isAuthenticated, async (req: an
 router.get("/marketplace/insurance-suggestion/:contractId", isAuthenticated, async (req: any, res) => {
   try {
     const contractId = parseInt(req.params.contractId);
+
+    // Security Guard: Verify ownership
+    const contract = await storage.getContract(contractId);
+    if (!contract || contract.workspaceId !== req.user.workspaceId) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
     const suggestion = await MarketplaceService.suggestInsurance(contractId);
     res.json(suggestion);
   } catch (error: any) {

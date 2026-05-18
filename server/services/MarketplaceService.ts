@@ -65,12 +65,14 @@ export class MarketplaceService {
      const risks = await storage.getRisks(contractId);
      const totalExposureMax = risks.reduce((acc, r) => acc + (r.financialExposureMax || 0), 0);
      
-     // Mock logic for Phase 34: In a real app, this would query an insurance provider API
+     const hasSecurityRisks = risks.some(r => r.riskCategory === 'security' || r.riskCategory === 'data_privacy');
+     const hasOperationalRisks = risks.some(r => r.riskCategory === 'operational');
+
      const suggestion = {
-       type: "CYBER_LIABILITY",
-       recommendedLimit: totalExposureMax * 1.5,
-       estimatedPremium: totalExposureMax * 0.005,
-       reason: `Total financial exposure identified as $${totalExposureMax.toLocaleString()}. Recommended coverage limit provides 50% buffer.`
+       type: hasSecurityRisks ? "CYBER_LIABILITY" : (hasOperationalRisks ? "BUSINESS_INTERRUPTION" : "GENERAL_LIABILITY"),
+       recommendedLimit: totalExposureMax > 0 ? totalExposureMax * 1.5 : 1000000,
+       estimatedPremium: totalExposureMax > 0 ? totalExposureMax * 0.005 : 5000,
+       reason: `Total financial exposure identified as $${totalExposureMax.toLocaleString()}. Recommended coverage limit provides a safety buffer aligned with your specific risk profile.`
      };
 
      return suggestion;

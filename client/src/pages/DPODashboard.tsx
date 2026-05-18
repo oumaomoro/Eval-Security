@@ -84,6 +84,8 @@ const itemVariants = {
   show: { y: 0, opacity: 1 }
 };
 
+import { Layout } from "@/components/Layout";
+
 export default function DPODashboard() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -105,34 +107,31 @@ export default function DPODashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30">
-      <div className="p-8 space-y-8 max-w-[1600px] mx-auto">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-between items-end border-b border-slate-800/60 pb-8"
-        >
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-2 w-8 bg-blue-600 rounded-full animate-pulse" />
-              <span className="text-blue-500 font-bold tracking-widest text-xs uppercase">{t("dpo.regulatory_sentinel")}</span>
-            </div>
-            <h1 className="text-5xl font-black tracking-tight flex items-center gap-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-500">
-               {t("dpo.title")}
-            </h1>
-            <p className="text-slate-400 mt-3 text-lg font-medium max-w-2xl">
-              {t("dpo.subtitle")}
-            </p>
+    <Layout header={
+      <div className="flex w-full items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-2 w-8 bg-blue-600 rounded-full animate-pulse" />
+            <span className="text-blue-500 font-bold tracking-widest text-xs uppercase">{t("dpo.regulatory_sentinel")}</span>
           </div>
-          <div className="flex gap-4 pb-1">
-             <Button variant="outline" className="border-slate-800 bg-slate-900/40 backdrop-blur-md hover:bg-slate-800/60 transition-all duration-300">
-               <Activity className="mr-2 h-4 w-4 text-emerald-400" /> {t("dpo.live_monitoring")}
-             </Button>
-             <Button className="bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-500/20 px-8 font-bold border-t border-blue-400/30 transition-all duration-300 hover:scale-105 active:scale-95">
-               <Zap className="mr-2 h-4 w-4 fill-white" /> {t("dpo.run_audit")}
-             </Button>
-          </div>
-        </motion.div>
+          <h1 className="text-5xl font-black tracking-tight flex items-center gap-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-500">
+             {t("dpo.title")}
+          </h1>
+          <p className="text-slate-400 mt-3 text-lg font-medium max-w-2xl">
+            {t("dpo.subtitle")}
+          </p>
+        </div>
+        <div className="flex gap-4">
+           <Button variant="outline" className="border-slate-800 bg-slate-900/40 backdrop-blur-md hover:bg-slate-800/60 transition-all duration-300">
+             <Activity className="mr-2 h-4 w-4 text-emerald-400" /> {t("dpo.live_monitoring")}
+           </Button>
+           <Button className="bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-500/20 px-8 font-bold border-t border-blue-400/30 transition-all duration-300 hover:scale-105 active:scale-95">
+             <Zap className="mr-2 h-4 w-4 fill-white" /> {t("dpo.run_audit")}
+           </Button>
+        </div>
+      </div>
+    }>
+      <div className="space-y-8 max-w-[1600px] mx-auto pb-12">
 
         <motion.div 
           variants={containerVariants}
@@ -452,7 +451,7 @@ export default function DPODashboard() {
           </Card>
         </motion.div>
       </div>
-    </div>
+    </Layout>
   );
 }
 

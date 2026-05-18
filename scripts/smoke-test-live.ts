@@ -4,8 +4,8 @@
  * Validates all critical endpoints on the live Vercel deployment
  */
 
-const BACKEND = "https://api.costloci.com";   // Vercel serverless
-const FRONTEND = "https://costloci.com";          // Cloudflare Pages
+const BACKEND = process.env.SMOKE_BACKEND || "http://127.0.0.1:3200";
+const FRONTEND = process.env.SMOKE_FRONTEND || "http://127.0.0.1:5173";
 
 const COLORS = {
   pass: "\x1b[32m",

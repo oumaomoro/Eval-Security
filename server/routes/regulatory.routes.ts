@@ -335,13 +335,27 @@ router.post("/remediation-suggestions", isAuthenticated, async (req: any, res) =
 
 router.get("/playbooks", isAuthenticated, async (req: any, res) => {
   try {
-    // Basic filter by workspace handled implicitly if we added workspace scoping
-    // Currently, getPlaybooks() gets all, which is fine for the MVP or restricted by RLS
     const playbooks = await storage.getPlaybooks();
     res.json(playbooks.filter(p => p.workspaceId === req.user.workspaceId));
   } catch (error) {
     console.error("[PLAYBOOKS GET ERROR]", error);
     res.status(500).json({ message: "Failed to fetch playbooks" });
+  }
+});
+
+router.get("/playbooks/:id", isAuthenticated, async (req: any, res) => {
+  try {
+    const playbookId = Number(req.params.id);
+    const playbooks = await storage.getPlaybooks();
+    const playbook = playbooks.find((p: any) => p.id === playbookId);
+    
+    if (!playbook || playbook.workspaceId !== req.user.workspaceId) {
+      return res.status(404).json({ message: "Playbook not found" });
+    }
+    res.json(playbook);
+  } catch (error) {
+    console.error("[PLAYBOOKS GET BY ID ERROR]", error);
+    res.status(500).json({ message: "Failed to fetch playbook" });
   }
 });
 
@@ -351,6 +365,16 @@ router.post("/playbooks", isAuthenticated, async (req: any, res) => {
       ...req.body,
       workspaceId: req.user.workspaceId,
     });
+    
+    await SOC2Logger.logEvent(req, {
+      action: "PLAYBOOK_CREATED",
+      userId: req.user.id,
+      workspaceId: req.user.workspaceId,
+      resourceType: "Playbook",
+      resourceId: String(playbook.id),
+      details: `Governance playbook created: ${playbook.name}`
+    });
+
     res.status(201).json(playbook);
   } catch (error) {
     console.error("[PLAYBOOKS CREATE ERROR]", error);
@@ -358,13 +382,77 @@ router.post("/playbooks", isAuthenticated, async (req: any, res) => {
   }
 });
 
+router.put("/playbooks/:id", isAuthenticated, async (req: any, res) => {
+  try {
+    const playbookId = Number(req.params.id);
+    const playbooks = await storage.getPlaybooks();
+    const playbook = playbooks.find((p: any) => p.id === playbookId);
+    
+    if (!playbook || playbook.workspaceId !== req.user.workspaceId) {
+      return res.status(404).json({ message: "Playbook not found" });
+    }
+
+    const updated = await storage.updatePlaybook(playbookId, req.body);
+    
+    await SOC2Logger.logEvent(req, {
+      action: "PLAYBOOK_UPDATED",
+      userId: req.user.id,
+      workspaceId: req.user.workspaceId,
+      resourceType: "Playbook",
+      resourceId: String(playbookId),
+      details: `Governance playbook updated: ${updated.name}`
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("[PLAYBOOKS UPDATE ERROR]", error);
+    res.status(500).json({ message: "Failed to update playbook" });
+  }
+});
+
 router.delete("/playbooks/:id", isAuthenticated, async (req: any, res) => {
   try {
-    await storage.deletePlaybook(Number(req.params.id));
+    const playbookId = Number(req.params.id);
+    // Workspace ownership guard — fetch first, reject if not owned by caller
+    const playbooks = await storage.getPlaybooks();
+    const playbook = playbooks.find((p: any) => p.id === playbookId);
+    if (!playbook) return res.status(404).json({ message: "Playbook not found" });
+    if (playbook.workspaceId !== req.user.workspaceId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    await storage.deletePlaybook(playbookId);
     res.status(204).end();
   } catch (error) {
     console.error("[PLAYBOOKS DELETE ERROR]", error);
     res.status(500).json({ message: "Failed to delete playbook" });
+  }
+});
+
+router.post("/playbooks/generate/:contractId", isAuthenticated, async (req: any, res) => {
+  try {
+    const contractId = Number(req.params.contractId);
+    const contract = await storage.getContract(contractId);
+    
+    if (!contract || contract.workspaceId !== req.user.workspaceId) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    const { PlaybookService } = await import("../services/PlaybookService.js");
+    const result = await PlaybookService.generateNegotiationPlaybook(contractId);
+    
+    await SOC2Logger.logEvent(req, {
+      action: "PLAYBOOK_GENERATED",
+      userId: req.user.id,
+      workspaceId: req.user.workspaceId,
+      resourceType: "Playbook",
+      resourceId: String(result.playbook.id),
+      details: `Negotiation playbook AI-generated for contract ${contract.vendorName}`
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("[PLAYBOOKS GENERATE ERROR]", error);
+    res.status(500).json({ message: "Failed to generate negotiation playbook: " + error.message });
   }
 });
 
@@ -374,7 +462,8 @@ router.get("/playbooks/:id/rules", isAuthenticated, async (req: any, res) => {
   try {
     const rules = await storage.getPlaybookRules(Number(req.params.id));
     res.json(rules);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
     console.error("[PLAYBOOK RULES GET ERROR]", error);
     res.status(500).json({ message: "Failed to fetch playbook rules" });
   }
@@ -387,17 +476,19 @@ router.post("/playbooks/:id/rules", isAuthenticated, async (req: any, res) => {
       playbookId: Number(req.params.id),
     });
     res.status(201).json(rule);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
     console.error("[PLAYBOOK RULES CREATE ERROR]", error);
     res.status(500).json({ message: "Failed to create playbook rule" });
   }
 });
 
-router.put("/playbooks/:id/rules/:ruleId", isAuthenticated, async (req: any, res) => {
+router.patch("/playbooks/:id/rules/:ruleId", isAuthenticated, async (req: any, res) => {
   try {
     const rule = await storage.updatePlaybookRule(Number(req.params.ruleId), req.body);
     res.json(rule);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
     console.error("[PLAYBOOK RULES UPDATE ERROR]", error);
     res.status(500).json({ message: "Failed to update playbook rule" });
   }
@@ -407,7 +498,8 @@ router.delete("/playbooks/:id/rules/:ruleId", isAuthenticated, async (req: any, 
   try {
     await storage.deletePlaybookRule(Number(req.params.ruleId));
     res.status(204).end();
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
     console.error("[PLAYBOOK RULES DELETE ERROR]", error);
     res.status(500).json({ message: "Failed to delete playbook rule" });
   }

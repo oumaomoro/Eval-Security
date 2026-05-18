@@ -5,11 +5,16 @@ import { IntelligenceGateway } from "../services/IntelligenceGateway.js";
 import { SOC2Logger } from "../services/SOC2Logger.js";
 import { storageContext } from "../services/storageContext.js";
 import multer from "multer";
+import os from "os";
+import fs from "fs/promises";
 import pdf from "pdf-parse";
 
 const router = Router();
 const upload = multer({ 
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
+  }),
   limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
 });
 
@@ -23,10 +28,12 @@ router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (
     const workspaceId = store?.workspaceId;
 
     if (!clientId || !workspaceId) {
+      await fs.unlink(req.file.path).catch(() => {});
       return res.status(400).json({ message: "Missing organization context." });
     }
 
-    const pdfData = await pdf(req.file.buffer);
+    const fileBuffer = await fs.readFile(req.file.path);
+    const pdfData = await pdf(fileBuffer);
     const extractedText = pdfData.text.substring(0, 15000);
 
     const analysis = await IntelligenceGateway.analyzeInsurancePolicy(extractedText, workspaceId);
@@ -37,10 +44,12 @@ router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (
     
     const { error: storageError } = await supabaseAdmin.storage
       .from("contracts") // using contracts bucket
-      .upload(storagePath, req.file.buffer, {
+      .upload(storagePath, fileBuffer, {
         contentType: req.file.mimetype || "application/pdf",
         upsert: false,
       });
+
+    await fs.unlink(req.file.path).catch(() => {});
 
     if (storageError) throw new Error("Storage upload failed: " + storageError.message);
 
@@ -108,7 +117,7 @@ router.post("/insurance/redline", isAuthenticated, async (req: any, res) => {
 // GET /api/insurance/policies - List all policies for the active organization
 router.get("/insurance/policies", isAuthenticated, async (req: any, res) => {
   try {
-    const workspaceId = storageContext.getStore()?.workspaceId;
+    const workspaceId = req.user.workspaceId;
     if (!workspaceId) return res.status(400).json({ message: "No workspace context" });
 
     const policies = await storage.getInsurancePolicies(workspaceId);
@@ -131,6 +140,11 @@ router.post("/insurance/compare", isAuthenticated, async (req: any, res) => {
 
     if (!policyA || !policyB) {
       return res.status(404).json({ message: "One or both policies not found." });
+    }
+
+    // Security Guard: Verify both policies belong to the user's workspace
+    if (policyA.workspaceId !== req.user.workspaceId || policyB.workspaceId !== req.user.workspaceId) {
+      return res.status(403).json({ message: "Access denied to one or more policies." });
     }
 
     // Intelligence comparison layer

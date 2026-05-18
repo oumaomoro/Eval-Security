@@ -26,29 +26,13 @@ export class InfrastructureIntelligence {
       actionTaken: `Scanning ${account.provider} account ${account.accountId} in ${account.region || 'Global'}...`
     });
 
-    // Mock discovered assets based on provider
-    const mockAssets = [
-      { name: "web-server-01", type: "compute", exposure: "public" },
-      { name: "customer-db-prod", type: "database", exposure: "private" },
-      { name: "app-storage-bucket", type: "storage", exposure: "public" },
-      { name: "edge-firewall", type: "firewall", exposure: "internal" }
-    ];
-
-    for (const mock of mockAssets) {
-      await (storage as any).createInfrastructureAsset({
-        workspaceId,
-        cloudAccountId,
-        name: mock.name,
-        assetType: mock.type,
-        exposureType: mock.exposure,
-        resourceId: `res-${Math.random().toString(36).substring(7)}`,
-        severity: mock.exposure === 'public' && mock.type === 'storage' ? 'critical' : 'none'
-      });
-    }
+    // Retrieve actual assets from the database instead of creating mock data
+    const assets = await (storage as any).getInfrastructureAssets(workspaceId) || [];
+    const accountAssets = assets.filter((a: any) => a.cloudAccountId === cloudAccountId);
 
     await storage.updateCloudAccount(cloudAccountId, { lastSyncAt: new Date() });
     
-    return { count: mockAssets.length };
+    return { count: accountAssets.length };
   }
 
   /**

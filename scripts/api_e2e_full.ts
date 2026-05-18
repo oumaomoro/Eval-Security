@@ -11,8 +11,9 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "fs";
+import { readFileSync, createReadStream } from "fs";
 import { resolve } from "path";
+import FormData from "form-data";
 
 // ─── 1. Load .env ─────────────────────────────────────────────────────────────
 try {
@@ -246,27 +247,27 @@ async function stage4_contracts() {
     fail("POST /api/contracts", `${create.status} — ${JSON.stringify(create.data)}`);
   }
 
-  // Bulk Upload
-  const formData = new FormData();
-  const fileBlob = new Blob(["%PDF-1.4 mock pdf data"], { type: "application/pdf" });
-  formData.append("files", fileBlob, "mock1.pdf");
-  formData.append("files", fileBlob, "mock2.pdf");
+  // Bulk Upload (Phase 37: High-Fidelity ingestion with real-world SEACOM contracts)
+  const form = new FormData();
+  form.append("files", readFileSync(resolve(process.cwd(), "scratch", "Seacom - Nairobi.pdf")), { filename: "Seacom - Nairobi.pdf" });
+  form.append("files", readFileSync(resolve(process.cwd(), "scratch", "Seacom - MSA Nyali.pdf")), { filename: "Seacom - MSA Nyali.pdf" });
 
   const bulkReq = await fetch(`${API}/api/contracts/bulk-upload`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,
-      "x-workspace-id": String(workspaceId)
+      "x-workspace-id": String(workspaceId),
+      ...form.getHeaders()
     },
-    body: formData as any
+    body: form.getBuffer() as any
   });
   
   if (bulkReq.status === 207 || bulkReq.ok) {
     const bulkData = await bulkReq.json();
-    pass(`POST /api/contracts/bulk-upload → Accepted: ${bulkData.summary?.accepted}`);
+    pass(`POST /api/contracts/bulk-upload → Accepted: ${bulkData.summary?.accepted} (Real PDF ingestion verified)`);
   } else {
-    console.warn(`[WARN] Bulk upload E2E test returned ${bulkReq.status}. Skipping strict fail since file mock is not a true PDF.`);
-    pass(`POST /api/contracts/bulk-upload → (Skipped strict check)`);
+    const errData = await bulkReq.text();
+    fail("POST /api/contracts/bulk-upload", `HTTP ${bulkReq.status} — ${errData.slice(0, 100)}`);
   }
 
   // Get by ID
@@ -338,7 +339,7 @@ async function stage6_compliance() {
   const posture = await req("GET", "/api/governance/posture", token, undefined, { "x-workspace-id": String(workspaceId) });
   posture.ok
     ? pass("GET /api/governance/posture → OK")
-    : fail("GET /api/governance/posture", `${posture.status}`);
+    : fail("GET /api/governance/posture", `${posture.status} — ${JSON.stringify(posture.data)}`);
 }
 
 async function stage7_savings_and_vendors() {
@@ -432,16 +433,16 @@ async function stage10_reports() {
   }
 
   // Create report
-  const create = await req("POST", "/api/reports", token, {
+  const create = await req("POST", "/api/reports/generate", token, {
     title: "E2E Monthly Summary",
     type: "monthly_summary",
     format: "pdf",
   }, { "x-workspace-id": String(workspaceId) });
   if (create.ok && create.data?.id) {
     reportId = create.data.id;
-    pass(`POST /api/reports → id=${reportId}`);
+    pass(`POST /api/reports/generate → id=${reportId}`);
   } else {
-    fail("POST /api/reports", `${create.status} — ${JSON.stringify(create.data)}`);
+    fail("POST /api/reports/generate", `${create.status} — ${JSON.stringify(create.data)}`);
   }
 
   // Schedules

@@ -10,6 +10,7 @@ import { storage } from "./storage.js";
 import { AutonomicEngine } from "./services/AutonomicEngine.js";
 import { serveStatic } from "./static.js";
 import { sanitizeRequest } from "./middleware/sanitizer.js";
+import { apiLimiter } from "./middleware/rate-limiter.js";
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
@@ -33,6 +34,7 @@ if ((Sentry as any).Handlers) {
 }
 
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
+app.use(apiLimiter); // Apply global rate limit to all requests
 
 function validateEnv() {
   const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY', 'CRON_SECRET'];
@@ -46,7 +48,11 @@ function validateEnv() {
 }
 validateEnv();
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: false }));
 app.use(sanitizeRequest);
 app.use(cookieParser());
@@ -132,14 +138,28 @@ app.use("/api", (req: any, res: any, next: any) => {
   //    CSRF cookie that was set on a different origin.
   // 3. Inbound webhooks from external services
   const authHeader = req.headers.authorization || req.headers.Authorization;
-  const isAuthRoute = req.path.startsWith("/auth/") || req.path === "/auth";
-  const isWebhookRoute = req.path === "/integrations/signnow/webhook" || 
-                         req.path === "/billing/paypal-webhook" ||
-                         req.path === "/billing/paystack-webhook" ||
-                         req.path === "/billing/stripe-webhook";
+  
+  // Use originalUrl for robust path matching across different mount points
+  const fullPath = req.originalUrl.split('?')[0];
+  const isAuthRoute = fullPath.startsWith("/api/auth/") || fullPath === "/api/auth" || fullPath.startsWith("/auth/") || fullPath === "/auth";
+  const isWebhookRoute = fullPath === "/api/integrations/signnow/webhook" || 
+                         fullPath === "/api/billing/paypal-webhook" ||
+                         fullPath === "/api/billing/paystack-webhook" ||
+                         fullPath === "/api/billing/stripe-webhook" ||
+                         fullPath === "/api/integrations/signnow/webhook" ||
+                         fullPath === "/api/billing/paypal-webhook" ||
+                         fullPath === "/api/billing/paystack-webhook" ||
+                         fullPath === "/api/billing/stripe-webhook";
   
   if (process.env.NODE_ENV === 'test' || (typeof authHeader === 'string' && authHeader.startsWith("Bearer ")) || isAuthRoute || isWebhookRoute) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[CSRF] Bypassing for ${fullPath} (Auth: ${!!isAuthRoute}, Webhook: ${!!isWebhookRoute})`);
+    }
     return next();
+  }
+  
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[CSRF] Protecting ${fullPath}`);
   }
   return doubleCsrfProtection(req, res, next);
 });
@@ -245,16 +265,20 @@ const httpServer = createServer(app);
         const port = parseInt(process.env.PORT || "3200", 10);
         httpServer.listen(port, "0.0.0.0", () => {
           if (process.env.NODE_ENV !== 'production') {
-            console.log(`[SERVER] serving on port ${port}`);
+            console.log(`[SERVER] serving on port ${port} (ENV: ${process.env.NODE_ENV})`);
           }
           setTimeout(() => {
             seedDatabase().catch((e: any) => console.error("Seed failed:", e));
-            AutonomicEngine.start();
+            if (process.env.NODE_ENV !== 'test') {
+              AutonomicEngine.start();
+            }
           }, 1000);
         });
       } else {
         seedDatabase().catch((e: any) => console.error("Seed failed:", e));
-        AutonomicEngine.start();
+        if (process.env.NODE_ENV !== 'test') {
+          AutonomicEngine.start();
+        }
       }
     }
   } catch (err: any) {

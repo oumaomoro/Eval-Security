@@ -16,9 +16,10 @@ const API_URL = "http://127.0.0.1:3200";
 
 export interface TestUser {
   userId: string;
+  workspaceId: string | number;
   email: string;
   /** Returns headers that inject test auth identity without JWT */
-  authHeaders: () => { "x-test-user-id": string };
+  authHeaders: () => { "x-test-user-id": string, "x-workspace-id": string };
 }
 
 /**
@@ -36,19 +37,20 @@ export async function createTestUser(
     .post("/api/auth/register")
     .send({ email, password, firstName, lastName });
 
-  // Registration returns { message, userId } — userId is the Supabase UUID
-  // which is also the primary key in the local users table.
+  // Registration returns { message, userId, workspaceId }
   let userId: string = regRes.body?.userId ?? "";
+  let workspaceId: string | number = regRes.body?.workspaceId ?? "";
 
-  if (!userId && regRes.status === 400 && regRes.body?.message?.includes("already been registered")) {
-    // Attempt to recover by fetching existing user ID from Supabase directly
+  if (!userId && regRes.status === 409 && regRes.body?.message?.includes("already")) {
+    // Attempt to recover by fetching existing user ID and workspaceId from the debug endpoint
     const res = await request(API_URL)
       .get(`/api/auth/debug/user-id?email=${encodeURIComponent(email)}`);
     const profile = res.body;
     
     if (profile?.userId) {
       userId = profile.userId;
-      console.log(`[test-auth] Recovered userId for ${email}: ${userId}`);
+      if (profile?.workspaceId) workspaceId = profile.workspaceId;
+      console.log(`[test-auth] Recovered userId=${userId} workspaceId=${workspaceId} for ${email}`);
     }
   }
 
@@ -57,11 +59,20 @@ export async function createTestUser(
       `[test-auth] createTestUser: registration did not return a userId for ${email}. ` +
       `Status: ${regRes.status}, body: ${JSON.stringify(regRes.body)}`
     );
+  } else {
+    console.log(`[test-auth] User created: ${email} (ID: ${userId}, Workspace: ${workspaceId})`);
   }
 
   return {
     userId,
+    workspaceId,
     email,
-    authHeaders: () => ({ "x-test-user-id": userId }),
+    authHeaders: () => {
+      console.log(`[test-auth] Generating headers for ${email}: user=${userId}, workspace=${workspaceId}`);
+      return { 
+        "x-test-user-id": userId,
+        "x-workspace-id": String(workspaceId)
+      };
+    },
   };
 }

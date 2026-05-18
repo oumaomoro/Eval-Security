@@ -282,9 +282,19 @@ export class AutonomicEngine {
         const { ScorecardEngine } = await import('./ScorecardEngine.js');
         const vendors = [...new Set(contracts.map(c => c.vendorName))];
         for (const vendor of vendors) {
+           const vendorWorkspaceId = contracts.find(c => c.vendorName === vendor)?.workspaceId || 1;
            QueueService.enqueue(async () => {
-             await ScorecardEngine.updateScorecard(vendor, 1);
-           }, { label: `scorecard_update::${vendor}` });
+             await ScorecardEngine.updateScorecard(vendor, vendorWorkspaceId);
+           }, { label: `scorecard_update::${vendor}`, workspaceId: vendorWorkspaceId });
+        }
+
+        // D. Immutable Audit Archiving (Phase 42 Governance)
+        const { ArchiveService } = await import("./ArchiveService.js");
+        const workspaces = await storage.getWorkspaces();
+        for (const ws of workspaces) {
+           await ArchiveService.archiveAuditLogs(ws.id).catch(err => {
+              console.error(`[AUTONOMIC] Audit archiving failed for Workspace ${ws.id}:`, err.message);
+           });
         }
       }
 

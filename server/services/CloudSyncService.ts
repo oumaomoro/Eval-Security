@@ -65,10 +65,29 @@ export class CloudSyncService {
 
   /**
    * Triggers a global sync for all active cloud accounts.
+   * Executed periodically via cron job.
    */
   static async syncAllAccounts() {
-    // In a real implementation, we would fetch all accounts and sync them.
-    // For now, this is a placeholder for the cron job.
     console.log("[CloudSyncService] Global sync initiated...");
+    try {
+      const accounts = await (storage as any).getCloudAccounts();
+      if (!accounts || accounts.length === 0) {
+        console.log("[CloudSyncService] No active cloud accounts found.");
+        return;
+      }
+
+      console.log(`[CloudSyncService] Found ${accounts.length} active accounts. Beginning synchronization...`);
+
+      // Using Promise.allSettled to ensure one failure doesn't stop the entire sync process
+      const syncPromises = accounts.map((account: any) => this.syncAccount(account.id));
+      const results = await Promise.allSettled(syncPromises);
+
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      console.log(`[CloudSyncService] Global sync complete. Success: ${successful}, Failed: ${failed}`);
+    } catch (error: any) {
+      console.error("[CloudSyncService] Global sync encountered a critical error:", error.message);
+    }
   }
 }

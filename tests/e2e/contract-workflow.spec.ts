@@ -7,19 +7,19 @@ async function registerAndLogin(page: Page): Promise<string> {
   const randomSuffix = Date.now();
   const testEmail = `playwright-${randomSuffix}@enterprise-test.com`;
 
-  // label matches "Register Account"
-  const registerTab = page.locator('button[role="tab"]').filter({ hasText: /register account/i });
+  // label matches "Create Account"
+  const registerTab = page.locator('button[role="tab"]').filter({ hasText: /create account/i });
   await registerTab.waitFor({ state: 'visible', timeout: 10000 });
   await registerTab.click();
 
   await page.fill('input[placeholder="John"]', 'Playwright');
   await page.fill('input[placeholder="Doe"]', 'Tester');
-  await page.fill('input[placeholder="j.doe@enterprise.com"]', testEmail);
+  await page.fill('input[placeholder="you@company.com"]', testEmail);
   const pwFields = page.locator('input[type="password"]');
   await pwFields.nth(0).fill('SecurePass123!');
   if (await pwFields.count() > 1) await pwFields.nth(1).fill('SecurePass123!');
 
-  await page.locator('button').filter({ hasText: /deploy enterprise identity/i }).click();
+  await page.locator('button').filter({ hasText: /create my account/i }).click();
   
   // Wait for registration flow to complete
   await page.waitForTimeout(3000);

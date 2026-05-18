@@ -54,14 +54,10 @@ export class GovernanceOrchestrator {
         totalContracts: contracts.length,
         totalAssets: assets.length,
         criticalRisks: risks.filter(r => r.severity === 'critical').length,
-        complianceScore: 94, // Mock score logic
+        complianceScore: Math.max(100 - (risks.filter(r => r.severity === 'critical').length * 5), 0),
       },
       infrastructureHealth: assets.length > 0 ? "STABLE" : "NO_DATA",
-      recommendations: [
-        "Consolidate cloud storage buckets to reduce exposure surface.",
-        "Review 3 expired vendor DPAs identified in last audit.",
-        "Update Terraform templates for RDS encryption-at-rest."
-      ]
+      recommendations: risks.filter(r => r.severity === 'critical').map(r => `Address critical risk: ${r.riskTitle}`).slice(0, 3)
     };
 
     return reportData;

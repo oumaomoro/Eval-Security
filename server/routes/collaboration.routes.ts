@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../replit_integrations/auth/index.js";
-import { SOC2Logger } from "../services/SOC2Logger.js";
 
 const router = Router();
 
@@ -17,7 +16,7 @@ router.post("/collaboration/presence", isAuthenticated, async (req: any, res) =>
     }
 
     await storage.upsertPresence({
-      workspaceId: req.workspaceId,
+      workspaceId: req.user.workspaceId, // FIXED: was req.workspaceId (always undefined)
       userId: req.user.id,
       resourceType,
       resourceId: String(resourceId)
@@ -37,7 +36,7 @@ router.get("/collaboration/presence/:resourceType/:resourceId", isAuthenticated,
   try {
     const { resourceType, resourceId } = req.params;
     const activeUsers = await storage.getActivePresence(
-      req.workspaceId,
+      req.user.workspaceId, // FIXED: was req.workspaceId (always undefined)
       resourceType,
       resourceId
     );
@@ -51,14 +50,16 @@ router.get("/collaboration/presence/:resourceType/:resourceId", isAuthenticated,
 /**
  * GET /api/collaboration/activity
  * Recent team activity in the current workspace.
+ * storageContext is set by the auth middleware so getAuditLogs()
+ * automatically scopes to the calling user's workspace.
  */
 router.get("/collaboration/activity", isAuthenticated, async (req: any, res) => {
   try {
-    const logs = await storage.getAuditLogs(undefined, undefined);
-    // Filter/map to a clean activity feed
-    const activity = logs.slice(0, 20).map(l => ({
+    // FIXED: removed explicit (undefined, undefined) args that bypassed workspace filter
+    const logs = await storage.getAuditLogs();
+    const activity = logs.slice(0, 20).map((l: any) => ({
       id: l.id,
-      user: l.userId, // In a real app, join with profile
+      user: l.userId,
       action: l.action,
       resource: l.resourceType,
       timestamp: l.timestamp,

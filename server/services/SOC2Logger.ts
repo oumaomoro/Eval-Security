@@ -42,7 +42,7 @@ export class SOC2Logger {
         metadata: eventData.metadata,
       };
 
-      storage.createAuditLog(log).catch(err => {
+      await storage.createAuditLog(log).catch(err => {
          console.error("[SOC-2 Logger] Database persistence failed:", err);
       });
 

@@ -12,8 +12,15 @@ export const PLANS = {
 };
 
 export async function getPayPalAccessToken() {
+  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_SECRET) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[BILLING] PayPal credentials missing — bypassing token retrieval.");
+    }
+    return null;
+  }
+
   const auth = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
   ).toString("base64");
 
   const response = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
@@ -37,6 +44,8 @@ export class BillingService {
   static async syncPayPalSubscription(userId: string, subscriptionId: string): Promise<{ success: boolean; tier?: string; status: string }> {
     try {
       const accessToken = await getPayPalAccessToken();
+      if (!accessToken) return { success: false, status: "CREDENTIALS_MISSING" };
+
       const response = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions/${subscriptionId}`, {
         method: "GET",
         headers: {
@@ -93,6 +102,7 @@ export class BillingService {
       },
       body: JSON.stringify({
         plan_id: planId,
+        custom_id: userId.toString(),
         subscriber: { email_address: email },
         application_context: {
           brand_name: "Costloci Enterprise",

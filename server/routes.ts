@@ -28,11 +28,11 @@ import monitoringCronRouter from "./cron/process-monitoring.js";
 import reportsRouter from "./routes/reports.routes.js";
 import vendorsRouter from "./routes/vendors.routes.js";
 import collaborationRouter from "./routes/collaboration.routes.js";
-import playbooksRouter from "./routes/playbooks.routes.js";
 import infrastructureRouter from "./routes/infrastructure.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import { telemetryMiddleware } from "./middleware/telemetry.js";
 import remediationRouter from "./routes/remediation.routes.js";
+import webhooksRouter from "./routes/webhooks.routes.js";
 
 import multer from "multer";
 import pdf from "pdf-parse";
@@ -56,10 +56,16 @@ const openai = IntelligenceGateway.openai;
 
 import { apiLimiter, authLimiter, uploadLimiter, intelligenceLimiter, cronLimiter } from "./middleware/rate-limiter.js";
 
-// Use memory storage — files are streamed directly to Supabase Storage.
-// NEVER use disk storage on Vercel: the ephemeral filesystem is wiped on every cold start.
+import os from "os";
+import fs from "fs/promises";
+
+// Use disk storage to /tmp — files are buffered to disk before processing.
+// This prevents Vercel OOM crashes during concurrent massive uploads.
 const upload = multer({ 
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
+  }),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max (Phase 28 Secure Hardening)
   fileFilter: (req, file, cb) => {
     // Exact MIME enforcement to block malicious payloads
@@ -77,15 +83,26 @@ const upload = multer({
 
 import { workspaceContextMiddleware } from "./middleware/workspace-context-middleware.js";
 
+import { QueueService_Pro } from "./services/QueueService_Pro.js";
+import { serveStatic } from "./static.js";
+
+// ... middle of registerRoutes logic ...
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  // Phase 40: Start Background Worker
+  QueueService_Pro.startWorker();
 
   // Phase 33: Real-time Collaboration Studio
   CollaborationService.init(httpServer);
 
-  // Real-time Telemetry Monitor - Hardened entry-point
+  // 1. SETUP CORE AUTHENTICATION FIRST
+  // All subsequent routes and middlewares depend on identity resolution.
+  await setupAuth(app);
+  
+  // 2. Real-time Telemetry Monitor - Hardened entry-point
   app.use(telemetryMiddleware);
   
-  // Enterprise Rate Limiting Policy
+  // 3. Enterprise Rate Limiting Policy
   app.use('/api/', apiLimiter);
   app.use('/api/auth/', authLimiter);
   app.use('/api/contracts/upload', uploadLimiter);
@@ -94,7 +111,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use('/api/intelligence/', intelligenceLimiter);
   app.use('/api/cron/', cronLimiter);
 
-  // Phase 34: Security Hardening - IP allow-listing for admin endpoints
+  // 4. Phase 34: Security Hardening - IP allow-listing for admin endpoints
+  // This is a secondary guard; RBAC is enforced within the routes themselves.
   app.use('/api/admin', (req, res, next) => {
     const allowedIpsStr = process.env.ADMIN_ALLOWED_IPS || '127.0.0.1,::1';
     if (allowedIpsStr === '*') return next();
@@ -110,14 +128,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     next();
   });
 
+  // 5. Admin Routes (Must follow setupAuth to ensure req.user availability)
   app.use(adminRouter);
 
   // Multi-tenant Workspace Context
   app.use(workspaceContextMiddleware);
 
   // Note: CSRF Protection is applied globally in index.ts for all /api routes
-  
-  await setupAuth(app);
   
   registerAuthRoutes(app);
   registerChatRoutes(app);
@@ -136,7 +153,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use("/api", vendorsRouter);
   app.use("/api", collaborationRouter);
   app.use("/api", insuranceRouter);
-  app.use("/api", playbooksRouter);
   app.use("/api", remediationRouter);
   app.use(infrastructureRouter);
   app.use("/api/v1", apiV1Router);
@@ -178,7 +194,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
    */
   app.get("/api/cron/cleanup-uploads", async (req, res) => {
     const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (authHeader?.replace(/bearer\s+/i, '') !== process.env.CRON_SECRET) {
       return res.status(401).json({ message: "Unauthorized cron execution." });
     }
 
@@ -391,14 +407,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { adminClient: supabaseAdmin } = await import("./services/supabase.js");
       const storagePath = `contracts/${clientId}/${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       
+      const fileBuffer = await fs.readFile(req.file.path);
+      
+      // Phase 41: Zero-Knowledge Encryption
+      const { CryptoUtility } = await import("./lib/crypto.js");
+      const encryptedBuffer = CryptoUtility.encrypt(fileBuffer);
+
       const { error: storageError } = await supabaseAdmin.storage
         .from("contracts")
-        .upload(storagePath, req.file.buffer, {
-          contentType: req.file.mimetype || "application/pdf",
+        .upload(storagePath, encryptedBuffer, {
+          contentType: "application/octet-stream", // Use binary for encrypted data
           upsert: false,
         });
 
       if (storageError) {
+        await fs.unlink(req.file.path).catch(() => {});
         throw new Error(`Failed to upload sovereign persistence pack: ${storageError.message}`);
       }
 
@@ -431,13 +454,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
 
       // 3. Background Async Processing (The Document Queue)
-      (async () => {
+      QueueService.enqueue(async () => {
         try {
           // Keep a reference to the request user ID
           const userId = req.user?.id || "SYSTEM";
 
-          // Buffer is available directly from multer memoryStorage
-          const pdfData = await pdf(req.file.buffer);
+          // Phase 41: Sovereign Decryption
+          const { CryptoUtility } = await import("./lib/crypto.js");
+          const decryptedBuffer = CryptoUtility.decrypt(fileBuffer);
+
+          const pdfData = await pdf(decryptedBuffer);
+          await fs.unlink(req.file.path).catch(() => {});
           const extractedText = pdfData.text.substring(0, 15000);
 
           let analysis: any = {};
@@ -592,7 +619,7 @@ Analyze the contract text and return JSON with exactly these fields:
              }
            });
         }
-      })();
+      }, { label: `contract_analysis::${contract.id}` });
 
     } catch (err: any) {
       console.error("[UPLOAD ERROR]", err.message);
@@ -650,13 +677,18 @@ Analyze the contract text and return JSON with exactly these fields:
           try {
             // 1. Upload to Supabase Storage
             const storagePath = `contracts/${clientId}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            const fileBuffer = await fs.readFile(file.path);
+
             const { error: storageError } = await supabaseAdmin.storage
               .from("contracts")
-              .upload(storagePath, file.buffer, {
+              .upload(storagePath, fileBuffer, {
                 contentType: file.mimetype || "application/pdf",
                 upsert: false,
               });
-            if (storageError) throw new Error(`Storage: ${storageError.message}`);
+            if (storageError) {
+              await fs.unlink(file.path).catch(() => {});
+              throw new Error(`Storage: ${storageError.message}`);
+            }
 
             const { data: pubUrl } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
             const fileUrl = pubUrl.publicUrl;
@@ -675,9 +707,10 @@ Analyze the contract text and return JSON with exactly these fields:
             }, userId);
 
             // 3. Background AI analysis (fire-and-forget per file)
-            (async () => {
+            QueueService.enqueue(async () => {
               try {
-                const pdfData = await pdf(file.buffer);
+                const pdfData = await pdf(fileBuffer);
+                await fs.unlink(file.path).catch(() => {});
                 const extractedText = pdfData.text.substring(0, 15000);
 
                 let analysis: any = {};
@@ -780,7 +813,7 @@ Analyze the contract text and return JSON with exactly these fields:
                   },
                 });
               }
-            })();
+            }, { label: `bulk_contract_analysis::${contract.id}` });
 
             return { filename, contractId: contract.id, status: "pending", error: null };
           } catch (err: any) {
@@ -1003,6 +1036,11 @@ Analyze the contract text and return JSON with exactly these fields:
     } catch { res.status(500).json({ message: "Multi-comparison failed" }); }
   });
 
+  app.use("/api/remediation", remediationRouter);
+  app.use("/api/webhooks", webhooksRouter);
+
+  // ─── CONTRACT UPLOAD (MULTI-MODAL INGESTION) ─────────────────────────────────────────────────────────────
+
   // ─── COMPLIANCE ─────────────────────────────────────────────────────────────
 
   app.get(api.compliance.rulesets.list.path, isAuthenticated, async (_req, res) => {
@@ -1100,7 +1138,7 @@ Analyze the contract text and return JSON with exactly these fields:
       });
 
       // Full async background analysis — real DB writes
-      (async () => {
+      QueueService.enqueue(async () => {
         try {
           const contracts = await storage.getContracts({ ids: scope.contractIds });
           const contractText = contracts.map(c => `[ID: ${c.id}, Vendor: ${c.vendorName}] ${c.intelligenceAnalysis?.summary || ""}`).join("\n");
@@ -1164,7 +1202,7 @@ Analyze the contract text and return JSON with exactly these fields:
           await storage.updateComplianceAudit(audit.id, { status: "failed" } as any);
           console.error("[AUDIT ENGINE ERROR]", e.message);
         }
-      })();
+      }, { label: `compliance_audit::${audit.id}` });
 
       res.status(201).json(audit);
     } catch (err) {
@@ -1300,6 +1338,16 @@ Analyze the contract text and return JSON with exactly these fields:
         mitigationStatus: status,
         mitigationStrategies: strategy ? [strategy] : undefined,
       } as any);
+
+      await SOC2Logger.logEvent(req, {
+        action: "RISK_MITIGATION_UPDATED",
+        userId: req.user.id,
+        workspaceId: updatedRisk.workspaceId ?? undefined,
+        resourceType: "Risk",
+        resourceId: String(id),
+        details: `Risk mitigation status set to ${status}. Strategy: ${strategy || 'N/A'}`
+      });
+
       res.json(updatedRisk);
     } catch (err: any) { 
       res.status(500).json({ message: "Mitigation failed: " + err.message }); 
@@ -1327,22 +1375,53 @@ Analyze the contract text and return JSON with exactly these fields:
 
   app.post("/api/playbooks", isAuthenticated, async (req: any, res) => {
     try {
-      if (!req.user?.workspaceId) return res.status(403).json({ message: "Workspace required" });
-      const playbook = await storage.createPlaybook({...req.body, workspaceId: req.user.workspaceId});
+      const workspaceId = storageContext.getStore()?.workspaceId || req.user?.workspaceId;
+      if (!workspaceId) return res.status(403).json({ message: "Workspace required" });
+      const playbook = await storage.createPlaybook({...req.body, workspaceId});
+
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_CREATED",
+        userId: req.user.id,
+        workspaceId,
+        resourceType: "Playbook",
+        resourceId: String(playbook.id),
+        details: `Governance playbook created: ${playbook.name}`
+      });
+
       res.json(playbook);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-  app.put("/api/playbooks/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/playbooks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const playbook = await storage.updatePlaybook(Number(req.params.id), req.body);
+      
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_UPDATED",
+        userId: req.user.id,
+        workspaceId: playbook.workspaceId,
+        resourceType: "Playbook",
+        resourceId: String(playbook.id),
+        details: `Governance playbook modified: ${playbook.name}`
+      });
+
       res.json(playbook);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-  app.delete("/api/playbooks/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/playbooks/:id", isAuthenticated, async (req: any, res) => {
     try {
-      await storage.deletePlaybook(Number(req.params.id));
+      const id = Number(req.params.id);
+      await storage.deletePlaybook(id);
+      
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_DELETED",
+        userId: req.user.id,
+        resourceType: "Playbook",
+        resourceId: String(id),
+        details: `Governance playbook purged from system.`
+      });
+
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -1352,36 +1431,89 @@ Analyze the contract text and return JSON with exactly these fields:
     try {
       const rules = await storage.getPlaybookRules(Number(req.params.id));
       res.json(rules);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { 
+      if (err.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
+      res.status(500).json({ message: err.message }); 
+    }
   });
 
-  app.post("/api/playbooks/:id/rules", isAuthenticated, async (req, res) => {
+  app.post("/api/playbooks/:id/rules", isAuthenticated, async (req: any, res) => {
     try {
-      const rule = await storage.createPlaybookRule({...req.body, playbookId: Number(req.params.id)});
+      const playbookId = Number(req.params.id);
+      const rule = await storage.createPlaybookRule({...req.body, playbookId});
+
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_RULE_CREATED",
+        userId: req.user.id,
+        resourceType: "PlaybookRule",
+        resourceId: String(rule.id),
+        details: `New governance rule added to playbook ${playbookId}: ${rule.name}`
+      });
+
+      res.status(201).json(rule);
+    } catch (err: any) { 
+      if (err.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
+      res.status(500).json({ message: err.message }); 
+    }
+  });
+
+  app.put("/api/playbooks/:id/rules/:ruleId", isAuthenticated, async (req: any, res) => {
+    try {
+      const ruleId = Number(req.params.ruleId);
+      const rule = await storage.updatePlaybookRule(ruleId, req.body);
+
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_RULE_UPDATED",
+        userId: req.user.id,
+        resourceType: "PlaybookRule",
+        resourceId: String(ruleId),
+        details: `Governance rule modified: ${rule.name}`
+      });
+
       res.json(rule);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { 
+      if (err.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
+      res.status(500).json({ message: err.message }); 
+    }
   });
 
-  app.put("/api/playbooks/:id/rules/:ruleId", isAuthenticated, async (req, res) => {
+  app.delete("/api/playbooks/:id/rules/:ruleId", isAuthenticated, async (req: any, res) => {
     try {
-      const rule = await storage.updatePlaybookRule(Number(req.params.ruleId), req.body);
-      res.json(rule);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
+      const ruleId = Number(req.params.ruleId);
+      await storage.deletePlaybookRule(ruleId);
 
-  app.delete("/api/playbooks/:id/rules/:ruleId", isAuthenticated, async (req, res) => {
-    try {
-      await storage.deletePlaybookRule(Number(req.params.ruleId));
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_RULE_DELETED",
+        userId: req.user.id,
+        resourceType: "PlaybookRule",
+        resourceId: String(ruleId),
+        details: `Governance rule removed from playbook.`
+      });
+
       res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { 
+      if (err.message === "Unauthorized") return res.status(403).json({ message: "Access denied" });
+      res.status(500).json({ message: err.message }); 
+    }
   });
 
   // Redlines Endpoints
   app.post("/api/contracts/:id/apply-playbooks", isAuthenticated, async (req: any, res) => {
     try {
-      if (!req.user?.workspaceId) return res.status(403).json({ message: "Workspace required" });
-      const { RulesEngine } = await import("./services/RulesEngine");
-      await RulesEngine.evaluateContract(Number(req.params.id), req.user.workspaceId);
+      const workspaceId = storageContext.getStore()?.workspaceId || req.user?.workspaceId;
+      if (!workspaceId) return res.status(403).json({ message: "Workspace required" });
+      const { RulesEngine } = await import("./services/RulesEngine.js");
+      await RulesEngine.evaluateContract(Number(req.params.id), workspaceId);
+
+      await SOC2Logger.logEvent(req, {
+        action: "PLAYBOOK_EVALUATION_TRIGGERED",
+        userId: req.user.id,
+        workspaceId,
+        resourceType: "Contract",
+        resourceId: String(req.params.id),
+        details: "Manual playbook evaluation triggered for contract."
+      });
+
       res.json({ success: true, message: "Playbooks evaluated successfully." });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -1526,6 +1658,15 @@ Analyze the contract text and return JSON with exactly these fields:
     try {
       const { userId, role } = api.workspaces.members.updateRole.input.parse(req.body);
       const updated = await storage.updateUser(userId, { role });
+      
+      await SOC2Logger.logEvent(req as any, {
+        action: "USER_ROLE_UPDATED",
+        userId: (req as any).user.id,
+        resourceType: "Profile",
+        resourceId: userId,
+        details: `User role updated to ${role} by administrator.`
+      });
+
       res.json(updated);
     } catch { res.status(500).json({ message: "Role update failed" }); }
   });
@@ -1542,8 +1683,17 @@ Analyze the contract text and return JSON with exactly these fields:
       const { logId } = api.infrastructure.heal.input.parse(req.body);
       const log = await storage.updateInfrastructureLog(logId, {
         status: "healed",
-        actionTaken: "Autonomic Remediation — predictive self-healing engaged.",
+        actionTaken: `Manual healing triggered by ${(req as any).user.email}`,
       });
+
+      await SOC2Logger.logEvent(req as any, {
+        action: "INFRASTRUCTURE_HEALED",
+        userId: (req as any).user.id,
+        resourceType: "InfrastructureLog",
+        resourceId: String(logId),
+        details: "Infrastructure guardrail manual resolution executed."
+      });
+
       res.json(log);
     } catch { res.status(500).json({ message: "Healing failed" }); }
   });
@@ -1635,7 +1785,7 @@ Analyze the contract text and return JSON with exactly these fields:
 
   // Health endpoints defined above at bootstrap level
 
-  app.get("/api/governance/posture", async (req: any, res) => {
+  app.get("/api/governance/posture", isAuthenticated, async (req: any, res) => {
     try {
       const stats = await storage.getDashboardStats(req.user?.clientId);
       
@@ -1661,11 +1811,12 @@ Analyze the contract text and return JSON with exactly these fields:
       
       res.json(resVal);
     } catch (err: any) {
-      res.status(500).json({ message: "Failed to fetch posture" });
+      console.error("[GOVERNANCE ERROR]", err);
+      res.status(500).json({ message: `Failed to fetch posture: ${err.message}` });
     }
   });
 
-  app.get("/api/dashboard/risk-heatmap", async (req: any, res) => {
+  app.get("/api/dashboard/risk-heatmap", isAuthenticated, async (req: any, res) => {
     try {
       const heatmapParams = await storage.getRiskHeatmap(req.user?.clientId);
       if (heatmapParams && heatmapParams.length > 0) {

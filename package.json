@@ -15,9 +15,9 @@
     "test:unit": "cross-env NODE_ENV=test jest tests/unit",
     "test:api": "cross-env NODE_ENV=test jest tests/api --runInBand",
     "test:security": "cross-env NODE_ENV=test jest tests/security",
-    "test:api:old": "tsx scripts/verify_all_endpoints.ts",
+
     "test:e2e": "tsx scripts/e2e_full_suite.ts",
-    "test:api:full": "tsx scripts/api_e2e_full.ts",
+    "test:api:full": "cross-env E2E_API_URL=http://127.0.0.1:3200 tsx scripts/api_e2e_full.ts",
     "smoke": "tsx scripts/smoke-test-live.ts",
     "provision:vercel": "powershell -ExecutionPolicy Bypass -File scripts/provision-vercel.ps1",
     "deploy": "powershell -ExecutionPolicy Bypass -File deploy_all.ps1",

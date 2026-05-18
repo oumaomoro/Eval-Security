@@ -18,7 +18,7 @@ router.post("/process-monitoring", async (req, res) => {
     
     // Verify Authorized Invocation
     const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (authHeader?.replace(/bearer\s+/i, '') !== cronSecret) {
       console.warn("[CRON] Unauthorized attempt to trigger monitoring processing.");
       return res.status(401).json({ message: "Unauthorized Trigger" });
     }

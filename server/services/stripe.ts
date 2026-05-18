@@ -37,4 +37,11 @@ export class StripeService {
     }
     return await stripe.customers.create({ email, name });
   }
+
+  /**
+   * Retrieves a subscription by ID.
+   */
+  static async getSubscription(subscriptionId: string) {
+    return await stripe.subscriptions.retrieve(subscriptionId);
+  }
 }

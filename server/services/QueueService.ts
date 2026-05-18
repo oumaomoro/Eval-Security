@@ -1,5 +1,7 @@
 import pRetry from "p-retry";
 import pLimit from "p-limit";
+import { storageContext } from "./storageContext.js";
+import { adminClient } from "./supabase.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,6 +14,8 @@ interface JobConfig {
   retries?: number;
   /** Minimum backoff in ms between retries (default: 1000) */
   minTimeout?: number;
+  /** Workspace context to restore during background execution */
+  workspaceId?: number;
 }
 
 // ─── QueueService ─────────────────────────────────────────────────────────────
@@ -20,13 +24,15 @@ interface JobConfig {
  * COSTLOCI ENTERPRISE — Lightweight Async Job Queue
  * ══════════════════════════════════════════════════
  * Fire-and-forget queue with automatic retry semantics and concurrency limits.
+ * Now Workspace-Aware to preserve multi-tenant context in background jobs.
  */
 export class QueueService {
   private static readonly DEFAULT_RETRIES = 3;
   private static readonly DEFAULT_MIN_TIMEOUT_MS = 1_000;
   
   // Enterprise Guard: Limit concurrent background jobs to prevent DB/AI exhaustion
-  private static readonly limit = pLimit(5);
+  // Scalable via QUEUE_CONCURRENCY environment variable (default: 5)
+  private static readonly limit = pLimit(Number(process.env.QUEUE_CONCURRENCY) || 5);
 
   /**
    * Enqueue an arbitrary async job with automatic retry on failure.
@@ -36,10 +42,11 @@ export class QueueService {
       label,
       retries = QueueService.DEFAULT_RETRIES,
       minTimeout = QueueService.DEFAULT_MIN_TIMEOUT_MS,
+      workspaceId = storageContext.getStore()?.workspaceId
     } = config;
 
     const jobId = `${label}::${Date.now()}`;
-    console.log(`[QUEUE] 📥 Enqueued: ${jobId}`);
+    console.log(`[QUEUE] 📥 Enqueued: ${jobId} (Workspace: ${workspaceId || 'Global'})`);
 
     // Fire-and-forget within concurrency limits
     this.limit(() => 
@@ -48,7 +55,11 @@ export class QueueService {
           if (attempt > 1) {
             console.log(`[QUEUE] 🔄 Retry ${attempt - 1}/${retries}: ${jobId}`);
           }
-          await fn();
+          
+          // Restore Workspace Context before execution
+          return storageContext.run({ client: adminClient, workspaceId }, async () => {
+             await fn();
+          });
         },
         {
           retries,
@@ -77,6 +88,7 @@ export class QueueService {
     to: string,
     subject: string
   ): void {
+    const workspaceId = storageContext.getStore()?.workspaceId;
     this.enqueue(
       async () => {
         const sent = await sendFn();
@@ -88,6 +100,7 @@ export class QueueService {
         label: `email::${to}::${subject.slice(0, 30)}`,
         retries: QueueService.DEFAULT_RETRIES,
         minTimeout: 1_500,
+        workspaceId
       }
     );
   }

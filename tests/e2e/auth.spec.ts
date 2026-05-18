@@ -12,8 +12,8 @@ test.describe('Platform Authentication', () => {
     // Page must load with Costloci branding
     await expect(page).toHaveTitle(/Costloci/i, { timeout: 20000 });
 
-    // Switch to the Registration tab — label matches "Register Account"
-    const registerTab = page.locator('button[role="tab"]').filter({ hasText: /register account/i });
+    // Switch to the Registration tab — label matches "Create Account"
+    const registerTab = page.locator('button[role="tab"]').filter({ hasText: /create account/i });
     await registerTab.waitFor({ state: 'visible', timeout: 10000 });
     await registerTab.click();
 
@@ -23,7 +23,7 @@ test.describe('Platform Authentication', () => {
 
     await page.fill('input[placeholder="John"]', 'Playwright');
     await page.fill('input[placeholder="Doe"]', 'Tester');
-    await page.fill('input[placeholder="j.doe@enterprise.com"]', testEmail);
+    await page.fill('input[placeholder="you@company.com"]', testEmail);
     // Password fields - fill the first password field, then the confirm field
     const passwordFields = page.locator('input[type="password"]');
     await passwordFields.nth(0).fill('SecurePass123!');
@@ -34,7 +34,7 @@ test.describe('Platform Authentication', () => {
     }
 
     // Submit
-    const submitBtn = page.locator('button').filter({ hasText: /deploy enterprise identity/i });
+    const submitBtn = page.locator('button').filter({ hasText: /create my account/i });
     await submitBtn.click();
 
     // After registration, the app shows a success message but stays on /auth
@@ -62,9 +62,12 @@ test.describe('Platform Authentication', () => {
 
     const onAuth = page.url().includes('/auth');
     if (onAuth) {
-      // Login form must be present
-      const loginForm = page.locator('button').filter({ hasText: /authenticate & connect/i });
-      await expect(loginForm).toBeVisible({ timeout: 5000 });
+      // Login form must be present - use specific role to avoid tab trigger collision
+      const loginForm = page.getByRole('button', { name: 'Sign In', exact: true }).filter({ hasNot: page.locator('[role="tab"]') });
+      // Actually, in our AuthPage, the submit button is a Button component but the tab is a TabsTrigger.
+      // Let's just use the one that is NOT a tab.
+      const submitButton = page.locator('button:not([role="tab"])').filter({ hasText: /^Sign In$/i });
+      await expect(submitButton).toBeVisible({ timeout: 5000 });
     }
   });
 

@@ -19,7 +19,7 @@ export function useInfrastructureLogs() {
         credentials: "include",      });
       if (!res.ok) throw new Error("Failed to fetch infrastructure logs");
       const result = await res.json();
-      return result.data || [];
+      return Array.isArray(result) ? result : [];
     },
         refetchInterval: 10000, // Refresh every 10s for live health
     });
@@ -27,7 +27,7 @@ export function useInfrastructureLogs() {
 
 export function useHealInfrastructure() {
     return useMutation<InfrastructureLog, Error, number>({
-        mutationFn: async (logId) => {      const res = await fetch(getApiUrl(api.infrastructure.heal.path), {
+        mutationFn: async (logId: number) => {      const res = await fetch(getApiUrl(api.infrastructure.heal.path), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -37,7 +37,7 @@ export function useHealInfrastructure() {
       });
       if (!res.ok) throw new Error("Healing operation failed");
       const result = await res.json();
-      return result.data;
+      return result;
     },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [api.infrastructure.logs.path] });
@@ -47,12 +47,12 @@ export function useHealInfrastructure() {
 
 export function useAdminStats() {
     return useQuery({
-        queryKey: ["/api/admin/stats"],
+        queryKey: [api.dashboard.stats.path],
         queryFn: async () => {
-            const res = await fetch(getApiUrl("/api/admin/stats"), {
+            const res = await fetch(getApiUrl(api.dashboard.stats.path), {
                 credentials: "include",
             });
-            if (!res.ok) throw new Error("Failed to fetch admin stats");
+            if (!res.ok) throw new Error("Failed to fetch dashboard stats");
             return res.json();
         },
         refetchInterval: 30000,

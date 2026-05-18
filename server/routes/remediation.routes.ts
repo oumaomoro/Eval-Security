@@ -8,8 +8,9 @@ const router = Router();
 
 /**
  * List all remediation suggestions for the active workspace.
+ * NOTE: Path has NO /api prefix — mounted at app.use("/api", remediationRouter)
  */
-router.get("/api/remediation-suggestions", isAuthenticated, async (req: any, res) => {
+router.get("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
   try {
     const suggestions = await storage.getRemediationSuggestions();
     res.json(suggestions);
@@ -21,7 +22,7 @@ router.get("/api/remediation-suggestions", isAuthenticated, async (req: any, res
 /**
  * Get suggestions for a specific contract.
  */
-router.get("/api/contracts/:id/remediation-suggestions", isAuthenticated, async (req: any, res) => {
+router.get("/contracts/:id/remediation-suggestions", isAuthenticated, async (req: any, res) => {
   try {
     const contractId = parseInt(req.params.id);
     const suggestions = await storage.getRemediationSuggestions(contractId);
@@ -34,16 +35,15 @@ router.get("/api/contracts/:id/remediation-suggestions", isAuthenticated, async 
 /**
  * Accept a remediation suggestion.
  */
-router.post("/api/remediation-suggestions/:id/accept", isAuthenticated, async (req: any, res) => {
+router.post("/remediation-suggestions/:id/accept", isAuthenticated, async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
     const suggestion = await storage.getRemediationSuggestion(id);
-    
+
     if (!suggestion) {
       return res.status(404).json({ message: "Suggestion not found" });
     }
 
-    // Update status to accepted
     const updated = await storage.updateRemediationSuggestion(id, {
       status: "accepted",
       acceptedAt: new Date()
@@ -66,9 +66,15 @@ router.post("/api/remediation-suggestions/:id/accept", isAuthenticated, async (r
 /**
  * Dismiss a remediation suggestion.
  */
-router.post("/api/remediation-suggestions/:id/dismiss", isAuthenticated, async (req: any, res) => {
+router.post("/remediation-suggestions/:id/dismiss", isAuthenticated, async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
+    const suggestion = await storage.getRemediationSuggestion(id);
+
+    if (!suggestion) {
+      return res.status(404).json({ message: "Suggestion not found" });
+    }
+
     const updated = await storage.updateRemediationSuggestion(id, {
       status: "dismissed"
     });
@@ -78,7 +84,7 @@ router.post("/api/remediation-suggestions/:id/dismiss", isAuthenticated, async (
       userId: req.user.id,
       resourceType: "RemediationSuggestion",
       resourceId: String(id),
-      details: `User dismissed remediation suggestion #${id}`
+      details: `User dismissed remediation suggestion #${id} (${suggestion.standard})`
     });
 
     res.json(updated);

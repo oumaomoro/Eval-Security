@@ -36,7 +36,7 @@ export default function AuditLog() {
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(22);
-    doc.text("Cyber-Optimize Audit Ledger", 20, 20);
+    doc.text("Costloci Audit Ledger", 20, 20);
     doc.setFontSize(10);
     doc.text(`Generated: ${new Date().toISOString()}`, 20, 30);
     doc.text(`Compliance Standard: SOC-2 Type II / KDPA Section 41`, 20, 35);
@@ -53,7 +53,7 @@ export default function AuditLog() {
       y += 25;
     });
 
-    doc.save(`Cyber-Optimize_Ledger_${new Date().getTime()}.pdf`);
+    doc.save(`Costloci_Ledger_${new Date().getTime()}.pdf`);
   };
 
   const filteredLogs = logs?.filter((log: any) => 
@@ -87,7 +87,7 @@ export default function AuditLog() {
         </div>
       </div>
     }>
-      <SEO title="Global Audit Ledger" description="Immutable record of all administrative and compliance actions within the Cyber-Optimize platform." />
+      <SEO title="Global Audit Ledger" description="Immutable record of all administrative and compliance actions within the Costloci platform." />
       
       <div className="space-y-10 pb-12 pt-4">
         

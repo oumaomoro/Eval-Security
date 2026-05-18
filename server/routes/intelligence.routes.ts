@@ -18,6 +18,12 @@ router.get("/contracts/:id/benchmarking", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
 
+    // Security Guard: Verify ownership
+    const contract = await storage.getContract(id);
+    if (!contract || contract.workspaceId !== (req as any).user.workspaceId) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
     // Fetch market intelligence from storage engine
     const benchmark = await storage.getMarketIntelligence(id);
     
@@ -87,6 +93,11 @@ router.post("/intelligence/compare-clauses", isAuthenticated, async (req: any, r
       const clauses = await storage.getContractClauses();
       const contractClause = clauses.find(c => c.id === contractClauseId);
       if (contractClause) {
+        // Security Guard: Check if the contract belongs to the user's workspace
+        const contract = await storage.getContract(contractClause.contractId);
+        if (!contract || contract.workspaceId !== req.user.workspaceId) {
+          return res.status(403).json({ message: "Access denied to this clause" });
+        }
         comparisonText = contractClause.content;
         category = contractClause.category;
       }
@@ -124,6 +135,13 @@ router.get("/contracts/:id/versions", isAuthenticated, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
+
+    // Security Guard: Verify ownership
+    const contract = await storage.getContract(id);
+    if (!contract || contract.workspaceId !== (req as any).user.workspaceId) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
     const versions = await storage.getContractVersions(id);
     res.json(versions);
   } catch (error: any) {
@@ -142,6 +160,12 @@ router.post("/contracts/:id/versions", isAuthenticated, async (req: any, res) =>
     
     if (isNaN(id) || !fileUrl) {
       return res.status(400).json({ message: "Contract ID and file URL are required." });
+    }
+
+    // Security Guard: Verify ownership
+    const contract = await storage.getContract(id);
+    if (!contract || contract.workspaceId !== req.user.workspaceId) {
+      return res.status(404).json({ message: "Contract not found" });
     }
 
     const existingVersions = await storage.getContractVersions(id);

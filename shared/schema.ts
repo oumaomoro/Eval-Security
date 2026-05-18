@@ -295,8 +295,24 @@ export const vendorScorecards = pgTable("vendor_scorecards", {
   riskScore: integer("risk_score"),
   securityScore: integer("security_score"),
   slaPerformance: integer("sla_performance"),
+  pricingScore: integer("pricing_score"),
   overallGrade: text("overall_grade"),
   lastAssessmentDate: timestamp("last_assessment_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const jobs = pgTable("jobs", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").references(() => workspaces.id),
+  type: text("type").notNull(), // 'contract_analysis', 'report_generation', 'compliance_audit'
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  priority: integer("priority").default(0),
+  attempts: integer("attempts").default(0),
+  maxAttempts: integer("max_attempts").default(3),
+  lastError: text("last_error"),
+  lockedAt: timestamp("locked_at"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

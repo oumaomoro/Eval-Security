@@ -18,7 +18,7 @@ router.post("/pulse", async (req, res) => {
     const cronSecret = process.env.CRON_SECRET || "dev_cron_secret";
     const authHeader = req.headers.authorization;
 
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (authHeader?.replace(/bearer\s+/i, '') !== cronSecret) {
       console.warn("[CRON] Unauthorized attempt to trigger autonomic pulse.");
       return res.status(401).json({ message: "Unauthorized Trigger" });
     }
@@ -43,7 +43,7 @@ router.post("/process-schedules", async (req, res) => {
     
     // Verify Authorized Invocation
     const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (authHeader?.replace(/bearer\s+/i, '') !== cronSecret) {
       console.warn("[CRON] Unauthorized attempt to trigger schedule processing.");
       return res.status(401).json({ message: "Unauthorized Trigger" });
     }
