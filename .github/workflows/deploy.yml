@@ -45,8 +45,10 @@ jobs:
       - name: Run API Tests
         run: |
           npx cross-env NODE_ENV=test tsx server/index.ts &
-          npx wait-on http://localhost:3200
-          npm run test:api
+          SERVER_PID=$!
+          npx wait-on http://127.0.0.1:3200
+          npm run test:api || (kill -9 $SERVER_PID && exit 1)
+          kill -9 $SERVER_PID
       
       - name: Run Security Tests
         run: npm run test:security
