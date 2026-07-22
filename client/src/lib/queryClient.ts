@@ -20,7 +20,8 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL === 'https://api.costloci.com' ? '' : (import.meta.env.VITE_API_URL || ""));
+  // Use VITE_API_URL for all production cross-origin requests; relative paths for local dev
+  const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL || '');
   const fullUrl = url.startsWith("http") ? url : `${apiUrl}${url.startsWith("/") ? url : `/${url}`}`;
 
   // Fetch CSRF token for mutating requests (Phase 28 Secure Sync)
@@ -71,7 +72,8 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL === 'https://api.costloci.com' ? '' : (import.meta.env.VITE_API_URL || ""));
+    // Use VITE_API_URL for all production cross-origin requests; relative paths for local dev
+    const apiUrl = isLocal ? '' : (import.meta.env.VITE_API_URL || '');
     const path = queryKey.join("/");
     const fullUrl = path.startsWith("http") ? path : `${apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
 

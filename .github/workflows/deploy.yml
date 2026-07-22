@@ -7,8 +7,42 @@ on:
     branches: [ main ]
 
 jobs:
-  validate:
+  # ── Job 1: Pre-flight Checks ──────────────────────────────────────────────
+  preflight:
+    name: Pre-flight Checks
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+      - name: System Health Check
+        run: npx tsx scripts/verify-health.ts
+
+  # ── Job 2: Build & Unit/Security Tests ────────────────────────────────────
+  build-and-test:
+    name: Type Check & Build
+    runs-on: ubuntu-latest
+    needs: preflight
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -21,87 +55,183 @@ jobs:
       PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       SIGNNOW_API_KEY: ${{ secrets.SIGNNOW_API_KEY }}
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      VITE_API_URL: "https://api.costloci.com"
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '22'
           cache: 'npm'
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Build Check (Frontend & Backend)
+
+      - name: Build Project
         run: npm run build
-      
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
       - name: Run Unit Tests
         run: npm run test:unit
-      
+
+      - name: Run Security Tests
+        run: npm run test:security
+
       - name: Run API Tests
         run: |
           npx cross-env NODE_ENV=test tsx server/index.ts &
           SERVER_PID=$!
-          npx wait-on http://127.0.0.1:3200
-          npm run test:api || (kill -9 $SERVER_PID && exit 1)
-          kill -9 $SERVER_PID
-      
-      - name: Run Security Tests
-        run: npm run test:security
-      
-      - name: System Health Check
-        run: npx tsx scripts/verify-health.ts
+          npx wait-on http://127.0.0.1:3200 --timeout 60000
+          npm run test:api
+          TEST_EXIT=$?
+          kill -9 $SERVER_PID 2>/dev/null || true
+          exit $TEST_EXIT
 
-  deploy-production:
-    needs: validate
-    if: github.ref == 'refs/heads/main'
+  # ── Job 3: Deploy Backend → Vercel ────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend → Vercel
     runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    strategy:
-      matrix:
-        target: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Deploy Backend to Vercel
-        if: matrix.target == 'backend'
-        uses: amondnet/vercel-action@v25
         with:
-          vercel-token: ${{ env.VERCEL_TOKEN }}
-          vercel-org-id: ${{ env.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ env.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy Frontend to Cloudflare
-        if: matrix.target == 'frontend'
-        uses: cloudflare/wrangler-action@v3
+      - name: Install Global CLIs
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel (Production)
+        run: |
+          vercel --prod --yes \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_ORG_ID \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -e SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
+            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            -e CRON_SECRET="${{ secrets.CRON_SECRET }}" \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            -e RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
+            -e PAYPAL_CLIENT_ID="${{ secrets.PAYPAL_CLIENT_ID }}" \
+            -e PAYPAL_SECRET="${{ secrets.PAYPAL_SECRET }}" \
+            -e PAYPAL_STARTER_PLAN_ID="${{ secrets.PAYPAL_STARTER_PLAN_ID }}" \
+            -e PAYPAL_PRO_PLAN_ID="${{ secrets.PAYPAL_PRO_PLAN_ID }}" \
+            -e PAYPAL_ENTERPRISE_PLAN_ID="${{ secrets.PAYPAL_ENTERPRISE_PLAN_ID }}" \
+            -e PAYPAL_WEBHOOK_ID="${{ secrets.PAYPAL_WEBHOOK_ID }}" \
+            -e PAYSTACK_SECRET_KEY="${{ secrets.PAYSTACK_SECRET_KEY }}" \
+            -e SIGNNOW_API_KEY="${{ secrets.SIGNNOW_API_KEY }}" \
+            -e CSRF_SECRET="${{ secrets.CSRF_SECRET }}" \
+            -e SESSION_SECRET="${{ secrets.SESSION_SECRET }}" \
+            -e GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            -e UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            -e UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            -e FRONTEND_URL="https://costloci.com" \
+            -e API_URL="https://api.costloci.com" \
+            -e NODE_ENV="production" \
+            -e ALLOWED_ORIGINS="https://costloci.com,https://api.costloci.com,https://costloci-frontend.pages.dev"
+
+  # ── Job 4: Deploy Frontend → Cloudflare Pages ─────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend → Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
         with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/public --project-name=costloci-frontend --branch=main
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Deploy to Cloudflare Pages
+        run: wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true
+
+  # ── Job 5: E2E Smoke Tests on Production ─────────────────────────────────
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      TEST_BASE_URL: https://costloci.com
+      API_URL: https://api.costloci.com
+      TEST_LOGIN_EMAIL: ${{ secrets.TEST_LOGIN_EMAIL }}
+      TEST_LOGIN_PASSWORD: ${{ secrets.TEST_LOGIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E Auth Tests
+        run: npx playwright test tests/e2e/auth.spec.ts --reporter=list
+        continue-on-error: false
+
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ── Notify ─────────────────────────────────────────────────────────────────
   notify:
-    needs: [validate, deploy-production]
-    if: always()
+    name: Deployment Status
+    needs: [deploy-backend, deploy-frontend, e2e-tests]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Success Notification
-        if: needs.deploy-production.result == 'success'
+      - name: Success
+        if: needs.deploy-backend.result == 'success' && needs.deploy-frontend.result == 'success'
         run: |
           echo "🚀 DEPLOYMENT SUCCESSFUL"
-          echo "Frontend is live at https://costloci-frontend.pages.dev"
-          echo "Backend API is live at https://cyberoptimize-frontend.vercel.app"
-      - name: Failure Notification
-        if: needs.validate.result == 'failure' || needs.deploy-production.result == 'failure'
+          echo "Frontend: https://costloci.com (Cloudflare Pages)"
+          echo "Backend API: https://api.costloci.com (Vercel)"
+
+      - name: Failure
+        if: needs.deploy-backend.result == 'failure' || needs.deploy-frontend.result == 'failure'
         run: |
-          echo "❌ DEPLOYMENT FAILED"
-          echo "Triggering automated rollback protocol (Vercel Instant Rollback enabled)."
+          echo "❌ DEPLOYMENT FAILED - check logs above"
+          exit 1

@@ -1,18 +1,45 @@
 {
-  "framework": "vite",
-  "buildCommand": "vite build",
-  "outputDirectory": "dist/public",
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/**", "shared/**", "scripts/verify-health.ts"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.ts"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://costloci.com" },
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,PATCH,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "content-type,authorization,x-requested-with,x-csrf-token,x-workspace-id,x-api-key" }
+      ]
+    }
+  ],
   "env": {
-    "VITE_API_URL": "https://api.costloci.com"
+    "NODE_ENV": "production",
+    "FRONTEND_URL": "https://costloci.com",
+    "API_URL": "https://api.costloci.com",
+    "ALLOWED_ORIGINS": "https://costloci.com,https://api.costloci.com,https://costloci-frontend.pages.dev"
   },
   "crons": [
     {
       "path": "/api/cron/process-schedules",
       "schedule": "0 0 * * *"
     }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
