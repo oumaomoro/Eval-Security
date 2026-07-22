@@ -87,3 +87,16 @@ export const createUserClient = (jwtToken: string) => {
     },
   });
 };
+
+export const createAuthClientWithIp = (reqIp?: string) => {
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    },
+    global: {
+      headers: reqIp ? { "x-forwarded-for": reqIp } : {},
+    },
+  });
+};

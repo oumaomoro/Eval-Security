@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { supabase, adminClient } from "../../services/supabase.js";
+import { supabase, adminClient, createAuthClientWithIp } from "../../services/supabase.js";
 import { storage } from "../../storage.js";
 import { authStorage } from "./storage.js";
 import { WebAuthnService } from "../../services/WebAuthn.js";
@@ -103,7 +103,7 @@ export function registerAuthRoutes(app: Express): void {
           status: "analyzing",
           actionTaken: `Admin provisioning restricted for ${email}. Attempting standard Enterprise Sign-Up.`
         }).catch(() => {});
-        registrationResult = await supabase.auth.signUp({
+        registrationResult = await createAuthClientWithIp(req.ip).auth.signUp({
           email,
           password,
           options: {
@@ -219,7 +219,7 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const { email, password } = loginSchema.parse(req.body);
       console.log(`[AUTH-DIAG] Login Handler entry: email=${email}`);
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await createAuthClientWithIp(req.ip).auth.signInWithPassword({ email, password });
 
       if (error) {
         console.error(`[AUTH-DIAG] Supabase signIn error:`, error.message);
@@ -268,8 +268,8 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = forgotPasswordSchema.parse(req.body);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+      const { error } = await createAuthClientWithIp(req.ip).auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.FRONTEND_URL}/auth?mode=reset`,
       });
       if (error) throw error;
       res.json({ message: "Password reset link sent successfully." });
@@ -306,7 +306,7 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const { email } = magicLinkSchema.parse(req.body);
       
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await createAuthClientWithIp(req.ip).auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${process.env.FRONTEND_URL || ''}/auth/callback`,
@@ -342,7 +342,7 @@ export function registerAuthRoutes(app: Express): void {
       const callbackUrl = `${apiBase}/api/auth/callback`;
       console.log(`[AUTH-DIAG] Google SSO Init. Callback URL: ${callbackUrl}`);
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await createAuthClientWithIp(req.ip).auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: callbackUrl,
@@ -370,7 +370,7 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/reset-password", async (req: any, res) => {
     try {
       const { password } = resetPasswordSchema.parse(req.body);
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await createAuthClientWithIp(req.ip).auth.updateUser({ password });
       if (error) throw error;
       res.json({ message: "Password updated successfully" });
     } catch (err: any) {
@@ -406,7 +406,7 @@ export function registerAuthRoutes(app: Express): void {
       // Use the anon supabase client (already imported) for PKCE code exchange.
       // Supabase manages the PKCE verifier internally server-side — no need to
       // store/retrieve it ourselves between requests.
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code as string);
+      const { data, error } = await createAuthClientWithIp(req.ip).auth.exchangeCodeForSession(code as string);
       if (error) throw error;
 
       if (!data.session) {
@@ -463,7 +463,7 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       // Identity validation to ensure the token is actually valid for logging
-      const { data: { user }, error } = await supabase.auth.getUser(access_token);
+      const { data: { user }, error } = await createAuthClientWithIp(req.ip).auth.getUser(access_token);
       
       if (user && !error) {
           if (req.session) {
