@@ -19,17 +19,7 @@
       "dest": "/api/index.ts"
     }
   ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://costloci.com" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,PATCH,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "content-type,authorization,x-requested-with,x-csrf-token,x-workspace-id,x-api-key" }
-      ]
-    }
-  ],
+
   "env": {
     "NODE_ENV": "production",
     "FRONTEND_URL": "https://costloci.com",

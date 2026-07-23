@@ -152,10 +152,18 @@ export class IntelligenceGateway {
     return this.geminiClient;
   }
 
+  private static sanitizeParamsForProvider(params: any, provider: string): any {
+    const sanitized = { ...params };
+    if (provider !== 'openai' && provider !== 'anthropic') {
+      delete sanitized.response_format;
+    }
+    return sanitized;
+  }
+
   /**
    * Helper for robust API execution with Exponential Backoff (Phase 38 Hardening)
    */
-  private static async withRetryAndTimeout<T>(fn: () => Promise<T>, timeoutMs = 25000, maxRetries = 3): Promise<T> {
+  private static async withRetryAndTimeout<T>(fn: () => Promise<T>, timeoutMs = 25000, maxRetries = 1): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       let timeoutId: any;
       try {
@@ -230,7 +238,7 @@ export class IntelligenceGateway {
     // 3.1. DeepSeek Primary (Sovereign Excellence)
     if (!responseContent && this.deepseekKey !== "missing" && this.isProviderAvailable("deepseek")) {
       try {
-        const dsParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
+        const dsParams = this.sanitizeParamsForProvider({ ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model }, 'deepseek');
         const response: any = await this.withRetryAndTimeout(() => this.getDeepSeek().chat.completions.create(dsParams as any));
         responseContent = response.choices[0]?.message?.content || "";
         if (responseContent) { 
@@ -346,7 +354,8 @@ export class IntelligenceGateway {
         // Use deepseek-r1 locally if available, else fallback to a standard llama model
         const localModel = process.env.LOCAL_AI_MODEL || "deepseek-r1:1.5b";
         
-        const response: any = await localOpenAI.chat.completions.create({ ...params, model: localModel } as any);
+        const localParams = this.sanitizeParamsForProvider({ ...params, model: localModel }, 'local');
+        const response: any = await localOpenAI.chat.completions.create(localParams as any);
         responseContent = response.choices[0]?.message?.content || "";
         
         if (responseContent) { 
@@ -389,7 +398,7 @@ export class IntelligenceGateway {
   static async createStreamingCompletion(params: OpenAI.Chat.ChatCompletionCreateParamsStreaming): Promise<any> {
      try {
         if (this.deepseekKey !== "missing") {
-           const deepseekParams = { ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model };
+           const deepseekParams = this.sanitizeParamsForProvider({ ...params, model: params.model.includes('gpt') ? 'deepseek-chat' : params.model }, 'deepseek');
            return await this.withRetryAndTimeout(() => this.getDeepSeek().chat.completions.create(deepseekParams as any) as any);
         }
      } catch (error: any) {

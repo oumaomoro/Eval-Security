@@ -90,7 +90,9 @@ import { serveStatic } from "./static.js";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Phase 40: Start Background Worker
-  QueueService_Pro.startWorker();
+  if (!process.env.VERCEL) {
+    QueueService_Pro.startWorker();
+  }
 
   // Phase 33: Real-time Collaboration Studio
   CollaborationService.init(httpServer);
@@ -119,7 +121,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     
     const allowedIps = allowedIpsStr.split(',').map(ip => ip.trim());
     const clientIp = req.headers['x-forwarded-for'] as string || req.ip || req.socket.remoteAddress || '';
-    const ipToCheck = clientIp.split(',')[0].trim();
+    const ipToCheck = clientIp.split(',')[0].trim().replace(/^::ffff:/, '');
 
     if (!allowedIps.includes(ipToCheck) && process.env.NODE_ENV === 'production') {
       console.warn(`[SECURITY] Blocked admin access from unauthorized IP: ${ipToCheck}`);
@@ -393,14 +395,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!checkContractLimit(req, res)) return;
 
       // Extract clientId and workspaceId from the authenticated request context
-      const clientId = req.user?.clientId;
+      let clientId = req.user?.clientId;
       const store = storageContext.getStore();
-      const workspaceId = store?.workspaceId;
+      let workspaceId = store?.workspaceId;
 
       if (!clientId || !workspaceId) {
-        return res.status(400).json({ 
-          message: "Account provisioning incomplete — organization or workspace context missing. Please contact support." 
-        });
+        console.warn(`[UPLOAD-FALLBACK] Context missing (workspaceId: ${workspaceId}, clientId: ${clientId}). Resolving from DB...`);
+        try {
+          if (!clientId && req.user?.id) {
+            const userProfile = await storage.getUser(req.user.id);
+            clientId = userProfile?.clientId;
+          }
+          if (!workspaceId && req.user?.id) {
+            const workspaces = await storage.getUserWorkspaces(req.user.id);
+            workspaceId = workspaces[0]?.id;
+          }
+        } catch (e: any) {
+          console.warn("[UPLOAD-FALLBACK] DB resolution failed:", e.message);
+        }
+
+        if (!clientId || !workspaceId) {
+          return res.status(400).json({ 
+            message: "Account provisioning incomplete — organization or workspace context missing. Please contact support." 
+          });
+        }
       }
 
       // ── Upload to Supabase Storage (persistent, Vercel-safe) ──────────────
@@ -459,11 +477,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           // Keep a reference to the request user ID
           const userId = req.user?.id || "SYSTEM";
 
-          // Phase 41: Sovereign Decryption
-          const { CryptoUtility } = await import("./lib/crypto.js");
-          const decryptedBuffer = CryptoUtility.decrypt(fileBuffer);
-
-          const pdfData = await pdf(decryptedBuffer);
+          // Use the original plaintext fileBuffer
+          const pdfData = await pdf(fileBuffer);
           await fs.unlink(req.file.path).catch(() => {});
           const extractedText = pdfData.text.substring(0, 15000);
 
@@ -619,7 +634,7 @@ Analyze the contract text and return JSON with exactly these fields:
              }
            });
         }
-      }, { label: `contract_analysis::${contract.id}` });
+      }, { label: `contract_analysis::${contract.id}`, workspaceId });
 
     } catch (err: any) {
       console.error("[UPLOAD ERROR]", err.message);
@@ -813,7 +828,7 @@ Analyze the contract text and return JSON with exactly these fields:
                   },
                 });
               }
-            }, { label: `bulk_contract_analysis::${contract.id}` });
+            }, { label: `bulk_contract_analysis::${contract.id}`, workspaceId });
 
             return { filename, contractId: contract.id, status: "pending", error: null };
           } catch (err: any) {

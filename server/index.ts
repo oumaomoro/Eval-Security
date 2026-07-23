@@ -211,15 +211,17 @@ app.use((req, res, next) => {
       }
 
       // --- AUTONOMIC TELEMETRY: Feed the Heartbeat (Phase 37) ---
-      // We skip telemetry routes to avoid feedback loops
-      if (!path.includes("/billing/telemetry") && !path.includes("/infrastructure/logs")) {
-        storage.createBillingTelemetry({
-          workspaceId: (req as any).headers["x-workspace-id"] ? parseInt((req as any).headers["x-workspace-id"] as string) : undefined,
-          clientId: (req as any).user?.clientId || 0,
-          metricType: "api_call",
-          value: 1,
-          cost: 0
-        }).catch(() => {}); // Fire and forget to minimize latency
+      // We skip telemetry routes to avoid feedback loops, GET requests, and sample at 10%
+      if (req.method !== 'GET' && Math.random() < 0.1 && !path.includes(".")) {
+        if (!path.includes("/billing/telemetry") && !path.includes("/infrastructure/logs")) {
+          storage.createBillingTelemetry({
+            workspaceId: (req as any).headers["x-workspace-id"] ? parseInt((req as any).headers["x-workspace-id"] as string) : undefined,
+            clientId: (req as any).user?.clientId || 0,
+            metricType: "api_call",
+            value: 1,
+            cost: 0
+          }).catch(() => {}); // Fire and forget to minimize latency
+        }
       }
     }
   });

@@ -12,6 +12,113 @@ import { EmailService } from "../../services/EmailService.js";
 import { z } from "zod";
 import { registrationSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, magicLinkSchema } from "../../../shared/auth-schemas.js";
 
+// Concurrency lock for identity healing to prevent race conditions during rapid refreshes
+const healingInProgress = new Map<string, Promise<any>>();
+
+/**
+ * SOVEREIGN IDENTITY HEALING: Autocorrects provisioning failures
+ */
+async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
+  const userId = authUser.id;
+  const email = authUser.email;
+
+  if (healingInProgress.has(userId)) {
+    console.log(`[IDENTITY-RESILLIENCE] Healing already in progress for ${email}. Waiting...`);
+    return healingInProgress.get(userId);
+  }
+
+  const healingPromise = (async () => {
+    console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
+
+    try {
+    // 1. Recover metadata
+    const userMeta = authUser.user_metadata || {};
+    let firstName = authUser.firstName || userMeta.first_name || "";
+    let lastName = authUser.lastName || userMeta.last_name || "";
+
+    // Handle Google/SSO full_name format
+    if (!firstName && userMeta.full_name) {
+      const parts = userMeta.full_name.split(" ");
+      firstName = parts[0] || "Enterprise";
+      lastName = parts.slice(1).join(" ") || "User";
+    } else if (!firstName) {
+      firstName = "Enterprise";
+      lastName = "User";
+    }
+
+    let clientId = localUser?.clientId;
+
+    // 2. Provision missing Client/Workspace
+    if (!clientId) {
+      const client = await storage.createClient({
+        companyName: `${firstName}'s Enterprise Hub`,
+        industry: "Professional Services",
+        contactName: `${firstName} ${lastName}`,
+        contactEmail: email,
+        contactPhone: "",
+        annualBudget: 0,
+        status: "active"
+      });
+      clientId = client.id;
+
+      // Persist the association to the profile
+      await storage.updateUser(userId, { clientId });
+      console.log(`[IDENTITY-RESILLIENCE] Created and linked Client ID ${clientId} for ${email}`);
+    }
+
+    // 3. Ensure a workspace exists for the user
+    // Check if workspace already exists before creating
+    const workspaces = await storage.getUserWorkspaces(userId);
+    if (workspaces.length === 0) {
+      const workspace = await storage.createWorkspace({
+        name: "Main Workspace",
+        ownerId: userId,
+        plan: "starter"
+      });
+      const workspaceId = Array.isArray(workspace) ? workspace[0]?.id : (workspace as any).id;
+      await storage.addWorkspaceMember({
+        userId,
+        workspaceId,
+        role: "owner"
+      });
+    }
+
+    // 4. Sync local profile
+    const healedUser = await authStorage.upsertUser({
+      id: userId,
+      email: email,
+      firstName,
+      lastName,
+      clientId,
+      role: "admin", // Explicitly force admin role for enterprise pivot
+      subscriptionTier: "free"
+    });
+
+    await storage.createInfrastructureLog({
+      component: "IdentityHealing",
+      event: "IDENTITY_REPAIRED",
+      status: "resolved",
+      actionTaken: `Atomic Identity Repair for ${email}`
+    });
+
+    return healedUser;
+    } catch (err: any) {
+      await storage.createInfrastructureLog({
+        component: "IdentityHealing",
+        event: "IDENTITY_HEALING_FAILURE",
+        status: "critical",
+        actionTaken: `Healing CRITICAL FAILURE for user ${userId}: ${err.message}`
+      }).catch(() => {});
+      return localUser; // Fallback to raw user to avoid blocking access
+    } finally {
+    healingInProgress.delete(userId);
+  }
+})();
+
+  healingInProgress.set(userId, healingPromise);
+  return healingPromise;
+}
+
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: process.env.NODE_ENV === "test" ? 1000000 : (process.env.NODE_ENV === "production" ? 10 : 100), // Large number for tests
@@ -42,11 +149,9 @@ export function registerAuthRoutes(app: Express): void {
       // ── AUTO-SYNC: Proactive PayPal Status Check (Phase 37 Live Sync) ──
       if (user && user.paypalSubscriptionId && (!user.lastSyncAt || Date.now() - new Date(user.lastSyncAt).getTime() > 24 * 60 * 60 * 1000)) {
          // Background Sync to avoid blocking the response
-         fetch(`${req.protocol}://${req.get("host")}/api/billing/sync-subscription`, {
-           method: "POST",
-           headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
-           body: JSON.stringify({ subscriptionId: user.paypalSubscriptionId })
-         }).catch(e => console.error("[AUTH SYNC] Background sync failed:", e.message));
+         import("../../services/BillingService.js").then(({ BillingService }) => {
+           BillingService.syncPayPalSubscription(user.id, user.paypalSubscriptionId as string).catch(e => console.error("[AUTH SYNC] Background sync failed:", e.message));
+         }).catch(e => console.error("[AUTH SYNC] Failed to load BillingService:", e));
       }
 
       res.json(user);
@@ -608,111 +713,4 @@ export function registerAuthRoutes(app: Express): void {
       res.status(500).json({ message: err.message });
     }
   });
-}
-
-// Concurrency lock for identity healing to prevent race conditions during rapid refreshes
-const healingInProgress = new Map<string, Promise<any>>();
-
-/**
- * SOVEREIGN IDENTITY HEALING: Autocorrects provisioning failures
- */
-async function healUserIdentity(authUser: any, localUser: any): Promise<any> {
-  const userId = authUser.id;
-  const email = authUser.email;
-
-  if (healingInProgress.has(userId)) {
-    console.log(`[IDENTITY-RESILLIENCE] Healing already in progress for ${email}. Waiting...`);
-    return healingInProgress.get(userId);
-  }
-
-  const healingPromise = (async () => {
-    console.log(`[IDENTITY-RESILLIENCE] Healing Identity for ${email}...`);
-
-    try {
-    // 1. Recover metadata
-    const userMeta = authUser.user_metadata || {};
-    let firstName = authUser.firstName || userMeta.first_name || "";
-    let lastName = authUser.lastName || userMeta.last_name || "";
-
-    // Handle Google/SSO full_name format
-    if (!firstName && userMeta.full_name) {
-      const parts = userMeta.full_name.split(" ");
-      firstName = parts[0] || "Enterprise";
-      lastName = parts.slice(1).join(" ") || "User";
-    } else if (!firstName) {
-      firstName = "Enterprise";
-      lastName = "User";
-    }
-
-    let clientId = localUser?.clientId;
-
-    // 2. Provision missing Client/Workspace
-    if (!clientId) {
-      const client = await storage.createClient({
-        companyName: `${firstName}'s Enterprise Hub`,
-        industry: "Professional Services",
-        contactName: `${firstName} ${lastName}`,
-        contactEmail: email,
-        contactPhone: "",
-        annualBudget: 0,
-        status: "active"
-      });
-      clientId = client.id;
-
-      // Persist the association to the profile
-      await storage.updateUser(userId, { clientId });
-      console.log(`[IDENTITY-RESILLIENCE] Created and linked Client ID ${clientId} for ${email}`);
-    }
-
-    // 3. Ensure a workspace exists for the user
-    // Check if workspace already exists before creating
-    const workspaces = await storage.getUserWorkspaces(userId);
-    if (workspaces.length === 0) {
-      const workspace = await storage.createWorkspace({
-        name: "Main Workspace",
-        ownerId: userId,
-        plan: "starter"
-      });
-      const workspaceId = Array.isArray(workspace) ? workspace[0]?.id : (workspace as any).id;
-      await storage.addWorkspaceMember({
-        userId,
-        workspaceId,
-        role: "owner"
-      });
-    }
-
-    // 4. Sync local profile
-    const healedUser = await authStorage.upsertUser({
-      id: userId,
-      email: email,
-      firstName,
-      lastName,
-      clientId,
-      role: "admin", // Explicitly force admin role for enterprise pivot
-      subscriptionTier: "free"
-    });
-
-    await storage.createInfrastructureLog({
-      component: "IdentityHealing",
-      event: "IDENTITY_REPAIRED",
-      status: "resolved",
-      actionTaken: `Atomic Identity Repair for ${email}`
-    });
-
-    return healedUser;
-    } catch (err: any) {
-      await storage.createInfrastructureLog({
-        component: "IdentityHealing",
-        event: "IDENTITY_HEALING_FAILURE",
-        status: "critical",
-        actionTaken: `Healing CRITICAL FAILURE for user ${userId}: ${err.message}`
-      }).catch(() => {});
-      return localUser; // Fallback to raw user to avoid blocking access
-    } finally {
-    healingInProgress.delete(userId);
-  }
-})();
-
-  healingInProgress.set(userId, healingPromise);
-  return healingPromise;
 }

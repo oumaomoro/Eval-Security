@@ -19,7 +19,8 @@ export async function getCsrfToken(): Promise<string | null> {
   }
 
   try {
-    const response = await fetch("/api/csrf-token", {
+    const { getApiUrl } = await import("./api-config");
+    const response = await fetch(getApiUrl("/api/csrf-token"), {
       credentials: "include"
     });
     
