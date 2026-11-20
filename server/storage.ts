@@ -13,7 +13,7 @@ import type {
   MarketplacePurchase, InsertMarketplacePurchase,
   CloudAccount, InsertCloudAccount,
   InfrastructureAsset, InsertInfrastructureAsset
-} from "../shared/schema";
+} from "../shared/schema.js";
 
 export interface UsageEvent {
   id: number;
@@ -62,7 +62,7 @@ import {
   type InsurancePolicy, type Subscription,
   type InsertInsurancePolicy, type InsertSubscription,
   type ContractVersion, type InsertContractVersion
-} from "../shared/schema";
+} from "../shared/schema.js";
 
 /**
  * SOVEREIGN REST STORAGE ENGINE - PRODUCTION HARDENED V3 (SOVEREIGN MODE PREMIUMLY RESTORED)

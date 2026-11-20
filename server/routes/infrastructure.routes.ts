@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { storage } from "../storage";
-import { isAuthenticated } from "../replit_integrations/auth/index";
-import { InfrastructureIntelligence } from "../services/InfrastructureIntelligence";
-import { SOC2Logger } from "../services/SOC2Logger";
-import { IaCScanner } from "../services/IaCScanner";
-import { SelfHealingEngine } from "../services/SelfHealingEngine";
-import { CloudSyncService } from "../services/CloudSyncService";
+import { storage } from "../storage.js";
+import { isAuthenticated } from "../replit_integrations/auth/index.js";
+import { InfrastructureIntelligence } from "../services/InfrastructureIntelligence.js";
+import { SOC2Logger } from "../services/SOC2Logger.js";
+import { IaCScanner } from "../services/IaCScanner.js";
+import { SelfHealingEngine } from "../services/SelfHealingEngine.js";
+import { CloudSyncService } from "../services/CloudSyncService.js";
 import { AutonomicEngine } from "../services/AutonomicEngine.js";
 
 const infrastructureRouter = Router();

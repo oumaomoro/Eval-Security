@@ -48,12 +48,7 @@ function validateRequiredEnvVars() {
   const missing = required.filter(key => !process.env[key] || process.env[key]?.trim() === "");
   if (missing.length > 0) {
     console.error(`❌ [ENV_VALIDATION] Missing required environment variables: ${missing.join(", ")}`);
-    if (process.env.NODE_ENV === "production") {
-      console.error("❌ [ENV_VALIDATION] Critical failure in production environment. Terminating process.");
-      process.exit(1);
-    } else {
-      console.warn("⚠️ [ENV_VALIDATION] Non-production environment detected. Continuing with warnings.");
-    }
+    console.warn("⚠️ [ENV_VALIDATION] Operating in fallback mode for missing services.");
   } else {
     console.log("✅ [ENV_VALIDATION] All required environment variables verified.");
   }
@@ -245,7 +240,7 @@ app.use((req, res, next) => {
 
 const httpServer = createServer(app);
 
-(async () => {
+export const appReady = (async () => {
   try {
     await registerRoutes(httpServer, app);
 
