@@ -40,7 +40,7 @@ export async function cleanupDatabase() {
   ];
 
   for (const table of tables) {
-    const { error } = await supabaseAdmin.from(table).delete().neq('id', -1);
+    const { error } = await supabaseAdmin.from(table).delete().not('id', 'is', null);
     if (error) console.warn(`[CLEANUP] Warning: could not truncate ${table}:`, error.message);
   }
 }
