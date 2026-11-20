@@ -45,8 +45,9 @@ import NotFound from "@/pages/not-found";
 
 function PrivateRouter() {
   return (
-    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-950"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>}>
-      <Switch>
+    <ErrorBoundary>
+      <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-950"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>}>
+        <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/infrastructure" component={InfrastructureDashboard} />
         <Route path="/dpo" component={DPODashboard} />
@@ -79,6 +80,7 @@ function PrivateRouter() {
         <Route component={NotFound} />
       </Switch>
     </Suspense>
+  </ErrorBoundary>
   );
 }
 

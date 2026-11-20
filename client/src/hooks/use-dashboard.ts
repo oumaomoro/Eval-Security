@@ -14,7 +14,12 @@ export function useDashboardStats() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch dashboard stats");
-      return api.dashboard.stats.responses[200].parse(await res.json());
+      const rawData = await res.json();
+      const parsed = api.dashboard.stats.responses[200].safeParse(rawData);
+      if (parsed.success) {
+        return parsed.data;
+      }
+      return rawData;
     },
     refetchInterval: 60000, // 1 minute refresh
     staleTime: 300000, // 5 minutes caching

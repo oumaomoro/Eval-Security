@@ -1424,8 +1424,10 @@ export class SupabaseRESTStorage implements IStorage {
       upcomingRenewals: contracts.slice(0, 5).sort((a, b) => String(a.renewalDate).localeCompare(String(b.renewalDate))),
       costByVendor: Object.entries(costByVendorMap).map(([vendor, cost]) => ({ vendor, cost })).sort((a, b) => b.cost - a.cost).slice(0, 5),
       complianceTrends: [],
+      riskHeatmap: [],
       technicalMetrics: { 
         apiResponseTimeAvgMs: avgLatency, 
+        aiAccuracyRate: 100,
         intelligenceAccuracyRate: 100, 
         systemUptime: 100, 
         errorRate: Number(errorRate.toFixed(2)), 

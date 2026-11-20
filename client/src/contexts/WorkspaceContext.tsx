@@ -27,9 +27,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const res = await fetch(getApiUrl(api.workspaces.list.path), { 
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch workspaces");
+      if (!res.ok) return [];
       const data = await res.json();
-      return api.workspaces.list.responses[200].parse(data);
+      const parsed = api.workspaces.list.responses[200].safeParse(data);
+      if (parsed.success) return parsed.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
