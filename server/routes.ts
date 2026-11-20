@@ -156,6 +156,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.use("/api", collaborationRouter);
   app.use("/api", insuranceRouter);
   app.use("/api", remediationRouter);
+  app.use("/api", infrastructureRouter);
   app.use(infrastructureRouter);
   app.use("/api/v1", apiV1Router);
   

@@ -122,7 +122,7 @@ jobs:
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "❌ CRITICAL: VERCEL_TOKEN secret is empty or missing in GitHub Secrets!"
-            echo "👉 Generate a token at https://vercel.com/account/tokens and add it as VERCEL_TOKEN in GitHub Secrets."
+            echo "👉 Please ensure VERCEL_TOKEN is set in GitHub Secrets at: https://github.com/oumaomoro/Eval-Security/settings/secrets/actions"
             exit 1
           fi
           mkdir -p .vercel
@@ -165,7 +165,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || '8dc05e6cc0ee7377c2f17f4ff69baec9' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,6 +189,7 @@ jobs:
           fi
           echo "Verifying build output directory:"
           ls -la dist/public
+          CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-8dc05e6cc0ee7377c2f17f4ff69baec9}" \
           wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true
 
   # ── Job 5: E2E Smoke Tests on Production ─────────────────────────────────

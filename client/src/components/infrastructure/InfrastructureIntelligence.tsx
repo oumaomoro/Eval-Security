@@ -6,10 +6,12 @@ import { useQuery } from "@tanstack/react-query";
 export function InfrastructureIntelligence() {
   const { data: assets } = useQuery<any[]>({
     queryKey: ["/api/infrastructure/assets"],
+    meta: { on401: "returnNull" },
   });
 
-  const criticalFindings = assets?.filter(a => a.severity === 'critical').length || 0;
-  const publicAssets = assets?.filter(a => a.exposureType === 'public').length || 0;
+  const safeAssets = Array.isArray(assets) ? assets : [];
+  const criticalFindings = safeAssets.filter(a => a && a.severity === 'critical').length;
+  const publicAssets = safeAssets.filter(a => a && a.exposureType === 'public').length;
 
   return (
     <Card className="bg-slate-900 border-slate-800 overflow-hidden relative group">

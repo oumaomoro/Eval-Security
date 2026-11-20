@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
-import InfrastructureDashboard from "./pages/InfrastructureDashboard";
+import InfrastructureDashboard from "@/pages/InfrastructureDashboard";
 import Dashboard from "@/pages/Dashboard";
 import Contracts from "@/pages/Contracts";
 import Compliance from "@/pages/Compliance";

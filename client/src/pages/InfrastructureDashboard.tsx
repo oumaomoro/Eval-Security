@@ -43,18 +43,21 @@ export default function InfrastructureDashboard() {
     meta: { on401: "returnNull" },
   });
 
+  const safeAssets = Array.isArray(assets) ? assets : [];
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+
   const stats = [
-    { label: "Total Assets", value: assets?.length || 0, icon: Server, color: "text-blue-400" },
-    { label: "Cloud Accounts", value: accounts?.length || 0, icon: Cloud, color: "text-cyan-400" },
-    { label: "Critical Risks", value: assets?.filter(a => a.severity === 'critical').length || 0, icon: ShieldAlert, color: "text-red-400" },
+    { label: "Total Assets", value: safeAssets.length, icon: Server, color: "text-blue-400" },
+    { label: "Cloud Accounts", value: safeAccounts.length, icon: Cloud, color: "text-cyan-400" },
+    { label: "Critical Risks", value: safeAssets.filter(a => a && a.severity === 'critical').length, icon: ShieldAlert, color: "text-red-400" },
     { label: "Compliance Score", value: "94%", icon: ShieldCheck, color: "text-green-400" },
   ];
 
   const typeData = [
-    { name: 'Compute', value: assets?.filter(a => a.assetType === 'compute').length || 12 },
-    { name: 'Database', value: assets?.filter(a => a.assetType === 'database').length || 4 },
-    { name: 'Storage', value: assets?.filter(a => a.assetType === 'storage').length || 8 },
-    { name: 'Network', value: assets?.filter(a => a.assetType === 'network').length || 6 },
+    { name: 'Compute', value: safeAssets.filter(a => a && a.assetType === 'compute').length || 12 },
+    { name: 'Database', value: safeAssets.filter(a => a && a.assetType === 'database').length || 4 },
+    { name: 'Storage', value: safeAssets.filter(a => a && a.assetType === 'storage').length || 8 },
+    { name: 'Network', value: safeAssets.filter(a => a && a.assetType === 'network').length || 6 },
   ];
 
   const COLORS = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b'];

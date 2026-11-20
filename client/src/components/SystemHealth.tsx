@@ -5,8 +5,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export function SystemHealth() {
   const { data: health } = useQuery<{ mode: 'sovereign' | 'degraded', missingTables: string[] }>({
     queryKey: ["/api/system/health"],
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    meta: { on401: "returnNull" },
   });
+
+  const missingList = Array.isArray(health?.missingTables) ? health.missingTables : [];
 
   if (!health || health.mode === 'sovereign') {
     return (
@@ -38,8 +41,8 @@ export function SystemHealth() {
         <TooltipContent className="max-w-xs">
           <p className="font-bold mb-1">Partial Persistence Active</p>
           <p className="text-xs text-muted-foreground">
-            Due to pending database sync, some data (logs, comments) is currently stored in-memory. 
-            Missing: {health.missingTables.join(", ") || "Schema Updates"}
+            Due to pending database sync, some data is currently stored in-memory. 
+            Missing: {missingList.join(", ") || "Schema Updates"}
           </p>
         </TooltipContent>
       </Tooltip>
