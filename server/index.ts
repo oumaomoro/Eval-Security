@@ -101,7 +101,7 @@ app.use(cors({
     }
     
     const isAllowed = allowedOrigins.includes(origin) || 
-                     (origin.endsWith(".vercel.app") || origin.endsWith(".vercel.dev")) ||
+                     (origin.endsWith(".vercel.app") || origin.endsWith(".vercel.dev") || origin.endsWith(".pages.dev")) ||
                      origin === process.env.FRONTEND_URL;
     
     if (isAllowed) {
