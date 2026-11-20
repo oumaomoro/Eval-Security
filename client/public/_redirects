@@ -1,6 +1,5 @@
-/* Cloudflare Pages _redirects
- * SPA fallback: all routes serve index.html for React Router
- * Docs: https://developers.cloudflare.com/pages/configuration/redirects/
- */
+# Cloudflare Pages _redirects
+# SPA fallback: all routes serve index.html for client-side routing
+# Docs: https://developers.cloudflare.com/pages/configuration/redirects/
 
 /* /index.html 200

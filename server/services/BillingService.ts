@@ -11,30 +11,48 @@ export const PLANS = {
   enterprise: process.env.PAYPAL_ENTERPRISE_PLAN_ID || "P-ENTERPRISE",
 };
 
-export async function getPayPalAccessToken() {
+export async function getPayPalAccessToken(): Promise<string | null> {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_SECRET) {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV !== "production") {
       console.warn("[BILLING] PayPal credentials missing — bypassing token retrieval.");
     }
     return null;
   }
 
-  const auth = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
-  ).toString("base64");
+  try {
+    const auth = Buffer.from(
+      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
+    ).toString("base64");
 
-  const response = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
+    const response = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${auth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(8000),
+    });
 
-  if (!response.ok) throw new Error("Failed to get PayPal access token");
-  const data = await response.json();
-  return data.access_token;
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[BILLING] PayPal auth failed (${response.status}) — credentials may be for wrong environment (sandbox vs live).`);
+      } else {
+        console.error(`[BILLING] PayPal auth failed: ${response.status} ${text}`);
+      }
+      return null;
+    }
+    const data = await response.json();
+    return data.access_token as string;
+  } catch (err: any) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[BILLING] PayPal token fetch skipped in dev:", err.message);
+    } else {
+      console.error("[BILLING] PayPal token fetch error:", err.message);
+    }
+    return null;
+  }
 }
 
 export class BillingService {
@@ -55,8 +73,13 @@ export class BillingService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch subscription from PayPal");
+        const errorData = await response.json().catch(() => ({}));
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(`[BillingService] Sync fetch skipped or failed (${response.status}) for User ${userId}: ${errorData.message || response.statusText}`);
+        } else {
+          console.error(`[BillingService] Failed to fetch subscription ${subscriptionId}: ${errorData.message || response.statusText}`);
+        }
+        return { success: false, status: "FETCH_FAILED" };
       }
 
       const data = await response.json();
@@ -81,8 +104,12 @@ export class BillingService {
         return { success: false, status };
       }
     } catch (err: any) {
-      console.error(`[BillingService] Critical Sync Failure for User ${userId}:`, err.message);
-      throw err;
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[BillingService] Sync Warning for User ${userId}:`, err.message);
+      } else {
+        console.error(`[BillingService] Critical Sync Failure for User ${userId}:`, err.message);
+      }
+      return { success: false, status: "ERROR" };
     }
   }
 
@@ -94,6 +121,9 @@ export class BillingService {
     if (!planId) throw new Error(`Invalid plan type: ${planType}`);
 
     const accessToken = await getPayPalAccessToken();
+    if (!accessToken) {
+      throw new Error("PayPal service unavailable: credentials not configured or authentication failed.");
+    }
     const response = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions`, {
       method: "POST",
       headers: {

@@ -2,6 +2,7 @@ import { Layout } from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InfrastructureIntelligence } from "@/components/infrastructure/InfrastructureIntelligence";
 import { IaCScanner } from "@/components/infrastructure/IaCScanner";
 import { CloudAccountManager } from "@/components/infrastructure/CloudAccountManager";
@@ -34,10 +35,12 @@ import { Button } from "@/components/ui/button";
 export default function InfrastructureDashboard() {
   const { data: assets } = useQuery<any[]>({
     queryKey: ["/api/infrastructure/assets"],
+    meta: { on401: "returnNull" },
   });
 
   const { data: accounts } = useQuery<any[]>({
     queryKey: ["/api/infrastructure/accounts"],
+    meta: { on401: "returnNull" },
   });
 
   const stats = [
@@ -61,9 +64,9 @@ export default function InfrastructureDashboard() {
       <div className="space-y-6 pb-10">
         
         <div className="grid gap-6 lg:grid-cols-3">
-          <InfrastructureIntelligence />
-          <IaCScanner />
-          <SelfHealingSentinel asset={{ name: "app-storage-bucket", assetType: "storage", issue: "Public Read Access" }} />
+          <ErrorBoundary><InfrastructureIntelligence /></ErrorBoundary>
+          <ErrorBoundary><IaCScanner /></ErrorBoundary>
+          <ErrorBoundary><SelfHealingSentinel asset={{ name: "app-storage-bucket", assetType: "storage", issue: "Public Read Access" }} /></ErrorBoundary>
         </div>
 
         {/* Metric Cards */}

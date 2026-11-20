@@ -16,6 +16,8 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,7 +97,7 @@ jobs:
         run: |
           npx cross-env NODE_ENV=test tsx server/index.ts &
           SERVER_PID=$!
-          npx wait-on http://127.0.0.1:3200 --timeout 60000
+          for i in {1..30}; do if curl -s http://127.0.0.1:3200/api/health > /dev/null 2>&1; then echo "Backend server is healthy and responding"; break; fi; sleep 2; done
           npm run test:api
           TEST_EXIT=$?
           kill -9 $SERVER_PID 2>/dev/null || true
@@ -110,7 +112,7 @@ jobs:
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || secrets.VERCEL_BACKEND_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,6 +124,8 @@ jobs:
 
       - name: Deploy to Vercel (Production)
         run: |
+          mkdir -p .vercel
+          echo "{\"orgId\":\"$VERCEL_ORG_ID\",\"projectId\":\"$VERCEL_PROJECT_ID\"}" > .vercel/project.json
           vercel --prod --yes \
             --token=$VERCEL_TOKEN \
             --scope=$VERCEL_ORG_ID \
@@ -150,7 +154,7 @@ jobs:
             -e FRONTEND_URL="https://costloci.com" \
             -e API_URL="https://api.costloci.com" \
             -e NODE_ENV="production" \
-            -e ALLOWED_ORIGINS="https://costloci.com,https://api.costloci.com,https://costloci-frontend.pages.dev"
+            -e ALLOWED_ORIGINS="https://costloci.com,https://www.costloci.com,https://api.costloci.com,https://costloci-frontend.pages.dev"
 
   # ── Job 4: Deploy Frontend → Cloudflare Pages ─────────────────────────────
   deploy-frontend:

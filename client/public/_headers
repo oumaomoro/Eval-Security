@@ -1,7 +1,6 @@
-/* Cloudflare Pages _headers file
- * Sets security and CORS headers for the Costloci frontend
- * Docs: https://developers.cloudflare.com/pages/configuration/headers/
- */
+# Cloudflare Pages _headers file
+# Sets security and CORS headers for the Costloci frontend
+# Docs: https://developers.cloudflare.com/pages/configuration/headers/
 
 /*
   X-Frame-Options: DENY

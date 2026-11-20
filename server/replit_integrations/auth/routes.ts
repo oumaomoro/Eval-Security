@@ -308,7 +308,8 @@ export function registerAuthRoutes(app: Express): void {
       res.status(201).json({ 
         message: "Costloci Hub provisioned. Please check your email to verify and activate your dashboard.",
         userId: data.user.id,
-        workspaceId: (workspace as any)?.id
+        workspaceId: (workspace as any)?.id,
+        requiresVerification: true
       });
     } catch (err: any) {
       if (err instanceof z.ZodError) {
@@ -447,7 +448,7 @@ export function registerAuthRoutes(app: Express): void {
       const callbackUrl = `${apiBase}/api/auth/callback`;
       console.log(`[AUTH-DIAG] Google SSO Init. Callback URL: ${callbackUrl}`);
       
-      const { data, error } = await createAuthClientWithIp(req.ip).auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: callbackUrl,
@@ -511,7 +512,7 @@ export function registerAuthRoutes(app: Express): void {
       // Use the anon supabase client (already imported) for PKCE code exchange.
       // Supabase manages the PKCE verifier internally server-side — no need to
       // store/retrieve it ourselves between requests.
-      const { data, error } = await createAuthClientWithIp(req.ip).auth.exchangeCodeForSession(code as string);
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code as string);
       if (error) throw error;
 
       if (!data.session) {

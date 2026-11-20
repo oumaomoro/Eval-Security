@@ -57,7 +57,7 @@ if (-not $SkipTests) {
     Write-Host "  ⚠️  Dev server not detected. Starting it in background..." -ForegroundColor Yellow
     $serverJob = Start-Job -ScriptBlock { 
       Set-Location $using:PSScriptRoot
-      npx cross-env NODE_ENV=development tsx server/index.ts 
+      npx cross-env NODE_ENV=test tsx server/index.ts 
     }
     Start-Sleep -Seconds 15
     Write-Host "  Server started (Job ID: $($serverJob.Id))" -ForegroundColor Yellow

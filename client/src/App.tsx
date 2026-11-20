@@ -25,6 +25,7 @@ import Savings from "@/pages/Savings";
 import Benchmarking from "@/pages/Benchmarking";
 import RedliningStudio from "@/pages/RedliningStudio";
 import AdminDashboard from "@/pages/AdminDashboard";
+import GovernanceStudio from "@/pages/GovernanceStudio";
 
 import React, { Suspense } from "react";
 const DPODashboard = React.lazy(() => import("@/pages/DPODashboard"));
@@ -74,6 +75,7 @@ function PrivateRouter() {
         <Route path="/history" component={History} />
         <Route path="/notifications" component={NotificationSettings} />
         <Route path="/admin" component={AdminDashboard} />
+        <Route path="/governance" component={GovernanceStudio} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

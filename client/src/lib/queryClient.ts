@@ -92,6 +92,12 @@ export const getQueryFn: <T>(options: {
 
       if (res.status === 401 || res.status === 403) {
         if (unauthorizedBehavior === "returnNull") return null;
+        // "throw" behavior — fall through to throwIfResNotOk below
+      }
+
+      // Don't throw on 4xx that we handle gracefully
+      if (res.ok) {
+        return await res.json();
       }
 
       await throwIfResNotOk(res);
@@ -108,7 +114,7 @@ export const getQueryFn: <T>(options: {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes by default

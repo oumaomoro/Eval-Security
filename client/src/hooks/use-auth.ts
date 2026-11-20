@@ -23,15 +23,24 @@ async function fetchUser(): Promise<User | null> {
     const data = await response.json();
     return data.user || data;
   } catch (error: any) {
-    // Phase 25 Autofix: Prevent spinner-lock on network/DNS/Infrastructure errors
-    console.error('[Auth] Persistent Spinner Resolution: Caught infrastructure error during fetchUser:', error.message);
+    // Prevent spinner-lock on network/DNS/Infrastructure errors
+    console.error('[Auth] Caught infrastructure error during fetchUser:', error.message);
     return null;
   }
 }
 
 async function logout(): Promise<void> {
-  await fetch("/api/auth/logout", { method: "POST" });
-  resetIdentity(); // Clear identifying traits from observability session
+  // CRITICAL FIX: Use absolute URL so logout works in production where
+  // frontend (costloci.com) and backend (api.costloci.com) are cross-domain.
+  try {
+    await fetch(getApiUrl("/api/auth/logout"), {
+      method: "POST",
+      credentials: "include"
+    });
+  } catch (e) {
+    console.warn("[Auth] Logout request failed, clearing client-side state anyway.");
+  }
+  resetIdentity();
   window.location.href = "/auth";
 }
 

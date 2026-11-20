@@ -6,7 +6,7 @@ async function verifyHealth() {
   console.log("--- 🕵️ SYSTEM HEALTH VALIDATION ---");
   
   // 1. Env Check
-  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET", "CRON_SECRET", "OPENAI_API_KEY"];
+  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET", "CRON_SECRET"];
   required.forEach(key => {
     if (!process.env[key]) {
       console.error(`❌ [FAIL] Missing required environment variable: ${key}`);
@@ -14,6 +14,12 @@ async function verifyHealth() {
     }
     console.log(`✅ [PASS] Environment variable found: ${key}`);
   });
+
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn("⚠️ [WARN] OPENAI_API_KEY not set. Operating in fallback mode.");
+  } else {
+    console.log("✅ [PASS] OPENAI_API_KEY found.");
+  }
 
   // 2. Database Connectivity & Schema Check
   try {

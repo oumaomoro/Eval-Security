@@ -270,7 +270,8 @@ export class SupabaseRESTStorage implements IStorage {
     missingTables: []
   };
 
-  private async withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 10000): Promise<T> {
+  private _lastTimeoutLog = 0;
+  private async withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 30000): Promise<T> {
     let timeoutId: any;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error("Database request timed out")), timeoutMs);
@@ -308,7 +309,11 @@ export class SupabaseRESTStorage implements IStorage {
     } catch (err: any) {
       if (err.message === "Database request timed out") {
         this.healthStatus.mode = 'degraded';
-        console.error("[STORAGE CRITICAL] DB TIMEOUT DETECTED");
+        const now = Date.now();
+        if (now - this._lastTimeoutLog > 60000) {
+          this._lastTimeoutLog = now;
+          console.error("[STORAGE CRITICAL] DB TIMEOUT DETECTED — check Supabase connectivity");
+        }
       }
       throw err;
     }

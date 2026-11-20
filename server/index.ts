@@ -36,17 +36,29 @@ if ((Sentry as any).Handlers) {
 app.set("trust proxy", 1); // Enable trusting the proxy (Vercel/Cloudflare) for accurate rate limiting
 app.use(apiLimiter); // Apply global rate limit to all requests
 
-function validateEnv() {
-  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY', 'CRON_SECRET'];
-  const missing = required.filter(key => !process.env[key]);
+function validateRequiredEnvVars() {
+  const required = [
+    'FRONTEND_URL',
+    'SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'OPENAI_API_KEY',
+    'SESSION_SECRET',
+    'CRON_SECRET'
+  ];
+  const missing = required.filter(key => !process.env[key] || process.env[key]?.trim() === "");
   if (missing.length > 0) {
-    console.error(`❌ Missing required env variables: ${missing.join(", ")}`);
+    console.error(`❌ [ENV_VALIDATION] Missing required environment variables: ${missing.join(", ")}`);
     if (process.env.NODE_ENV === "production") {
+      console.error("❌ [ENV_VALIDATION] Critical failure in production environment. Terminating process.");
       process.exit(1);
+    } else {
+      console.warn("⚠️ [ENV_VALIDATION] Non-production environment detected. Continuing with warnings.");
     }
+  } else {
+    console.log("✅ [ENV_VALIDATION] All required environment variables verified.");
   }
 }
-validateEnv();
+validateRequiredEnvVars();
 
 app.use(express.json({
   verify: (req: any, res, buf) => {
@@ -104,7 +116,7 @@ app.use(cors({
   allowedHeaders: ["content-type", "authorization", "x-requested-with", "x-p25-status", "Authorization", "Content-Type", "x-csrf-token", "x-workspace-id", "x-api-key"]
 }));
 
-// CSRF Protection Configuration (Phase 32 Hardening)
+// CSRF Protection Configuration
 const {
   invalidCsrfTokenError,
   generateCsrfToken,
@@ -114,7 +126,9 @@ const {
   cookieName: "costloci_csrf",
   cookieOptions: {
     httpOnly: true,
-    sameSite: "lax",
+    // CRITICAL: SameSite=none required so frontend (costloci.com) can receive
+    // the CSRF cookie set by backend (api.costloci.com) — different domains.
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",
   },

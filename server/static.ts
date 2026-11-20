@@ -5,9 +5,12 @@ import path from "path";
 export function serveStatic(app: Express) {
   const distPath = path.resolve(process.cwd(), "dist", "public");
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+    // In decoupled architecture (Vercel Backend + Cloudflare Pages Frontend),
+    // dist/public is hosted on Cloudflare Pages. The Vercel backend serves API endpoints.
+    app.get("/", (_req, res) => {
+      res.json({ status: "healthy", service: "costloci-api", mode: "sovereign", timestamp: new Date().toISOString() });
+    });
+    return;
   }
 
   app.use(express.static(distPath));

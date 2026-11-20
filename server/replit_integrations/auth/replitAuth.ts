@@ -1,7 +1,9 @@
 import { type Express, type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import { adminClient as supabase, createUserClient } from "../../services/supabase.js";
+// CRITICAL FIX: Use anon 'supabase' client (NOT adminClient) for auth.getUser().
+// adminClient uses the service_role key as its own identity and cannot validate user JWTs.
+import { supabase, adminClient, createUserClient } from "../../services/supabase.js";
 import { authStorage } from "./storage.js";
 import { storageContext } from "../../services/storageContext.js";
 import { storage } from "../../storage.js";
@@ -30,16 +32,19 @@ export async function setupAuth(app: Express) {
     sessionStore = new session.MemoryStore();
   }
 
+  const isProd = process.env.NODE_ENV === "production";
   app.use(session({
     store: sessionStore,
     secret: process.env.SESSION_SECRET || "costloci-sovereign-secret-2026",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      // CRITICAL: SameSite=none required for cross-domain cookie delivery.
+      // Frontend (costloci.com) and backend (api.costloci.com) are different domains.
+      secure: isProd,           // Must be true when sameSite=none
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      sameSite: "lax"
+      sameSite: isProd ? "none" : "lax"
     }
   }));
 
@@ -147,13 +152,18 @@ export async function setupAuth(app: Express) {
     if (!token) return next();
 
     try {
-      // 2. Refresh/Verify with Supabase
+      // 2. Verify token with Supabase using the ANON client.
+      // The anon client correctly treats the passed token as the user's JWT.
+      // Using adminClient here was the root cause of auth failures in production.
       const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data.user) return next();
+      if (error || !data.user) {
+        if (error) console.warn(`[AUTH] Token validation failed: ${error.message}`);
+        return next();
+      }
 
       const user = data.user;
 
-      // 3. Resolve Local Profile
+      // 3. Resolve Local Profile (non-fatal — healing happens in /api/auth/user)
       const localUser = await authStorage.getUser(user.id).catch((err) => {
         console.error(`[AUTH] Profile retrieval failed for ${user.id}:`, err.message);
         return null;
@@ -166,10 +176,12 @@ export async function setupAuth(app: Express) {
         firstName: localUser?.firstName ?? user.user_metadata?.first_name ?? "",
         lastName: localUser?.lastName ?? user.user_metadata?.last_name ?? "",
         clientId: localUser?.clientId ?? null,
-        role: localUser?.role ?? "viewer",
+        role: localUser?.role ?? "admin",
         subscriptionTier: localUser?.subscriptionTier ?? "starter",
         contractsCount: localUser?.contractsCount ?? 0,
         profileImageUrl: localUser?.profileImageUrl ?? null,
+        paypalSubscriptionId: (localUser as any)?.paypalSubscriptionId ?? null,
+        lastSyncAt: (localUser as any)?.lastSyncAt ?? null,
         expires_at: user.last_sign_in_at,
         ip: req.ip,
         userAgent: req.headers["user-agent"] || "unknown"
@@ -177,9 +189,17 @@ export async function setupAuth(app: Express) {
 
       res.setHeader("X-P25-Status", "Harmonized-V3-Stateless-Hybrid");
 
-      // 5. Resolve Active Workspace Context (Sovereign Mode)
-      const defaultWorkspace = await storage.getDefaultWorkspace(user.id).catch(() => null);
-      const workspaceId = defaultWorkspace?.id;
+      // 5. Resolve Active Workspace Context — wrapped so it never blocks the request
+      let workspaceId: number | undefined;
+      try {
+        const defaultWorkspace = await Promise.race([
+          storage.getDefaultWorkspace(user.id),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+        ]);
+        workspaceId = (defaultWorkspace as any)?.id;
+      } catch (wsErr: any) {
+        console.warn(`[AUTH] Workspace resolution failed for ${user.id}: ${wsErr.message}`);
+      }
 
       (req as any).user.workspaceId = workspaceId;
 

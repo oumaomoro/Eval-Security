@@ -22,14 +22,46 @@ function getResend() {
   return resend;
 }
 
+/**
+ * Helper to get the canonical Frontend Base URL.
+ * In development, defaults to http://localhost:3200 if env vars are unset.
+ * In production, throws a clear error if FRONTEND_URL is missing.
+ */
+export function getFrontendUrl(): string {
+  const url = process.env.FRONTEND_URL || process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  if (url && url.trim() !== "") {
+    return url.trim().replace(/\/$/, "");
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[EmailService] CRITICAL ERROR: FRONTEND_URL environment variable is required in production.");
+  }
+  return "http://localhost:3200";
+}
+
+/**
+ * Helper to get the canonical API Base URL.
+ * In development, defaults to http://localhost:3200 if env vars are unset.
+ * In production, throws a clear error if API_URL and FRONTEND_URL are missing.
+ */
+export function getApiUrl(): string {
+  const url = process.env.API_URL || process.env.FRONTEND_URL || process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  if (url && url.trim() !== "") {
+    return url.trim().replace(/\/$/, "");
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[EmailService] CRITICAL ERROR: API_URL or FRONTEND_URL environment variable is required in production.");
+  }
+  return "http://localhost:3200";
+}
+
 export class EmailService {
   /**
    * Send a verification email during registration.
    */
   static async sendVerificationEmail(email: string, token: string): Promise<boolean> {
     try {
-      const host = process.env.FRONTEND_URL || process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3200");
-      const verificationUrl = `${host}/api/auth/verify?token=${token}`;
+      const apiHost = getApiUrl();
+      const verificationUrl = `${apiHost}/api/auth/verify?token=${token}`;
 
       const { data, error } = await getResend().emails.send({
         from: "Costloci <onboarding@costloci.com>",
@@ -89,7 +121,7 @@ export class EmailService {
    */
   static async sendReportReadyNotification(email: string, reportId: number, reportTitle: string): Promise<boolean> {
     try {
-      const host = process.env.FRONTEND_URL || process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3200");
+      const host = getFrontendUrl();
       const reportUrl = `${host}/reports`;
 
       const { data, error } = await getResend().emails.send({
@@ -141,10 +173,7 @@ export class EmailService {
     complianceGrade: string
   ): Promise<boolean> {
     try {
-      const host =
-        process.env.FRONTEND_URL ||
-        process.env.APP_URL ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3200");
+      const host = getFrontendUrl();
       const contractUrl = `${host}/contracts/${contractId}`;
 
       const riskColor =

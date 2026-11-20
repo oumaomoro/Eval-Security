@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
+import { getApiUrl } from "@/lib/api-config";
 
 export function AuthCallback() {
   const [, setLocation] = useLocation();
@@ -21,7 +22,7 @@ export function AuthCallback() {
           try {
             // Exchange raw JWT for a secure HttpOnly server cookie.
             // No CSRF token needed — /api/auth/* routes are exempt.
-            const res = await fetch("/api/auth/session", {
+            const res = await fetch(getApiUrl("/api/auth/session"), {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
@@ -51,7 +52,7 @@ export function AuthCallback() {
 
       if (code) {
         try {
-          const res = await fetch(`/api/auth/callback?code=${encodeURIComponent(code)}`, {
+          const res = await fetch(getApiUrl(`/api/auth/callback?code=${encodeURIComponent(code)}`), {
             method: "GET",
             credentials: "include",
           });
