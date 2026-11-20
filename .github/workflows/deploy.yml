@@ -120,37 +120,42 @@ jobs:
 
       - name: Deploy to Vercel (Production)
         run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "❌ CRITICAL: VERCEL_TOKEN secret is empty or missing in GitHub Secrets!"
+            echo "👉 Generate a token at https://vercel.com/account/tokens and add it as VERCEL_TOKEN in GitHub Secrets."
+            exit 1
+          fi
           mkdir -p .vercel
           echo "{\"orgId\":\"$VERCEL_ORG_ID\",\"projectId\":\"$VERCEL_PROJECT_ID\",\"settings\":{\"framework\":null}}" > .vercel/project.json
           vercel --prod --yes \
-            --token=$VERCEL_TOKEN \
-            --scope=$VERCEL_ORG_ID \
-            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
-            -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -e SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
-            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            -e CRON_SECRET="${{ secrets.CRON_SECRET }}" \
-            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            -e RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
-            -e PAYPAL_CLIENT_ID="${{ secrets.PAYPAL_CLIENT_ID }}" \
-            -e PAYPAL_SECRET="${{ secrets.PAYPAL_SECRET }}" \
-            -e PAYPAL_STARTER_PLAN_ID="${{ secrets.PAYPAL_STARTER_PLAN_ID }}" \
-            -e PAYPAL_PRO_PLAN_ID="${{ secrets.PAYPAL_PRO_PLAN_ID }}" \
-            -e PAYPAL_ENTERPRISE_PLAN_ID="${{ secrets.PAYPAL_ENTERPRISE_PLAN_ID }}" \
-            -e PAYPAL_WEBHOOK_ID="${{ secrets.PAYPAL_WEBHOOK_ID }}" \
-            -e PAYSTACK_SECRET_KEY="${{ secrets.PAYSTACK_SECRET_KEY }}" \
-            -e SIGNNOW_API_KEY="${{ secrets.SIGNNOW_API_KEY }}" \
-            -e CSRF_SECRET="${{ secrets.CSRF_SECRET }}" \
-            -e SESSION_SECRET="${{ secrets.SESSION_SECRET }}" \
-            -e GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
-            -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-            -e UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}" \
-            -e UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
-            -e FRONTEND_URL="https://costloci.com" \
-            -e API_URL="https://api.costloci.com" \
-            -e NODE_ENV="production" \
-            -e ALLOWED_ORIGINS="https://costloci.com,https://www.costloci.com,https://api.costloci.com,https://costloci-frontend.pages.dev"
+            --token="$VERCEL_TOKEN" \
+            --scope="$VERCEL_ORG_ID" \
+            --env SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --env SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --env SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
+            --env JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --env CRON_SECRET="${{ secrets.CRON_SECRET }}" \
+            --env DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --env OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --env RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
+            --env PAYPAL_CLIENT_ID="${{ secrets.PAYPAL_CLIENT_ID }}" \
+            --env PAYPAL_SECRET="${{ secrets.PAYPAL_SECRET }}" \
+            --env PAYPAL_STARTER_PLAN_ID="${{ secrets.PAYPAL_STARTER_PLAN_ID }}" \
+            --env PAYPAL_PRO_PLAN_ID="${{ secrets.PAYPAL_PRO_PLAN_ID }}" \
+            --env PAYPAL_ENTERPRISE_PLAN_ID="${{ secrets.PAYPAL_ENTERPRISE_PLAN_ID }}" \
+            --env PAYPAL_WEBHOOK_ID="${{ secrets.PAYPAL_WEBHOOK_ID }}" \
+            --env PAYSTACK_SECRET_KEY="${{ secrets.PAYSTACK_SECRET_KEY }}" \
+            --env SIGNNOW_API_KEY="${{ secrets.SIGNNOW_API_KEY }}" \
+            --env CSRF_SECRET="${{ secrets.CSRF_SECRET }}" \
+            --env SESSION_SECRET="${{ secrets.SESSION_SECRET }}" \
+            --env GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --env GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            --env UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --env UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            --env FRONTEND_URL="https://costloci.com" \
+            --env API_URL="https://api.costloci.com" \
+            --env NODE_ENV="production" \
+            --env ALLOWED_ORIGINS="https://costloci.com,https://www.costloci.com,https://api.costloci.com,https://costloci-frontend.pages.dev"
 
   # ── Job 4: Deploy Frontend → Cloudflare Pages ─────────────────────────────
   deploy-frontend:
@@ -177,7 +182,14 @@ jobs:
         run: npm install -g wrangler
 
       - name: Deploy to Cloudflare Pages
-        run: wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "❌ CRITICAL: CLOUDFLARE_API_TOKEN secret is empty or missing in GitHub Secrets!"
+            exit 1
+          fi
+          echo "Verifying build output directory:"
+          ls -la dist/public
+          wrangler pages deploy dist/public --project-name=costloci-frontend --branch=main --commit-dirty=true
 
   # ── Job 5: E2E Smoke Tests on Production ─────────────────────────────────
   e2e-tests:
