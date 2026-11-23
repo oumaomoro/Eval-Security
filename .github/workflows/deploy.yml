@@ -195,7 +195,8 @@ jobs:
         run: npm ci
 
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium || echo "Playwright install non-fatal - continuing"
+        continue-on-error: true
 
       - name: Run E2E tests
         run: npx playwright test tests/e2e/auth.spec.ts --reporter=list
