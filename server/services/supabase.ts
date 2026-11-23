@@ -14,25 +14,25 @@ import { resolve } from 'path';
  */
 
 const getEnvKey = (keyName: string): string => {
-  if (process.env[keyName]) return process.env[keyName]!.trim().replace(/\r/g, '');
-  
-  const envPath = resolve(process.cwd(), ".env");
-  if (existsSync(envPath)) {
-    try {
-      const envFile = readFileSync(envPath, "utf-8");
-      for (const line of envFile.split(/\r?\n/)) {
-        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-        if (match && match[1] === keyName) {
-          let val = match[2] || "";
-          if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-          return val.trim();
-        }
-      }
-    } catch (e) {
-      console.error(`Warning: Could not read .env for ${keyName}`);
-    }
-  }
-  return "";
+ if (process.env[keyName]) return process.env[keyName]!.trim().replace(/\r/g, '');
+ 
+ const envPath = resolve(process.cwd(), ".env");
+ if (existsSync(envPath)) {
+ try {
+ const envFile = readFileSync(envPath, "utf-8");
+ for (const line of envFile.split(/\r?\n/)) {
+ const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+ if (match && match[1] === keyName) {
+ let val = match[2] || "";
+ if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+ return val.trim();
+ }
+ }
+ } catch (e) {
+ console.error(`Warning: Could not read .env for ${keyName}`);
+ }
+ }
+ return "";
 };
 
 const url = getEnvKey("SUPABASE_URL") || "https://ulercnwyckrcjcnrenzz.supabase.co";
@@ -47,56 +47,56 @@ const anonKey = getEnvKey("SUPABASE_ANON_KEY") || serviceKey || DEFAULT_ANON_KEY
 
 // STANDARD CLIENT (User Auth)
 export const supabase = createClient(url, anonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  }
+ auth: {
+ persistSession: false,
+ autoRefreshToken: false,
+ detectSessionInUrl: false
+ }
 });
 
 // ADMIN CLIENT (Sovereign Operations — requires SUPABASE_SERVICE_ROLE_KEY at runtime)
 export const adminClient = createClient(url, serviceKey || anonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  }
+ auth: {
+ persistSession: false,
+ autoRefreshToken: false,
+ detectSessionInUrl: false
+ }
 });
 
 if (!serviceKey) {
-  console.warn("⚠️  [SUPABASE] SUPABASE_SERVICE_ROLE_KEY is missing. Autonomic provisioning and RLS bypass will be DISABLED.");
-  console.warn("⚠️  [SUPABASE] E2E tests and administrative operations will fail RLS checks.");
+ console.warn("[WARNING] [SUPABASE] SUPABASE_SERVICE_ROLE_KEY is missing. Autonomic provisioning and RLS bypass will be DISABLED.");
+ console.warn("[WARNING] [SUPABASE] E2E tests and administrative operations will fail RLS checks.");
 } else {
-  console.log(`[SUPABASE] Isolated Admin Client initialized. RLS bypass enabled.`);
-  console.log(`[SUPABASE] Target URL: ${url}`);
+ console.log(`[SUPABASE] Isolated Admin Client initialized. RLS bypass enabled.`);
+ console.log(`[SUPABASE] Target URL: ${url}`);
 }
 
 export const getSupabase = () => supabase;
 export const getAdminClient = () => adminClient;
 export const createUserClient = (jwtToken: string) => {
-  return createClient(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${jwtToken}`,
-      },
-    },
-  });
+ return createClient(url, anonKey, {
+ auth: {
+ persistSession: false,
+ autoRefreshToken: false,
+ detectSessionInUrl: false
+ },
+ global: {
+ headers: {
+ Authorization: `Bearer ${jwtToken}`,
+ },
+ },
+ });
 };
 
 export const createAuthClientWithIp = (reqIp?: string) => {
-  return createClient(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    },
-    global: {
-      headers: reqIp ? { "x-forwarded-for": reqIp } : {},
-    },
-  });
+ return createClient(url, anonKey, {
+ auth: {
+ persistSession: false,
+ autoRefreshToken: false,
+ detectSessionInUrl: false
+ },
+ global: {
+ headers: reqIp ? { "x-forwarded-for": reqIp } : {},
+ },
+ });
 };

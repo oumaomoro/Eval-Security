@@ -1,13 +1,13 @@
-# 🚀 Zero-Investment KDPA/CBK Fine-Tuning Pipeline
+# Zero-Investment KDPA/CBK Fine-Tuning Pipeline
 
 This guide explains how to fine-tune a Llama-3-8B model for cybersecurity contract compliance (KDPA/CBK) using only free-tier infrastructure.
 
-## 🛠️ Components
+## ️ Components
 1. **Google Colab (Free Tier)**: For GPU-accelerated QLoRA training (T4 GPU).
 2. **Hugging Face (Free Tier)**: For model hosting and serverless inference.
 3. **DeepSeek (Optional/Free Credits)**: For synthetic data generation.
 
-## 📋 Step-by-Step Workflow
+## Step-by-Step Workflow
 
 ### 1. Data Preparation
 - Use the template in `data/kdpa_finetune_template.jsonl`.
@@ -28,23 +28,23 @@ This guide explains how to fine-tune a Llama-3-8B model for cybersecurity contra
 
 ### 4. Integration
 - Update your `.env` file with:
-  ```env
-  HF_TOKEN=your_huggingface_token
-  HF_MODEL_ID=your-username/costloci-kdpa-llama3
-  ```
+ ```env
+ HF_TOKEN=your_huggingface_token
+ HF_MODEL_ID=your-username/costloci-kdpa-llama3
+ ```
 - The `AIGateway.ts` is already configured to prioritize this model.
 
 ### 5. Validation
 - Run the test script:
-  ```bash
-  node scripts/test_hf_model.js
-  ```
+ ```bash
+ node scripts/test_hf_model.js
+ ```
 
-## ⚠️ Free Tier Limitations
+## [WARNING] Free Tier Limitations
 - **Colab**: 12-hour session limit on T4 GPU. Save checkpoints to Drive frequently.
 - **Hugging Face**: Serverless inference is rate-limited (approx. 30 requests/min). 
 - **Model Size**: 8B models are the sweet spot for Colab Free Tier.
 
-## 🚀 Future Scalability
+## Future Scalability
 - For higher volumes, migrate the model to a **Hugging Face Dedicated Endpoint** or a private GPU cluster.
 - Continue fine-tuning on real (anonymized) contract data as the platform scales.

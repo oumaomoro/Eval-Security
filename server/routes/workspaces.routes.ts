@@ -10,153 +10,153 @@ const router = Router();
 
 // GET /api/workspaces/:workspaceId/members
 router.get("/api/workspaces/:workspaceId/members", isAuthenticated, requireWorkspacePermission('viewer'), async (req, res) => {
-  try {
-    const workspaceId = parseInt(req.params.workspaceId as string);
-    const members = await storage.getWorkspaceMembers(workspaceId);
-    res.json(members);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch workspace members" });
-  }
+ try {
+ const workspaceId = parseInt(req.params.workspaceId as string);
+ const members = await storage.getWorkspaceMembers(workspaceId);
+ res.json(members);
+ } catch (error) {
+ res.status(500).json({ message: "Failed to fetch workspace members" });
+ }
 });
 
 // POST /api/workspaces/:workspaceId/members
 router.post("/api/workspaces/:workspaceId/members", isAuthenticated, requireWorkspacePermission('admin'), async (req: any, res) => {
-  try {
-    const workspaceId = parseInt(req.params.workspaceId as string);
-    const { userId, role } = req.body;
-    
-    if (!userId || !role) {
-      return res.status(400).json({ message: "userId and role are required" });
-    }
+ try {
+ const workspaceId = parseInt(req.params.workspaceId as string);
+ const { userId, role } = req.body;
+ 
+ if (!userId || !role) {
+ return res.status(400).json({ message: "userId and role are required" });
+ }
 
-    const member = await storage.addWorkspaceMember({
-      userId,
-      workspaceId,
-      role
-    });
+ const member = await storage.addWorkspaceMember({
+ userId,
+ workspaceId,
+ role
+ });
 
-    await SOC2Logger.logEvent(req, {
-      userId: req.user.id,
-      action: "WORKSPACE_MEMBER_ADDED",
-      workspaceId,
-      resourceType: "User",
-      resourceId: userId,
-      details: `Added user to workspace with role: ${role}`
-    });
-    
-    res.status(201).json(member);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to add member to workspace" });
-  }
+ await SOC2Logger.logEvent(req, {
+ userId: req.user.id,
+ action: "WORKSPACE_MEMBER_ADDED",
+ workspaceId,
+ resourceType: "User",
+ resourceId: userId,
+ details: `Added user to workspace with role: ${role}`
+ });
+ 
+ res.status(201).json(member);
+ } catch (error) {
+ res.status(500).json({ message: "Failed to add member to workspace" });
+ }
 });
 
 // PUT /api/workspaces/:workspaceId/members/:userId
 router.put("/api/workspaces/:workspaceId/members/:userId", isAuthenticated, requireWorkspacePermission('admin'), async (req: any, res) => {
-  try {
-    const workspaceId = parseInt(req.params.workspaceId as string);
-    const userId = req.params.userId as string;
-    const { role } = req.body;
+ try {
+ const workspaceId = parseInt(req.params.workspaceId as string);
+ const userId = req.params.userId as string;
+ const { role } = req.body;
 
-    if (!role) {
-      return res.status(400).json({ message: "role is required" });
-    }
+ if (!role) {
+ return res.status(400).json({ message: "role is required" });
+ }
 
-    await storage.updateWorkspaceMemberRole(userId, workspaceId, role);
+ await storage.updateWorkspaceMemberRole(userId, workspaceId, role);
 
-    await SOC2Logger.logEvent(req, {
-      userId: req.user.id,
-      action: "WORKSPACE_MEMBER_ROLE_UPDATED",
-      workspaceId,
-      resourceType: "User",
-      resourceId: userId,
-      details: `Updated workspace member role to: ${role}`
-    });
+ await SOC2Logger.logEvent(req, {
+ userId: req.user.id,
+ action: "WORKSPACE_MEMBER_ROLE_UPDATED",
+ workspaceId,
+ resourceType: "User",
+ resourceId: userId,
+ details: `Updated workspace member role to: ${role}`
+ });
 
-    res.json({ message: "Member role updated successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to update member role" });
-  }
+ res.json({ message: "Member role updated successfully" });
+ } catch (error) {
+ res.status(500).json({ message: "Failed to update member role" });
+ }
 });
 
 // DELETE /api/workspaces/:workspaceId/members/:userId
 router.delete("/api/workspaces/:workspaceId/members/:userId", isAuthenticated, requireWorkspacePermission('admin'), async (req: any, res) => {
-  try {
-    const workspaceId = parseInt(req.params.workspaceId as string);
-    const userId = req.params.userId as string;
+ try {
+ const workspaceId = parseInt(req.params.workspaceId as string);
+ const userId = req.params.userId as string;
 
-    await storage.removeWorkspaceMember(userId, workspaceId);
+ await storage.removeWorkspaceMember(userId, workspaceId);
 
-    await SOC2Logger.logEvent(req, {
-      userId: req.user.id,
-      action: "WORKSPACE_MEMBER_REMOVED",
-      workspaceId,
-      resourceType: "User",
-      resourceId: userId,
-      details: "Removed user from workspace"
-    });
+ await SOC2Logger.logEvent(req, {
+ userId: req.user.id,
+ action: "WORKSPACE_MEMBER_REMOVED",
+ workspaceId,
+ resourceType: "User",
+ resourceId: userId,
+ details: "Removed user from workspace"
+ });
 
-    res.json({ message: "Member removed from workspace" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to remove member from workspace" });
-  }
+ res.json({ message: "Member removed from workspace" });
+ } catch (error) {
+ res.status(500).json({ message: "Failed to remove member from workspace" });
+ }
 });
 
 // GET /api/workspaces - Fetch all workspaces for the authenticated user
 router.get("/api/workspaces", isAuthenticated, async (req: any, res) => {
-  try {
-    const userId = req.user.id;
-    const workspaces = await storage.getUserWorkspaces(userId);
-    res.json(workspaces);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch workspaces" });
-  }
+ try {
+ const userId = req.user.id;
+ const workspaces = await storage.getUserWorkspaces(userId);
+ res.json(workspaces);
+ } catch (error) {
+ res.status(500).json({ message: "Failed to fetch workspaces" });
+ }
 });
 
 // POST /api/workspaces/:workspaceId/notifications/channels
 // Slack/Teams Integration: Register a new webhook delivery channel for real-time contract events
 router.post("/api/workspaces/:workspaceId/notifications/channels", isAuthenticated, requireWorkspacePermission('admin'), async (req: any, res) => {
-  try {
-    const workspaceId = parseInt(req.params.workspaceId as string);
-    const { provider, webhookUrl, events } = req.body;
+ try {
+ const workspaceId = parseInt(req.params.workspaceId as string);
+ const { provider, webhookUrl, events } = req.body;
 
-    if (!provider || !webhookUrl) {
-      return res.status(400).json({ message: "provider and webhookUrl are required" });
-    }
+ if (!provider || !webhookUrl) {
+ return res.status(400).json({ message: "provider and webhookUrl are required" });
+ }
 
-    // adminClient imported at top level
-    
-    const { data: channel, error } = await adminClient
-      .from("notification_channels")
-      .insert([{
-        workspace_id: workspaceId,
-        client_id: req.user.clientId,
-        provider,
-        webhook_url: webhookUrl,
-        events: events || [],
-        is_active: true
-      }])
-      .select()
-      .single();
+ // adminClient imported at top level
+ 
+ const { data: channel, error } = await adminClient
+ .from("notification_channels")
+ .insert([{
+ workspace_id: workspaceId,
+ client_id: req.user.clientId,
+ provider,
+ webhook_url: webhookUrl,
+ events: events || [],
+ is_active: true
+ }])
+ .select()
+ .single();
 
-    if (error) throw error;
+ if (error) throw error;
 
-    await SOC2Logger.logEvent(req, {
-      userId: req.user.id,
-      action: "NOTIFICATION_CHANNEL_CREATED",
-      workspaceId,
-      resourceType: "Integration",
-      resourceId: String(channel.id),
-      details: `Configured ${provider} webhook integration.`
-    });
+ await SOC2Logger.logEvent(req, {
+ userId: req.user.id,
+ action: "NOTIFICATION_CHANNEL_CREATED",
+ workspaceId,
+ resourceType: "Integration",
+ resourceId: String(channel.id),
+ details: `Configured ${provider} webhook integration.`
+ });
 
-    res.status(201).json(channel);
-  } catch (err: any) {
-    console.error("[SLACK INTEGRATION ERROR]", err.message);
-    res.status(500).json({ 
-      message: "Failed to configure notification channel",
-      error: err.message
-    });
-  }
+ res.status(201).json(channel);
+ } catch (err: any) {
+ console.error("[SLACK INTEGRATION ERROR]", err.message);
+ res.status(500).json({ 
+ message: "Failed to configure notification channel",
+ error: err.message
+ });
+ }
 });
 
 

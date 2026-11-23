@@ -1,4 +1,4 @@
-# 🎨 Landing Page Copy Enhancements: Costloci
+# Landing Page Copy Enhancements: Costloci
 
 ## 1. Hero Section Transformation
 **Current**: AI Contract Governance & Enterprise Compliance.

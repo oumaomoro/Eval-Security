@@ -5,119 +5,119 @@ import { isAuthenticated } from "../auth/index.js";
 import { SOC2Logger } from "../../services/SOC2Logger.js";
 
 export function registerChatRoutes(app: Express): void {
-  // Get all conversations
-  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const conversations = await chatStorage.getAllConversations();
-      res.json(conversations);
-    } catch (error) {
-      console.error("Error fetching conversations:", error);
-      res.status(500).json({ error: "Failed to fetch conversations" });
-    }
-  });
+ // Get all conversations
+ app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const conversations = await chatStorage.getAllConversations();
+ res.json(conversations);
+ } catch (error) {
+ console.error("Error fetching conversations:", error);
+ res.status(500).json({ error: "Failed to fetch conversations" });
+ }
+ });
 
-  // Get single conversation with messages
-  app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
-      const conversation = await chatStorage.getConversation(id);
-      if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found" });
-      }
-      const messages = await chatStorage.getMessagesByConversation(id);
-      res.json({ ...conversation, messages });
-    } catch (error) {
-      console.error("Error fetching conversation:", error);
-      res.status(500).json({ error: "Failed to fetch conversation" });
-    }
-  });
+ // Get single conversation with messages
+ app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
+ const conversation = await chatStorage.getConversation(id);
+ if (!conversation) {
+ return res.status(404).json({ error: "Conversation not found" });
+ }
+ const messages = await chatStorage.getMessagesByConversation(id);
+ res.json({ ...conversation, messages });
+ } catch (error) {
+ console.error("Error fetching conversation:", error);
+ res.status(500).json({ error: "Failed to fetch conversation" });
+ }
+ });
 
-  // Create new conversation
-  app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const { title } = req.body;
-      const conversation = await chatStorage.createConversation(title || "New Chat");
-      res.status(201).json(conversation);
-    } catch (error) {
-      console.error("Error creating conversation:", error);
-      res.status(500).json({ error: "Failed to create conversation" });
-    }
-  });
+ // Create new conversation
+ app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const { title } = req.body;
+ const conversation = await chatStorage.createConversation(title || "New Chat");
+ res.status(201).json(conversation);
+ } catch (error) {
+ console.error("Error creating conversation:", error);
+ res.status(500).json({ error: "Failed to create conversation" });
+ }
+ });
 
-  // Delete conversation
-  app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
-      await chatStorage.deleteConversation(id);
+ // Delete conversation
+ app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
+ await chatStorage.deleteConversation(id);
 
-      await SOC2Logger.logEvent(req as any, {
-        userId: (req as any).user.id,
-        action: "CHAT_CONVERSATION_DELETED",
-        resourceType: "Conversation",
-        resourceId: String(id),
-        details: "User deleted a collaborative chat history."
-      });
+ await SOC2Logger.logEvent(req as any, {
+ userId: (req as any).user.id,
+ action: "CHAT_CONVERSATION_DELETED",
+ resourceType: "Conversation",
+ resourceId: String(id),
+ details: "User deleted a collaborative chat history."
+ });
 
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting conversation:", error);
-      res.status(500).json({ error: "Failed to delete conversation" });
-    }
-  });
+ res.status(204).send();
+ } catch (error) {
+ console.error("Error deleting conversation:", error);
+ res.status(500).json({ error: "Failed to delete conversation" });
+ }
+ });
 
-  // Send message and get AI response (streaming)
-  app.post("/api/conversations/:id/messages", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const conversationId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
-      const { content } = req.body;
+ // Send message and get AI response (streaming)
+ app.post("/api/conversations/:id/messages", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const conversationId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
+ const { content } = req.body;
 
-      // Save user message
-      await chatStorage.createMessage(conversationId, "user", content);
+ // Save user message
+ await chatStorage.createMessage(conversationId, "user", content);
 
-      // Get conversation history for context
-      const messages = await chatStorage.getMessagesByConversation(conversationId);
-      const chatMessages = messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
+ // Get conversation history for context
+ const messages = await chatStorage.getMessagesByConversation(conversationId);
+ const chatMessages = messages.map((m) => ({
+ role: m.role as "user" | "assistant",
+ content: m.content,
+ }));
 
-      // Set up SSE
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
+ // Set up SSE
+ res.setHeader("Content-Type", "text/event-stream");
+ res.setHeader("Cache-Control", "no-cache");
+ res.setHeader("Connection", "keep-alive");
 
-      // Stream response from OpenAI (Resilient Path)
-      const stream = await IntelligenceGateway.createStreamingCompletion({
-        model: "gpt-4o",
-        messages: chatMessages,
-        stream: true,
-        max_completion_tokens: 8192,
-      });
+ // Stream response from OpenAI (Resilient Path)
+ const stream = await IntelligenceGateway.createStreamingCompletion({
+ model: "gpt-4o",
+ messages: chatMessages,
+ stream: true,
+ max_completion_tokens: 8192,
+ });
 
-      let fullResponse = "";
+ let fullResponse = "";
 
-      for await (const chunk of stream as AsyncIterable<any>) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          fullResponse += content;
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
-        }
-      }
+ for await (const chunk of stream as AsyncIterable<any>) {
+ const content = chunk.choices[0]?.delta?.content || "";
+ if (content) {
+ fullResponse += content;
+ res.write(`data: ${JSON.stringify({ content })}\n\n`);
+ }
+ }
 
-      // Save assistant message
-      await chatStorage.createMessage(conversationId, "assistant", fullResponse);
+ // Save assistant message
+ await chatStorage.createMessage(conversationId, "assistant", fullResponse);
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      res.end();
-    } catch (error) {
-      console.error("Error sending message:", error);
-      if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: "Failed to send message" })}\n\n`);
-        res.end();
-      } else {
-        res.status(500).json({ error: "Failed to send message" });
-      }
-    }
-  });
+ res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+ res.end();
+ } catch (error) {
+ console.error("Error sending message:", error);
+ if (res.headersSent) {
+ res.write(`data: ${JSON.stringify({ error: "Failed to send message" })}\n\n`);
+ res.end();
+ } else {
+ res.status(500).json({ error: "Failed to send message" });
+ }
+ }
+ });
 }
 

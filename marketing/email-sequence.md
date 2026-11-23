@@ -1,4 +1,4 @@
-# ✉️ DPO Strategic Email Sequence
+# ️ DPO Strategic Email Sequence
 
 ## Email 1: "The cost of blind vendor risk"
 **Subject**: [First Name], is your vendor portfolio KDPA compliant?

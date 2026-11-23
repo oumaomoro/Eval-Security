@@ -9,6 +9,6 @@ react-dropzone | File upload drag and drop area
 ## Notes
 Tailwind Config - extend fontFamily:
 fontFamily: {
-  sans: ["Inter", "sans-serif"],
-  mono: ["JetBrains Mono", "monospace"],
+ sans: ["Inter", "sans-serif"],
+ mono: ["JetBrains Mono", "monospace"],
 }

@@ -1,10 +1,10 @@
-# 📧 Costloci Transactional Email & Verification Configuration
+# Costloci Transactional Email & Verification Configuration
 
 This document outlines the email architecture, required environment variables, verification link generation, local testing instructions, and E2E testing email bypass patterns for Costloci.
 
 ---
 
-## 1. ⚙️ Environment Variables
+## 1. ️ Environment Variables
 
 The following environment variables govern transactional emails and verification link generation:
 
@@ -14,11 +14,11 @@ The following environment variables govern transactional emails and verification
 | `API_URL` | **Yes** | `https://api.costloci.com` | Primary backend API domain. Base for `/api/auth/verify?token=...` links. |
 | `RESEND_API_KEY` | **Yes** | `re_...` | Resend API key for sending production emails via HTTPS. |
 
-> ⚠️ **Server Startup Guard**: In production (`NODE_ENV=production`), if `FRONTEND_URL` is missing, `validateRequiredEnvVars()` logs a critical failure and terminates server startup (`process.exit(1)`).
+> [WARNING] **Server Startup Guard**: In production (`NODE_ENV=production`), if `FRONTEND_URL` is missing, `validateRequiredEnvVars()` logs a critical failure and terminates server startup (`process.exit(1)`).
 
 ---
 
-## 2. 🔗 Verification Link Construction
+## 2. Verification Link Construction
 
 Verification links are constructed dynamically in `EmailService.ts` using `getApiUrl()` and `getFrontendUrl()` helpers:
 
@@ -37,11 +37,11 @@ res.redirect(`${getFrontendUrl()}/auth?verified=true`);
 
 ---
 
-## 3. 🛠️ Local Testing Options
+## 3. ️ Local Testing Options
 
 ### Option 1: Mock Email Engine (Default fallback)
 If `RESEND_API_KEY` is not set or set to dummy value (`re_123`), `EmailService.ts` automatically uses an internal mock engine:
-- Log output: `🛠️ [MOCK_EMAIL] Sending email to: user@example.com`
+- Log output: `️ [MOCK_EMAIL] Sending email to: user@example.com`
 - Verification URL is printed directly to terminal logs.
 
 ### Option 2: Live Resend Key in Development
@@ -52,7 +52,7 @@ If `RESEND_API_KEY` is not set or set to dummy value (`re_123`), `EmailService.t
 
 ---
 
-## 4. 🧪 Automated E2E Testing (Email Bypass Pattern)
+## 4. Automated E2E Testing (Email Bypass Pattern)
 
 In CI environments (e.g. GitHub Actions), testing real inbox delivery adds external latency and flakiness.
 
@@ -61,7 +61,7 @@ Instead, use **Option A (Email Bypass Pattern)** implemented in [`tests/e2e/regi
 ```typescript
 // 1. Register new user via API
 const registerRes = await request.post('/api/auth/register', {
-  data: { email, password, firstName, lastName }
+ data: { email, password, firstName, lastName }
 });
 const { userId } = await registerRes.json();
 
@@ -78,7 +78,7 @@ await expect(page).toHaveURL(/(\/|\/dashboard)$/);
 
 ---
 
-## 5. ✅ Manual Verification Checklist
+## 5. Manual Verification Checklist
 
 Before deploying changes to production, execute this checklist:
 

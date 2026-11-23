@@ -1,4 +1,4 @@
-# 📽️ Costloci Pitch Deck: 12-Slide Structure
+# ️ Costloci Pitch Deck: 12-Slide Structure
 
 ## Slide 1: Title Slide
 - **Visual**: High-fidelity Costloci Dashboard Mockup.

@@ -14,42 +14,42 @@ let _pool: pg.Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export function getDb() {
-  if (!_db) {
-    if (!process.env.DATABASE_URL) {
-      console.warn("⚠️  DATABASE_URL is missing. DB Direct access is disabled. Falling back to REST Sovereignty Bridge.");
-      return null;
-    }
+ if (!_db) {
+ if (!process.env.DATABASE_URL) {
+ console.warn("[WARNING] DATABASE_URL is missing. DB Direct access is disabled. Falling back to REST Sovereignty Bridge.");
+ return null;
+ }
 
-    const dbUrl = process.env.DATABASE_URL.trim().replace(/\r/g, '');
-    const sslConfig = (dbUrl.includes("supabase.co") || dbUrl.includes("supabase.com"))
-      ? { ssl: { rejectUnauthorized: false } }
-      : {};
+ const dbUrl = process.env.DATABASE_URL.trim().replace(/\r/g, '');
+ const sslConfig = (dbUrl.includes("supabase.co") || dbUrl.includes("supabase.com"))
+ ? { ssl: { rejectUnauthorized: false } }
+ : {};
 
-    _pool = new Pool({
-      connectionString: dbUrl,
-      ...sslConfig,
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    });
+ _pool = new Pool({
+ connectionString: dbUrl,
+ ...sslConfig,
+ max: 5,
+ idleTimeoutMillis: 30000,
+ connectionTimeoutMillis: 10000,
+ });
 
-    // Handle background pool errors silently to prevent process crash
-    _pool.on('error', (err) => {
-      console.error('⚠️  Postgres Pool Error:', err.message);
-    });
+ // Handle background pool errors silently to prevent process crash
+ _pool.on('error', (err) => {
+ console.error('[WARNING] Postgres Pool Error:', err.message);
+ });
 
-    _db = drizzle(_pool, { schema });
-  }
-  return _db;
+ _db = drizzle(_pool, { schema });
+ }
+ return _db;
 }
 
 // Proxy for backward compatibility
 export const db = new Proxy({} as any, {
-  get: (_target, prop) => {
-    const d = getDb();
-    if (!d) throw new Error("Database direct access is unavailable. Ensure DATABASE_URL is set or use the REST Storage layer.");
-    return (d as any)[prop];
-  }
+ get: (_target, prop) => {
+ const d = getDb();
+ if (!d) throw new Error("Database direct access is unavailable. Ensure DATABASE_URL is set or use the REST Storage layer.");
+ return (d as any)[prop];
+ }
 });
 
 // Ensure pool is initialized if possible on load

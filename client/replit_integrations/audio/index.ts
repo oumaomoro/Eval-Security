@@ -10,30 +10,30 @@
  * import { useVoiceRecorder, useVoiceStream } from "./audio";
  * 
  * function VoiceChat() {
- *   const [transcript, setTranscript] = useState("");
- *   const recorder = useVoiceRecorder();
- *   const stream = useVoiceStream({
- *     onTranscript: (_, full) => setTranscript(full),
- *     onComplete: (text) => console.log("Done:", text),
- *   });
+ * const [transcript, setTranscript] = useState("");
+ * const recorder = useVoiceRecorder();
+ * const stream = useVoiceStream({
+ * onTranscript: (_, full) => setTranscript(full),
+ * onComplete: (text) => console.log("Done:", text),
+ * });
  * 
- *   const handleClick = async () => {
- *     if (recorder.state === "recording") {
- *       const blob = await recorder.stopRecording();
- *       await stream.streamVoiceResponse("/api/voice-conversations/1/messages", blob);
- *     } else {
- *       await recorder.startRecording();
- *     }
- *   };
+ * const handleClick = async () => {
+ * if (recorder.state === "recording") {
+ * const blob = await recorder.stopRecording();
+ * await stream.streamVoiceResponse("/api/voice-conversations/1/messages", blob);
+ * } else {
+ * await recorder.startRecording();
+ * }
+ * };
  * 
- *   return (
- *     <div>
- *       <button onClick={handleClick}>
- *         {recorder.state === "recording" ? "Stop" : "Record"}
- *       </button>
- *       <p>{transcript}</p>
- *     </div>
- *   );
+ * return (
+ * <div>
+ * <button onClick={handleClick}>
+ * {recorder.state === "recording" ? "Stop" : "Record"}
+ * </button>
+ * <p>{transcript}</p>
+ * </div>
+ * );
  * }
  * ```
  */

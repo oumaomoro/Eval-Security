@@ -25,18 +25,18 @@ If any are missing, the workflow will fail at the **Pre-flight Checks** step wit
 
 ```
 push to main
-     │
-     ▼
+ │
+ ▼
 [Pre-flight] — fails fast if any secret is missing
-     │
-     ▼
+ │
+ ▼
 [Build] — npm run check + npm run build + output verification
-     │
-     ├──────────────────────────────┐
-     ▼                              ▼
-[deploy-frontend]           [deploy-backend]
-Cloudflare Pages             Vercel (Production)
-dist/public → CDN          cyberoptimize-prod/backend
+ │
+ ├──────────────────────────────┐
+ ▼ ▼
+[deploy-frontend] [deploy-backend]
+Cloudflare Pages Vercel (Production)
+dist/public → CDN cyberoptimize-prod/backend
 ```
 
 ## Notes

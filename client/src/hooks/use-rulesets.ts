@@ -5,33 +5,33 @@ import { getApiUrl } from "@/lib/api-config";
 import { type AuditRuleset } from "@shared/schema";
 
 export function useRulesets() {
-  return useQuery<AuditRuleset[]>({
-    queryKey: [api.auditRulesets.list.path],
-    queryFn: async () => {      const res = await fetch(getApiUrl(api.auditRulesets.list.path), { 
-        credentials: "include",      });
-      if (!res.ok) throw new Error("Failed to fetch rulesets");
-      return res.json();
-    },
-  });
+ return useQuery<AuditRuleset[]>({
+ queryKey: [api.auditRulesets.list.path],
+ queryFn: async () => { const res = await fetch(getApiUrl(api.auditRulesets.list.path), { 
+ credentials: "include", });
+ if (!res.ok) throw new Error("Failed to fetch rulesets");
+ return res.json();
+ },
+ });
 }
 
 export const useAuditRulesets = useRulesets;
 
 export function useCreateRuleset() {
-  return useMutation({
-    mutationFn: async (data: any) => {      const res = await fetch(getApiUrl(api.auditRulesets.create.path), {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to create ruleset");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.auditRulesets.list.path] });
-    }
-  });
+ return useMutation({
+ mutationFn: async (data: any) => { const res = await fetch(getApiUrl(api.auditRulesets.create.path), {
+ method: "POST",
+ headers: { 
+ "Content-Type": "application/json",
+ },
+ body: JSON.stringify(data),
+ credentials: "include",
+ });
+ if (!res.ok) throw new Error("Failed to create ruleset");
+ return res.json();
+ },
+ onSuccess: () => {
+ queryClient.invalidateQueries({ queryKey: [api.auditRulesets.list.path] });
+ }
+ });
 }

@@ -1,36 +1,27 @@
-# 🚀 Launch Readiness Checklist (Costloci)
+# Launch Readiness Checklist
 
-Ensure all items are checked before running `./scripts/deploy_all.ps1`.
+## 1. Environment Variables
 
-## 1. Environment Variables (Secret Manager)
-- [x] `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` (Database access)
-- [x] `OPENAI_API_KEY` (AI Analysis & Redlining)
-- [x] `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` (Core Subscriptions)
-- [x] `PAYPAL_CLIENT_ID` / `PAYPAL_SECRET` (Marketplace Payouts)
-- [x] `RESEND_API_KEY` (Strategic Pack & Invoice emails)
+- [ ] `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] `OPENAI_API_KEY`
+- [ ] `PAYPAL_CLIENT_ID` / `PAYPAL_SECRET`
+- [ ] `RESEND_API_KEY`
+- [ ] `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`
+- [ ] `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`
 
-## 2. Database State (Track 1)
-- [x] Run `scripts/sync_missing_tables.sql` in Supabase UI.
-- [x] Run `scripts/final_prod_patch.sql` in Supabase UI (Fixes `owner_id`, `presence`, `ai_cache`).
-- [x] Run `scripts/fix_rls_recursion.sql` in Supabase UI.
-- [x] Verify `contracts` bucket exists in Supabase Storage with "Public" access for the `insurance/` and `remediation/` paths.
+## 2. Database
 
-## 3. Enterprise Intelligence (Track 2)
-- [x] V1 API Gateway (`/api/v1`) live and secured with `apiKeyAuth`.
-- [x] Real-time presence heartbeat operational for collaborative redlining.
-- [x] AI Cache efficiency dashboard reporting cost/latency savings.
-- [x] Regional sharding distribution mapped for KDPA/POPIA transparency.
+- [ ] Run migrations in `supabase/migrations/` via the Supabase SQL editor.
+- [ ] Verify `contracts` storage bucket exists with correct access policy.
 
-## 3. Infrastructure Config
-- [x] Cloudflare Pages: Build command is `npm run build`, output directory is `dist`.
-- [x] Vercel: Function timeout set to 60s (for AI analysis).
-- [x] Resend: Sender domain is verified.
+## 3. Infrastructure
 
-## 4. Certification
-- [x] `npm run build` returns zero errors (Exit Code 0).
-- [x] `npm run test:e2e` is GREEN (All enterprise endpoints verified).
-- [x] Strategic Pack generation returns a valid `.zip` signed URL.
+- [ ] Cloudflare Pages: build command `npm run build`, output `dist/public`.
+- [ ] Vercel: function timeout 60s (required for AI analysis).
+- [ ] Resend: sender domain verified.
 
----
-**Status: MISSION CONTROL - FINAL CLEARANCE GRANTED** 🛰️
-**Deployment Target: SOVEREIGN PRODUCTION**
+## 4. Verification
+
+- [ ] `npm run build` exits with code 0.
+- [ ] `npm run test:unit` passes.
+- [ ] `npm run check` (TypeScript) passes.

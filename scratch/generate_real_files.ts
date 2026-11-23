@@ -16,7 +16,7 @@ async function generateFiles() {
   doc2.text("Data Breach Notification: Within 72 hours of discovery.", 10, 30);
   fs.writeFileSync('contract_b.pdf', Buffer.from(doc2.output('arraybuffer')));
 
-  console.log("✅ Real PDFs generated: contract_a.pdf, contract_b.pdf");
+  console.log(" Real PDFs generated: contract_a.pdf, contract_b.pdf");
 }
 
 generateFiles().catch(console.error);

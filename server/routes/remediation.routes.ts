@@ -11,86 +11,86 @@ const router = Router();
  * NOTE: Path has NO /api prefix — mounted at app.use("/api", remediationRouter)
  */
 router.get("/remediation-suggestions", isAuthenticated, async (req: any, res) => {
-  try {
-    const suggestions = await storage.getRemediationSuggestions();
-    res.json(suggestions);
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
-  }
+ try {
+ const suggestions = await storage.getRemediationSuggestions();
+ res.json(suggestions);
+ } catch (err: any) {
+ res.status(500).json({ message: err.message });
+ }
 });
 
 /**
  * Get suggestions for a specific contract.
  */
 router.get("/contracts/:id/remediation-suggestions", isAuthenticated, async (req: any, res) => {
-  try {
-    const contractId = parseInt(req.params.id);
-    const suggestions = await storage.getRemediationSuggestions(contractId);
-    res.json(suggestions);
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
-  }
+ try {
+ const contractId = parseInt(req.params.id);
+ const suggestions = await storage.getRemediationSuggestions(contractId);
+ res.json(suggestions);
+ } catch (err: any) {
+ res.status(500).json({ message: err.message });
+ }
 });
 
 /**
  * Accept a remediation suggestion.
  */
 router.post("/remediation-suggestions/:id/accept", isAuthenticated, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const suggestion = await storage.getRemediationSuggestion(id);
+ try {
+ const id = parseInt(req.params.id);
+ const suggestion = await storage.getRemediationSuggestion(id);
 
-    if (!suggestion) {
-      return res.status(404).json({ message: "Suggestion not found" });
-    }
+ if (!suggestion) {
+ return res.status(404).json({ message: "Suggestion not found" });
+ }
 
-    const updated = await storage.updateRemediationSuggestion(id, {
-      status: "accepted",
-      acceptedAt: new Date()
-    });
+ const updated = await storage.updateRemediationSuggestion(id, {
+ status: "accepted",
+ acceptedAt: new Date()
+ });
 
-    await SOC2Logger.logEvent(req, {
-      action: "REMEDIATION_SUGGESTION_ACCEPTED",
-      userId: req.user.id,
-      resourceType: "RemediationSuggestion",
-      resourceId: String(id),
-      details: `User accepted remediation suggestion for ${suggestion.standard} on contract ${suggestion.contractId}`
-    });
+ await SOC2Logger.logEvent(req, {
+ action: "REMEDIATION_SUGGESTION_ACCEPTED",
+ userId: req.user.id,
+ resourceType: "RemediationSuggestion",
+ resourceId: String(id),
+ details: `User accepted remediation suggestion for ${suggestion.standard} on contract ${suggestion.contractId}`
+ });
 
-    res.json(updated);
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
-  }
+ res.json(updated);
+ } catch (err: any) {
+ res.status(500).json({ message: err.message });
+ }
 });
 
 /**
  * Dismiss a remediation suggestion.
  */
 router.post("/remediation-suggestions/:id/dismiss", isAuthenticated, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const suggestion = await storage.getRemediationSuggestion(id);
+ try {
+ const id = parseInt(req.params.id);
+ const suggestion = await storage.getRemediationSuggestion(id);
 
-    if (!suggestion) {
-      return res.status(404).json({ message: "Suggestion not found" });
-    }
+ if (!suggestion) {
+ return res.status(404).json({ message: "Suggestion not found" });
+ }
 
-    const updated = await storage.updateRemediationSuggestion(id, {
-      status: "dismissed"
-    });
+ const updated = await storage.updateRemediationSuggestion(id, {
+ status: "dismissed"
+ });
 
-    await SOC2Logger.logEvent(req, {
-      action: "REMEDIATION_SUGGESTION_DISMISSED",
-      userId: req.user.id,
-      resourceType: "RemediationSuggestion",
-      resourceId: String(id),
-      details: `User dismissed remediation suggestion #${id} (${suggestion.standard})`
-    });
+ await SOC2Logger.logEvent(req, {
+ action: "REMEDIATION_SUGGESTION_DISMISSED",
+ userId: req.user.id,
+ resourceType: "RemediationSuggestion",
+ resourceId: String(id),
+ details: `User dismissed remediation suggestion #${id} (${suggestion.standard})`
+ });
 
-    res.json(updated);
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
-  }
+ res.json(updated);
+ } catch (err: any) {
+ res.status(500).json({ message: err.message });
+ }
 });
 
 export default router;

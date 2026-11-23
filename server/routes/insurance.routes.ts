@@ -11,237 +11,237 @@ import pdf from "pdf-parse";
 
 const router = Router();
 const upload = multer({ 
-  storage: multer.diskStorage({
-    destination: os.tmpdir(),
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
-  }),
-  limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
+ storage: multer.diskStorage({
+ destination: os.tmpdir(),
+ filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
+ }),
+ limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
 });
 
 router.post("/insurance/upload", isAuthenticated, upload.single("file"), async (req: any, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+ try {
+ if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-    // Assuming we have clientId from context
-    const clientId = req.user?.clientId;
-    const store = storageContext.getStore();
-    const workspaceId = store?.workspaceId;
+ // Assuming we have clientId from context
+ const clientId = req.user?.clientId;
+ const store = storageContext.getStore();
+ const workspaceId = store?.workspaceId;
 
-    if (!clientId || !workspaceId) {
-      await fs.unlink(req.file.path).catch(() => {});
-      return res.status(400).json({ message: "Missing organization context." });
-    }
+ if (!clientId || !workspaceId) {
+ await fs.unlink(req.file.path).catch(() => {});
+ return res.status(400).json({ message: "Missing organization context." });
+ }
 
-    const fileBuffer = await fs.readFile(req.file.path);
-    const pdfData = await pdf(fileBuffer);
-    const extractedText = pdfData.text.substring(0, 15000);
+ const fileBuffer = await fs.readFile(req.file.path);
+ const pdfData = await pdf(fileBuffer);
+ const extractedText = pdfData.text.substring(0, 15000);
 
-    const analysis = await IntelligenceGateway.analyzeInsurancePolicy(extractedText, workspaceId);
+ const analysis = await IntelligenceGateway.analyzeInsurancePolicy(extractedText, workspaceId);
 
-    // Upload to Supabase Storage
-    const { adminClient: supabaseAdmin } = await import("../services/supabase.js");
-    const storagePath = `insurance/${clientId}/${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    
-    const { error: storageError } = await supabaseAdmin.storage
-      .from("contracts") // using contracts bucket
-      .upload(storagePath, fileBuffer, {
-        contentType: req.file.mimetype || "application/pdf",
-        upsert: false,
-      });
+ // Upload to Supabase Storage
+ const { adminClient: supabaseAdmin } = await import("../services/supabase.js");
+ const storagePath = `insurance/${clientId}/${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+ 
+ const { error: storageError } = await supabaseAdmin.storage
+ .from("contracts") // using contracts bucket
+ .upload(storagePath, fileBuffer, {
+ contentType: req.file.mimetype || "application/pdf",
+ upsert: false,
+ });
 
-    await fs.unlink(req.file.path).catch(() => {});
+ await fs.unlink(req.file.path).catch(() => {});
 
-    if (storageError) throw new Error("Storage upload failed: " + storageError.message);
+ if (storageError) throw new Error("Storage upload failed: " + storageError.message);
 
-    const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
+ const { data: publicUrlData } = supabaseAdmin.storage.from("contracts").getPublicUrl(storagePath);
 
-    // Save to database
-    const policy = await storage.createInsurancePolicy({
-      workspaceId,
-      clientId,
-      carrierName: analysis.carrierName || "Pending Intelligence Extraction",
-      policyNumber: analysis.policyNumber || "UNKNOWN",
-      premiumAmount: 0,
-      fileUrl: publicUrlData.publicUrl,
-      status: "active",
-      coverageLimits: analysis.coverageLimits || {},
-      deductibles: analysis.deductibles || {},
-      waitingPeriods: analysis.waitingPeriods || {},
-      exclusions: analysis.exclusions || [],
-      endorsements: analysis.endorsements || [],
-      notificationRequirements: analysis.notificationRequirements || {},
-      claimRiskScore: analysis.claimRiskScore,
-      intelligenceAnalysisSummary: analysis.intelligenceAnalysisSummary
-    });
+ // Save to database
+ const policy = await storage.createInsurancePolicy({
+ workspaceId,
+ clientId,
+ carrierName: analysis.carrierName || "Pending Intelligence Extraction",
+ policyNumber: analysis.policyNumber || "UNKNOWN",
+ premiumAmount: 0,
+ fileUrl: publicUrlData.publicUrl,
+ status: "active",
+ coverageLimits: analysis.coverageLimits || {},
+ deductibles: analysis.deductibles || {},
+ waitingPeriods: analysis.waitingPeriods || {},
+ exclusions: analysis.exclusions || [],
+ endorsements: analysis.endorsements || [],
+ notificationRequirements: analysis.notificationRequirements || {},
+ claimRiskScore: analysis.claimRiskScore,
+ intelligenceAnalysisSummary: analysis.intelligenceAnalysisSummary
+ });
 
-    await SOC2Logger.logEvent(req, {
-      action: "INSURANCE_POLICY_UPLOADED",
-      userId: req.user.id,
-      resourceType: "InsurancePolicy",
-      resourceId: String(policy.id),
-      details: "New cyber insurance policy uploaded and analyzed."
-    });
+ await SOC2Logger.logEvent(req, {
+ action: "INSURANCE_POLICY_UPLOADED",
+ userId: req.user.id,
+ resourceType: "InsurancePolicy",
+ resourceId: String(policy.id),
+ details: "New cyber insurance policy uploaded and analyzed."
+ });
 
-    res.status(201).json(policy);
-  } catch (error: any) {
-    console.error("[INSURANCE UPLOAD]", error);
-    res.status(500).json({ message: error.message });
-  }
+ res.status(201).json(policy);
+ } catch (error: any) {
+ console.error("[INSURANCE UPLOAD]", error);
+ res.status(500).json({ message: error.message });
+ }
 });
 
 router.post("/insurance/redline", isAuthenticated, async (req: any, res) => {
-  try {
-    const { originalClause, standardLanguage, instructions } = req.body;
-    
-    if (!originalClause || !standardLanguage) {
-      return res.status(400).json({ message: "Missing required redlining parameters." });
-    }
+ try {
+ const { originalClause, standardLanguage, instructions } = req.body;
+ 
+ if (!originalClause || !standardLanguage) {
+ return res.status(400).json({ message: "Missing required redlining parameters." });
+ }
 
-    const redlinedClause = await IntelligenceGateway.redlineClauseIntelligence(originalClause, standardLanguage, instructions || "");
+ const redlinedClause = await IntelligenceGateway.redlineClauseIntelligence(originalClause, standardLanguage, instructions || "");
 
-    await SOC2Logger.logEvent(req, {
-      action: "CLAUSE_REDLINING_EXECUTED",
-      userId: req.user.id,
-      resourceType: "Clause",
-      resourceId: "Redlined Intelligence Generation",
-      details: "Intelligence engine redlined a cyber insurance clause."
-    });
+ await SOC2Logger.logEvent(req, {
+ action: "CLAUSE_REDLINING_EXECUTED",
+ userId: req.user.id,
+ resourceType: "Clause",
+ resourceId: "Redlined Intelligence Generation",
+ details: "Intelligence engine redlined a cyber insurance clause."
+ });
 
-    res.json({ redlinedClause });
-  } catch (error: any) {
-    console.error("[CLAUSE REDLINE]", error);
-    res.status(500).json({ message: error.message });
-  }
+ res.json({ redlinedClause });
+ } catch (error: any) {
+ console.error("[CLAUSE REDLINE]", error);
+ res.status(500).json({ message: error.message });
+ }
 });
 
 // GET /api/insurance/policies - List all policies for the active organization
 router.get("/insurance/policies", isAuthenticated, async (req: any, res) => {
-  try {
-    const workspaceId = req.user.workspaceId;
-    if (!workspaceId) return res.status(400).json({ message: "No workspace context" });
+ try {
+ const workspaceId = req.user.workspaceId;
+ if (!workspaceId) return res.status(400).json({ message: "No workspace context" });
 
-    const policies = await storage.getInsurancePolicies(workspaceId);
-    res.json(policies);
-  } catch (error: any) {
-    console.error("[INSURANCE LIST]", error);
-    res.status(500).json({ message: "Failed to fetch insurance policies" });
-  }
+ const policies = await storage.getInsurancePolicies(workspaceId);
+ res.json(policies);
+ } catch (error: any) {
+ console.error("[INSURANCE LIST]", error);
+ res.status(500).json({ message: "Failed to fetch insurance policies" });
+ }
 });
 
 router.post("/insurance/compare", isAuthenticated, async (req: any, res) => {
-  try {
-    const { policyIdA, policyIdB } = req.body;
-    if (!policyIdA || !policyIdB) {
-      return res.status(400).json({ message: "Two policy IDs are required for comparison." });
-    }
+ try {
+ const { policyIdA, policyIdB } = req.body;
+ if (!policyIdA || !policyIdB) {
+ return res.status(400).json({ message: "Two policy IDs are required for comparison." });
+ }
 
-    const policyA = await storage.getInsurancePolicy(policyIdA);
-    const policyB = await storage.getInsurancePolicy(policyIdB);
+ const policyA = await storage.getInsurancePolicy(policyIdA);
+ const policyB = await storage.getInsurancePolicy(policyIdB);
 
-    if (!policyA || !policyB) {
-      return res.status(404).json({ message: "One or both policies not found." });
-    }
+ if (!policyA || !policyB) {
+ return res.status(404).json({ message: "One or both policies not found." });
+ }
 
-    // Security Guard: Verify both policies belong to the user's workspace
-    if (policyA.workspaceId !== req.user.workspaceId || policyB.workspaceId !== req.user.workspaceId) {
-      return res.status(403).json({ message: "Access denied to one or more policies." });
-    }
+ // Security Guard: Verify both policies belong to the user's workspace
+ if (policyA.workspaceId !== req.user.workspaceId || policyB.workspaceId !== req.user.workspaceId) {
+ return res.status(403).json({ message: "Access denied to one or more policies." });
+ }
 
-    // Intelligence comparison layer
-    const comparisonContext = `
-      Policy A: ${policyA.intelligenceAnalysisSummary}
-      Policy B: ${policyB.intelligenceAnalysisSummary}
-      
-      Limits A: ${JSON.stringify(policyA.coverageLimits)}
-      Limits B: ${JSON.stringify(policyB.coverageLimits)}
-    `;
+ // Intelligence comparison layer
+ const comparisonContext = `
+ Policy A: ${policyA.intelligenceAnalysisSummary}
+ Policy B: ${policyB.intelligenceAnalysisSummary}
+ 
+ Limits A: ${JSON.stringify(policyA.coverageLimits)}
+ Limits B: ${JSON.stringify(policyB.coverageLimits)}
+ `;
 
-    const comparisonSummary = await IntelligenceGateway.createCompletion({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "You are a cyber insurance analyst comparing two policies. Identify key differences in coverage, deductibles, and risk scores. Format as a HTML table fragment." },
-        { role: "user", content: `Compare these two policies side-by-side: ${comparisonContext}` }
-      ]
-    });
+ const comparisonSummary = await IntelligenceGateway.createCompletion({
+ model: "gpt-4o",
+ messages: [
+ { role: "system", content: "You are a cyber insurance analyst comparing two policies. Identify key differences in coverage, deductibles, and risk scores. Format as a HTML table fragment." },
+ { role: "user", content: `Compare these two policies side-by-side: ${comparisonContext}` }
+ ]
+ });
 
-    res.json({
-      policyA,
-      policyB,
-      comparisonSummary
-    });
-  } catch (error: any) {
-    console.error("[POLICY COMPARE]", error);
-    res.status(500).json({ message: error.message });
-  }
+ res.json({
+ policyA,
+ policyB,
+ comparisonSummary
+ });
+ } catch (error: any) {
+ console.error("[POLICY COMPARE]", error);
+ res.status(500).json({ message: error.message });
+ }
 });
 
 // ─── TRACK 3: DPO METRICS ──────────────────────────────────────────
 router.get("/dpo/metrics", isAuthenticated, async (req: any, res) => {
-  try {
-    const workspaceId = storageContext.getStore()?.workspaceId;
-    if (!workspaceId) return res.status(400).json({ message: "No workspace context" });
+ try {
+ const workspaceId = storageContext.getStore()?.workspaceId;
+ if (!workspaceId) return res.status(400).json({ message: "No workspace context" });
 
-    const [contracts, insurance, risks, audits] = await Promise.all([
-      storage.getContracts(),
-      storage.getInsurancePolicies(workspaceId),
-      storage.getRisks(),
-      storage.getComplianceAudits()
-    ]);
+ const [contracts, insurance, risks, audits] = await Promise.all([
+ storage.getContracts(),
+ storage.getInsurancePolicies(workspaceId),
+ storage.getRisks(),
+ storage.getComplianceAudits()
+ ]);
 
-    const filteredContracts = (contracts as any[]).filter(c => c.workspaceId === workspaceId);
-    const filteredRisks = (risks as any[]).filter(r => filteredContracts.some(c => c.id === r.contractId));
-    const scopeStandards = [...new Set((audits as any[]).flatMap(a => a.scope?.standards || []))].slice(0, 4);
+ const filteredContracts = (contracts as any[]).filter(c => c.workspaceId === workspaceId);
+ const filteredRisks = (risks as any[]).filter(r => filteredContracts.some(c => c.id === r.contractId));
+ const scopeStandards = [...new Set((audits as any[]).flatMap(a => a.scope?.standards || []))].slice(0, 4);
 
-    // Calculate Scores (Aggregated)
-    const complianceScore = Math.round(
-      filteredContracts.reduce((acc: number, c: any) => acc + (c.intelligenceAnalysis?.legalAlignmentScore || 85), 0) / 
-      (filteredContracts.length || 1)
-    );
+ // Calculate Scores (Aggregated)
+ const complianceScore = Math.round(
+ filteredContracts.reduce((acc: number, c: any) => acc + (c.intelligenceAnalysis?.legalAlignmentScore || 85), 0) / 
+ (filteredContracts.length || 1)
+ );
 
-    const readinessScore = Math.round(
-      filteredRisks.reduce((acc: number, r: any) => acc + (r.mitigationStatus === 'mitigated' ? 100 : 50), 0) /
-      (filteredRisks.length || 1)
-    );
+ const readinessScore = Math.round(
+ filteredRisks.reduce((acc: number, r: any) => acc + (r.mitigationStatus === 'mitigated' ? 100 : 50), 0) /
+ (filteredRisks.length || 1)
+ );
 
-    res.json({
-      complianceScore,
-      readinessScore,
-      dpasReviewed: filteredContracts.length,
-      openFindings: filteredRisks.length,
-      heatmap: scopeStandards.length > 0 ? scopeStandards.map((std: string) => {
-        const stdAudits = (audits as any[]).filter(a => a.workspaceId === workspaceId && a.scope?.standards?.includes(std));
-        const avgScore = stdAudits.length > 0
-          ? Math.round(stdAudits.reduce((acc: number, a: any) => acc + (a.overallComplianceScore || 0), 0) / stdAudits.length)
-          : 0;
-        
-        const colors: Record<string, string> = {
-          'GDPR': '#3b82f6',
-          'KDPA': '#06b6d4',
-          'CCPA': '#10b981',
-          'ISO27001': '#8b5cf6',
-          'IRA Kenya': '#f59e0b'
-        };
+ res.json({
+ complianceScore,
+ readinessScore,
+ dpasReviewed: filteredContracts.length,
+ openFindings: filteredRisks.length,
+ heatmap: scopeStandards.length > 0 ? scopeStandards.map((std: string) => {
+ const stdAudits = (audits as any[]).filter(a => a.workspaceId === workspaceId && a.scope?.standards?.includes(std));
+ const avgScore = stdAudits.length > 0
+ ? Math.round(stdAudits.reduce((acc: number, a: any) => acc + (a.overallComplianceScore || 0), 0) / stdAudits.length)
+ : 0;
+ 
+ const colors: Record<string, string> = {
+ 'GDPR': '#3b82f6',
+ 'KDPA': '#06b6d4',
+ 'CCPA': '#10b981',
+ 'ISO27001': '#8b5cf6',
+ 'IRA Kenya': '#f59e0b'
+ };
 
-        return { 
-          standard: std, 
-          score: avgScore || (std === 'KDPA' ? 92 : 85), // Fallback to baseline if no audits yet
-          color: colors[std] || '#64748b' 
-        };
-      }) : [
-        { standard: 'GDPR', score: 85, color: '#3b82f6' },
-        { standard: 'KDPA', score: 92, color: '#06b6d4' },
-        { standard: 'ISO27001', score: 88, color: '#8b5cf6' }
-      ],
-      readinessData: [
-        { subject: 'Privacy', A: complianceScore, fullMark: 100 },
-        { subject: 'Security', A: 88, fullMark: 100 },
-        { subject: 'SLA', A: 75, fullMark: 100 },
-        { subject: 'DPA', A: 92, fullMark: 100 }
-      ]
-    });
-  } catch (error: any) {
-    res.status(500).json({ message: "Failed to fetch DPO metrics" });
-  }
+ return { 
+ standard: std, 
+ score: avgScore || (std === 'KDPA' ? 92 : 85), // Fallback to baseline if no audits yet
+ color: colors[std] || '#64748b' 
+ };
+ }) : [
+ { standard: 'GDPR', score: 85, color: '#3b82f6' },
+ { standard: 'KDPA', score: 92, color: '#06b6d4' },
+ { standard: 'ISO27001', score: 88, color: '#8b5cf6' }
+ ],
+ readinessData: [
+ { subject: 'Privacy', A: complianceScore, fullMark: 100 },
+ { subject: 'Security', A: 88, fullMark: 100 },
+ { subject: 'SLA', A: 75, fullMark: 100 },
+ { subject: 'DPA', A: 92, fullMark: 100 }
+ ]
+ });
+ } catch (error: any) {
+ res.status(500).json({ message: "Failed to fetch DPO metrics" });
+ }
 });
 
 export default router;

@@ -9,138 +9,138 @@ import { SOC2Logger } from "../../services/SOC2Logger.js";
 const audioBodyParser = express.json({ limit: "50mb" });
 
 export function registerAudioRoutes(app: Express): void {
-  // Get all conversations
-  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const conversations = await chatStorage.getAllConversations();
-      res.json(conversations);
-    } catch (error) {
-      console.error("Error fetching conversations:", error);
-      res.status(500).json({ error: "Failed to fetch conversations" });
-    }
-  });
+ // Get all conversations
+ app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const conversations = await chatStorage.getAllConversations();
+ res.json(conversations);
+ } catch (error) {
+ console.error("Error fetching conversations:", error);
+ res.status(500).json({ error: "Failed to fetch conversations" });
+ }
+ });
 
-  // Get single conversation with messages
-  app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
-      const conversation = await chatStorage.getConversation(id);
-      if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found" });
-      }
-      const messages = await chatStorage.getMessagesByConversation(id);
-      res.json({ ...conversation, messages });
-    } catch (error) {
-      console.error("Error fetching conversation:", error);
-      res.status(500).json({ error: "Failed to fetch conversation" });
-    }
-  });
+ // Get single conversation with messages
+ app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
+ const conversation = await chatStorage.getConversation(id);
+ if (!conversation) {
+ return res.status(404).json({ error: "Conversation not found" });
+ }
+ const messages = await chatStorage.getMessagesByConversation(id);
+ res.json({ ...conversation, messages });
+ } catch (error) {
+ console.error("Error fetching conversation:", error);
+ res.status(500).json({ error: "Failed to fetch conversation" });
+ }
+ });
 
-  // Create new conversation
-  app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const { title } = req.body;
-      const conversation = await chatStorage.createConversation(title || "New Chat");
-      res.status(201).json(conversation);
-    } catch (error) {
-      console.error("Error creating conversation:", error);
-      res.status(500).json({ error: "Failed to create conversation" });
-    }
-  });
+ // Create new conversation
+ app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const { title } = req.body;
+ const conversation = await chatStorage.createConversation(title || "New Chat");
+ res.status(201).json(conversation);
+ } catch (error) {
+ console.error("Error creating conversation:", error);
+ res.status(500).json({ error: "Failed to create conversation" });
+ }
+ });
 
-  // Delete conversation
-  app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
-      await chatStorage.deleteConversation(id);
+ // Delete conversation
+ app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
+ try {
+ const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
+ await chatStorage.deleteConversation(id);
 
-      await SOC2Logger.logEvent(req as any, {
-        userId: (req as any).user.id,
-        action: "AUDIO_CONVERSATION_DELETED",
-        resourceType: "Conversation",
-        resourceId: String(id),
-        details: "User deleted an audio chat history."
-      });
+ await SOC2Logger.logEvent(req as any, {
+ userId: (req as any).user.id,
+ action: "AUDIO_CONVERSATION_DELETED",
+ resourceType: "Conversation",
+ resourceId: String(id),
+ details: "User deleted an audio chat history."
+ });
 
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting conversation:", error);
-      res.status(500).json({ error: "Failed to delete conversation" });
-    }
-  });
+ res.status(204).send();
+ } catch (error) {
+ console.error("Error deleting conversation:", error);
+ res.status(500).json({ error: "Failed to delete conversation" });
+ }
+ });
 
-  // Send voice message and get streaming audio response
-  app.post("/api/conversations/:id/messages", isAuthenticated, audioBodyParser, async (req: Request, res: Response) => {
-    try {
-      const conversationId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
-      const { audio, voice = "alloy" } = req.body;
+ // Send voice message and get streaming audio response
+ app.post("/api/conversations/:id/messages", isAuthenticated, audioBodyParser, async (req: Request, res: Response) => {
+ try {
+ const conversationId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id as string);
+ const { audio, voice = "alloy" } = req.body;
 
-      if (!audio) {
-        return res.status(400).json({ error: "Audio data (base64) is required" });
-      }
+ if (!audio) {
+ return res.status(400).json({ error: "Audio data (base64) is required" });
+ }
 
-      // 1. Auto-detect format and convert to OpenAI-compatible format
-      const rawBuffer = Buffer.from(audio, "base64");
-      const { buffer: audioBuffer, format: inputFormat } = await ensureCompatibleFormat(rawBuffer);
+ // 1. Auto-detect format and convert to OpenAI-compatible format
+ const rawBuffer = Buffer.from(audio, "base64");
+ const { buffer: audioBuffer, format: inputFormat } = await ensureCompatibleFormat(rawBuffer);
 
-      // 2. Transcribe user audio
-      const userTranscript = await speechToText(audioBuffer, inputFormat);
+ // 2. Transcribe user audio
+ const userTranscript = await speechToText(audioBuffer, inputFormat);
 
-      // 3. Save user message
-      await chatStorage.createMessage(conversationId, "user", userTranscript);
+ // 3. Save user message
+ await chatStorage.createMessage(conversationId, "user", userTranscript);
 
-      // 4. Get conversation history
-      const existingMessages = await chatStorage.getMessagesByConversation(conversationId);
-      const chatHistory = existingMessages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
+ // 4. Get conversation history
+ const existingMessages = await chatStorage.getMessagesByConversation(conversationId);
+ const chatHistory = existingMessages.map((m) => ({
+ role: m.role as "user" | "assistant",
+ content: m.content,
+ }));
 
-      // 5. Set up SSE
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
+ // 5. Set up SSE
+ res.setHeader("Content-Type", "text/event-stream");
+ res.setHeader("Cache-Control", "no-cache");
+ res.setHeader("Connection", "keep-alive");
 
-      res.write(`data: ${JSON.stringify({ type: "user_transcript", data: userTranscript })}\n\n`);
+ res.write(`data: ${JSON.stringify({ type: "user_transcript", data: userTranscript })}\n\n`);
 
-      // 6. Stream audio response from gpt-audio
-      const stream = await openai.chat.completions.create({
-        model: "gpt-audio",
-        modalities: ["text", "audio"],
-        audio: { voice, format: "pcm16" },
-        messages: chatHistory,
-        stream: true,
-      });
+ // 6. Stream audio response from gpt-audio
+ const stream = await openai.chat.completions.create({
+ model: "gpt-audio",
+ modalities: ["text", "audio"],
+ audio: { voice, format: "pcm16" },
+ messages: chatHistory,
+ stream: true,
+ });
 
-      let assistantTranscript = "";
+ let assistantTranscript = "";
 
-      for await (const chunk of stream) {
-        const delta = chunk.choices?.[0]?.delta as any;
-        if (!delta) continue;
+ for await (const chunk of stream) {
+ const delta = chunk.choices?.[0]?.delta as any;
+ if (!delta) continue;
 
-        if (delta?.audio?.transcript) {
-          assistantTranscript += delta.audio.transcript;
-          res.write(`data: ${JSON.stringify({ type: "transcript", data: delta.audio.transcript })}\n\n`);
-        }
+ if (delta?.audio?.transcript) {
+ assistantTranscript += delta.audio.transcript;
+ res.write(`data: ${JSON.stringify({ type: "transcript", data: delta.audio.transcript })}\n\n`);
+ }
 
-        if (delta?.audio?.data) {
-          res.write(`data: ${JSON.stringify({ type: "audio", data: delta.audio.data })}\n\n`);
-        }
-      }
+ if (delta?.audio?.data) {
+ res.write(`data: ${JSON.stringify({ type: "audio", data: delta.audio.data })}\n\n`);
+ }
+ }
 
-      // 7. Save assistant message
-      await chatStorage.createMessage(conversationId, "assistant", assistantTranscript);
+ // 7. Save assistant message
+ await chatStorage.createMessage(conversationId, "assistant", assistantTranscript);
 
-      res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantTranscript })}\n\n`);
-      res.end();
-    } catch (error) {
-      console.error("Error processing voice message:", error);
-      if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ type: "error", error: "Failed to process voice message" })}\n\n`);
-        res.end();
-      } else {
-        res.status(500).json({ error: "Failed to process voice message" });
-      }
-    }
-  });
+ res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantTranscript })}\n\n`);
+ res.end();
+ } catch (error) {
+ console.error("Error processing voice message:", error);
+ if (res.headersSent) {
+ res.write(`data: ${JSON.stringify({ type: "error", error: "Failed to process voice message" })}\n\n`);
+ res.end();
+ } else {
+ res.status(500).json({ error: "Failed to process voice message" });
+ }
+ }
+ });
 }

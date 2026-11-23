@@ -14,33 +14,33 @@ const router = Router();
  * from the Costloci global hub.
  */
 router.get("/contracts/:id/benchmarking", isAuthenticated, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
+ try {
+ const id = parseInt(req.params.id);
+ if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
 
-    // Security Guard: Verify ownership
-    const contract = await storage.getContract(id);
-    if (!contract || contract.workspaceId !== (req as any).user.workspaceId) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
+ // Security Guard: Verify ownership
+ const contract = await storage.getContract(id);
+ if (!contract || contract.workspaceId !== (req as any).user.workspaceId) {
+ return res.status(404).json({ message: "Contract not found" });
+ }
 
-    // Fetch market intelligence from storage engine
-    const benchmark = await storage.getMarketIntelligence(id);
-    
-    // Audit log for enterprise transparency
-    await SOC2Logger.logEvent(req as any, {
-        action: "MARKET_BENCHMARK_RETRIEVED",
-        userId: (req as any).user?.id || "SYSTEM",
-        resourceType: "Contract",
-        resourceId: String(id),
-        details: `Calculated market intelligence for ${benchmark.category}. Peer count: ${benchmark.peerCount}.`
-    });
+ // Fetch market intelligence from storage engine
+ const benchmark = await storage.getMarketIntelligence(id);
+ 
+ // Audit log for enterprise transparency
+ await SOC2Logger.logEvent(req as any, {
+ action: "MARKET_BENCHMARK_RETRIEVED",
+ userId: (req as any).user?.id || "SYSTEM",
+ resourceType: "Contract",
+ resourceId: String(id),
+ details: `Calculated market intelligence for ${benchmark.category}. Peer count: ${benchmark.peerCount}.`
+ });
 
-    res.json(benchmark);
-  } catch (error: any) {
-    console.error("[INTELLIGENCE API ERROR]", error.message);
-    res.status(500).json({ message: "Failed to fetch market benchmarking data." });
-  }
+ res.json(benchmark);
+ } catch (error: any) {
+ console.error("[INTELLIGENCE API ERROR]", error.message);
+ res.status(500).json({ message: "Failed to fetch market benchmarking data." });
+ }
 });
 
 /**
@@ -48,34 +48,34 @@ router.get("/contracts/:id/benchmarking", isAuthenticated, async (req, res) => {
  * Advanced AI-driven clause generation for specific jurisdictions.
  */
 router.post("/intelligence/generate-clause", isAuthenticated, async (req: any, res) => {
-  try {
-    const { category, requirements, standards = ["KDPA"], tone = "balanced", risks = [] } = req.body;
-    
-    if (!category || !requirements) {
-      return res.status(400).json({ message: "Category and requirements are required." });
-    }
+ try {
+ const { category, requirements, standards = ["KDPA"], tone = "balanced", risks = [] } = req.body;
+ 
+ if (!category || !requirements) {
+ return res.status(400).json({ message: "Category and requirements are required." });
+ }
 
-    const result = await IntelligenceGateway.generateClauseIntelligence({
-      category,
-      standards,
-      requirements,
-      risks,
-      tone
-    });
-    
-    await SOC2Logger.logEvent(req, {
-      action: "CLAUSE_GENERATED",
-      userId: req.user.id,
-      resourceType: "Intelligence",
-      resourceId: category,
-      details: `Generated high-fidelity ${category} clause.`
-    });
+ const result = await IntelligenceGateway.generateClauseIntelligence({
+ category,
+ standards,
+ requirements,
+ risks,
+ tone
+ });
+ 
+ await SOC2Logger.logEvent(req, {
+ action: "CLAUSE_GENERATED",
+ userId: req.user.id,
+ resourceType: "Intelligence",
+ resourceId: category,
+ details: `Generated high-fidelity ${category} clause.`
+ });
 
-    res.json(result);
-  } catch (error: any) {
-    console.error("[INTELLIGENCE API ERROR]", error.message);
-    res.status(500).json({ message: "Clause generation failed." });
-  }
+ res.json(result);
+ } catch (error: any) {
+ console.error("[INTELLIGENCE API ERROR]", error.message);
+ res.status(500).json({ message: "Clause generation failed." });
+ }
 });
 
 /**
@@ -83,48 +83,48 @@ router.post("/intelligence/generate-clause", isAuthenticated, async (req: any, r
  * Compares a contract clause against the standard library and identifies deviations.
  */
 router.post("/intelligence/compare-clauses", isAuthenticated, async (req: any, res) => {
-  try {
-    const { contractClauseId, libraryClauseId, contractText } = req.body;
-    
-    let comparisonText = contractText;
-    let category = "General";
+ try {
+ const { contractClauseId, libraryClauseId, contractText } = req.body;
+ 
+ let comparisonText = contractText;
+ let category = "General";
 
-    if (contractClauseId) {
-      const clauses = await storage.getContractClauses();
-      const contractClause = clauses.find(c => c.id === contractClauseId);
-      if (contractClause) {
-        // Security Guard: Check if the contract belongs to the user's workspace
-        const contract = await storage.getContract(contractClause.contractId);
-        if (!contract || contract.workspaceId !== req.user.workspaceId) {
-          return res.status(403).json({ message: "Access denied to this clause" });
-        }
-        comparisonText = contractClause.content;
-        category = contractClause.category;
-      }
-    }
+ if (contractClauseId) {
+ const clauses = await storage.getContractClauses();
+ const contractClause = clauses.find(c => c.id === contractClauseId);
+ if (contractClause) {
+ // Security Guard: Check if the contract belongs to the user's workspace
+ const contract = await storage.getContract(contractClause.contractId);
+ if (!contract || contract.workspaceId !== req.user.workspaceId) {
+ return res.status(403).json({ message: "Access denied to this clause" });
+ }
+ comparisonText = contractClause.content;
+ category = contractClause.category;
+ }
+ }
 
-    const library = await storage.getClauseLibrary();
-    const standardClause = library.find(c => c.id === libraryClauseId);
+ const library = await storage.getClauseLibrary();
+ const standardClause = library.find(c => c.id === libraryClauseId);
 
-    if (!standardClause) {
-      return res.status(404).json({ message: "Standard library clause not found." });
-    }
+ if (!standardClause) {
+ return res.status(404).json({ message: "Standard library clause not found." });
+ }
 
-    if (!comparisonText) {
-      return res.status(400).json({ message: "Contract text or clause ID is required." });
-    }
+ if (!comparisonText) {
+ return res.status(400).json({ message: "Contract text or clause ID is required." });
+ }
 
-    const comparison = await IntelligenceGateway.compareClauseIntelligence(
-      comparisonText,
-      standardClause.standardLanguage,
-      standardClause.clauseCategory || category
-    );
+ const comparison = await IntelligenceGateway.compareClauseIntelligence(
+ comparisonText,
+ standardClause.standardLanguage,
+ standardClause.clauseCategory || category
+ );
 
-    res.json(comparison);
-  } catch (error: any) {
-    console.error("[INTELLIGENCE API ERROR]", error.message);
-    res.status(500).json({ message: "Clause comparison failed." });
-  }
+ res.json(comparison);
+ } catch (error: any) {
+ console.error("[INTELLIGENCE API ERROR]", error.message);
+ res.status(500).json({ message: "Clause comparison failed." });
+ }
 });
 
 /**
@@ -132,21 +132,21 @@ router.post("/intelligence/compare-clauses", isAuthenticated, async (req: any, r
  * Fetches the version history of a contract.
  */
 router.get("/contracts/:id/versions", isAuthenticated, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
+ try {
+ const id = parseInt(req.params.id);
+ if (isNaN(id)) return res.status(400).json({ message: "Invalid contract ID" });
 
-    // Security Guard: Verify ownership
-    const contract = await storage.getContract(id);
-    if (!contract || contract.workspaceId !== (req as any).user.workspaceId) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
+ // Security Guard: Verify ownership
+ const contract = await storage.getContract(id);
+ if (!contract || contract.workspaceId !== (req as any).user.workspaceId) {
+ return res.status(404).json({ message: "Contract not found" });
+ }
 
-    const versions = await storage.getContractVersions(id);
-    res.json(versions);
-  } catch (error: any) {
-    res.status(500).json({ message: "Failed to fetch version history." });
-  }
+ const versions = await storage.getContractVersions(id);
+ res.json(versions);
+ } catch (error: any) {
+ res.status(500).json({ message: "Failed to fetch version history." });
+ }
 });
 
 /**
@@ -154,40 +154,40 @@ router.get("/contracts/:id/versions", isAuthenticated, async (req, res) => {
  * Creates a new version for a contract (e.g., after a manual upload or automated remediation).
  */
 router.post("/contracts/:id/versions", isAuthenticated, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { fileUrl, changesSummary } = req.body;
-    
-    if (isNaN(id) || !fileUrl) {
-      return res.status(400).json({ message: "Contract ID and file URL are required." });
-    }
+ try {
+ const id = parseInt(req.params.id);
+ const { fileUrl, changesSummary } = req.body;
+ 
+ if (isNaN(id) || !fileUrl) {
+ return res.status(400).json({ message: "Contract ID and file URL are required." });
+ }
 
-    // Security Guard: Verify ownership
-    const contract = await storage.getContract(id);
-    if (!contract || contract.workspaceId !== req.user.workspaceId) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
+ // Security Guard: Verify ownership
+ const contract = await storage.getContract(id);
+ if (!contract || contract.workspaceId !== req.user.workspaceId) {
+ return res.status(404).json({ message: "Contract not found" });
+ }
 
-    const existingVersions = await storage.getContractVersions(id);
-    const nextVersion = existingVersions.length > 0 
-      ? Math.max(...existingVersions.map((v: any) => v.versionNumber)) + 1 
-      : 1;
+ const existingVersions = await storage.getContractVersions(id);
+ const nextVersion = existingVersions.length > 0 
+ ? Math.max(...existingVersions.map((v: any) => v.versionNumber)) + 1 
+ : 1;
 
-    const version = await storage.createContractVersion({
-      contractId: id,
-      versionNumber: nextVersion,
-      fileUrl,
-      changesSummary: changesSummary || `Manual version ${nextVersion} upload.`,
-      createdBy: req.user.id
-    });
+ const version = await storage.createContractVersion({
+ contractId: id,
+ versionNumber: nextVersion,
+ fileUrl,
+ changesSummary: changesSummary || `Manual version ${nextVersion} upload.`,
+ createdBy: req.user.id
+ });
 
-    // Optionally update the main contract record to point to this new fileUrl
-    await storage.updateContract(id, { fileUrl });
+ // Optionally update the main contract record to point to this new fileUrl
+ await storage.updateContract(id, { fileUrl });
 
-    res.json(version);
-  } catch (error: any) {
-    res.status(500).json({ message: "Failed to create new version." });
-  }
+ res.json(version);
+ } catch (error: any) {
+ res.status(500).json({ message: "Failed to create new version." });
+ }
 });
 
 export default router;

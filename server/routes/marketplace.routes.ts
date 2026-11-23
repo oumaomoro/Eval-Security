@@ -13,13 +13,13 @@ const router = Router();
  * Lists all available clause templates for purchase.
  */
 router.get("/marketplace/listings", isAuthenticated, async (req: any, res) => {
-  try {
-    const listings = await storage.getMarketplaceListings();
-    res.json(listings);
-  } catch (error: any) {
-    console.error("[MARKETPLACE LISTINGS]", error.message);
-    res.status(500).json({ message: "Failed to fetch marketplace listings." });
-  }
+ try {
+ const listings = await storage.getMarketplaceListings();
+ res.json(listings);
+ } catch (error: any) {
+ console.error("[MARKETPLACE LISTINGS]", error.message);
+ res.status(500).json({ message: "Failed to fetch marketplace listings." });
+ }
 });
 
 /**
@@ -27,15 +27,15 @@ router.get("/marketplace/listings", isAuthenticated, async (req: any, res) => {
  * Returns listings created by the current authenticated user.
  */
 router.get("/marketplace/my-listings", isAuthenticated, async (req: any, res) => {
-  try {
-    const listings = await storage.getMarketplaceListings();
-    // Filter by sellerId if storage method doesn't support it directly
-    const myListings = listings.filter(l => l.sellerId === req.user.id);
-    res.json(myListings);
-  } catch (error: any) {
-    console.error("[MARKETPLACE MY LISTINGS]", error.message);
-    res.status(500).json({ message: "Failed to fetch your listings." });
-  }
+ try {
+ const listings = await storage.getMarketplaceListings();
+ // Filter by sellerId if storage method doesn't support it directly
+ const myListings = listings.filter(l => l.sellerId === req.user.id);
+ res.json(myListings);
+ } catch (error: any) {
+ console.error("[MARKETPLACE MY LISTINGS]", error.message);
+ res.status(500).json({ message: "Failed to fetch your listings." });
+ }
 });
 
 /**
@@ -43,40 +43,40 @@ router.get("/marketplace/my-listings", isAuthenticated, async (req: any, res) =>
  * Allows legal professionals to list their clauses for sale.
  */
 router.post("/marketplace/listings", isAuthenticated, async (req: any, res) => {
-  try {
-    const { title, description, category, content, price } = req.body;
-    
-    if (!title || !category || !content || price === undefined) {
-      return res.status(400).json({ message: "Missing required listing fields." });
-    }
+ try {
+ const { title, description, category, content, price } = req.body;
+ 
+ if (!title || !category || !content || price === undefined) {
+ return res.status(400).json({ message: "Missing required listing fields." });
+ }
 
-    const listing = await storage.createMarketplaceListing({
-      sellerId: req.user.id,
-      workspaceId: storageContext.getStore()?.workspaceId,
-      title,
-      description,
-      category,
-      content,
-      price: parseFloat(price),
-      currency: "USD",
-      rating: 0,
-      salesCount: 0,
-      isVerified: false
-    });
+ const listing = await storage.createMarketplaceListing({
+ sellerId: req.user.id,
+ workspaceId: storageContext.getStore()?.workspaceId,
+ title,
+ description,
+ category,
+ content,
+ price: parseFloat(price),
+ currency: "USD",
+ rating: 0,
+ salesCount: 0,
+ isVerified: false
+ });
 
-    await SOC2Logger.logEvent(req, {
-      action: "MARKETPLACE_LISTING_CREATED",
-      userId: req.user.id,
-      resourceType: "MarketplaceListing",
-      resourceId: String(listing.id),
-      details: `New clause listing created: ${title}`
-    });
+ await SOC2Logger.logEvent(req, {
+ action: "MARKETPLACE_LISTING_CREATED",
+ userId: req.user.id,
+ resourceType: "MarketplaceListing",
+ resourceId: String(listing.id),
+ details: `New clause listing created: ${title}`
+ });
 
-    res.status(201).json(listing);
-  } catch (error: any) {
-    console.error("[MARKETPLACE CREATE]", error.message);
-    res.status(500).json({ message: "Failed to create listing." });
-  }
+ res.status(201).json(listing);
+ } catch (error: any) {
+ console.error("[MARKETPLACE CREATE]", error.message);
+ res.status(500).json({ message: "Failed to create listing." });
+ }
 });
 
 /**
@@ -84,54 +84,54 @@ router.post("/marketplace/listings", isAuthenticated, async (req: any, res) => {
  * Process a purchase for a clause template.
  */
 router.post("/marketplace/purchase", isAuthenticated, async (req: any, res) => {
-  try {
-    const { listingId } = req.body;
-    const workspaceId = storageContext.getStore()?.workspaceId;
+ try {
+ const { listingId } = req.body;
+ const workspaceId = storageContext.getStore()?.workspaceId;
 
-    if (!listingId || !workspaceId) {
-      return res.status(400).json({ message: "Missing listing identity or workspace context." });
-    }
+ if (!listingId || !workspaceId) {
+ return res.status(400).json({ message: "Missing listing identity or workspace context." });
+ }
 
-    const listing = await storage.getMarketplaceListing(listingId);
-    if (!listing) return res.status(404).json({ message: "Listing not found." });
+ const listing = await storage.getMarketplaceListing(listingId);
+ if (!listing) return res.status(404).json({ message: "Listing not found." });
 
-    // ── TRACK 3: PAYPAL MARKETPLACE CHECKOUT ────────────────────────
-    // Calculate commission (70% Seller / 30% Platform)
-    const platformFee = listing.price * 0.3;
-    const sellerShare = listing.price * 0.7;
+ // ── TRACK 3: PAYPAL MARKETPLACE CHECKOUT ────────────────────────
+ // Calculate commission (70% Seller / 30% Platform)
+ const platformFee = listing.price * 0.3;
+ const sellerShare = listing.price * 0.7;
 
-    // Trigger Real Purchase Record (No simulations in Phase 27)
-    // Supports PayPal & Paystack Priority (User Requirement Phase 27)
-    const transactionId = `PAY-${randomUUID().substring(0, 8).toUpperCase()}`;
-    
-    await storage.createMarketplacePurchase({
-      buyerWorkspaceId: workspaceId,
-      buyerId: req.user.id,
-      listingId: parseInt(listingId),
-      amount: listing.price,
-      platformFee,
-      sellerPayout: sellerShare,
-      status: "pending",
-      transactionId
-    });
+ // Trigger Real Purchase Record (No simulations in Phase 27)
+ // Supports PayPal & Paystack Priority (User Requirement Phase 27)
+ const transactionId = `PAY-${randomUUID().substring(0, 8).toUpperCase()}`;
+ 
+ await storage.createMarketplacePurchase({
+ buyerWorkspaceId: workspaceId,
+ buyerId: req.user.id,
+ listingId: parseInt(listingId),
+ amount: listing.price,
+ platformFee,
+ sellerPayout: sellerShare,
+ status: "pending",
+ transactionId
+ });
 
-    await SOC2Logger.logEvent(req, {
-      action: "MARKETPLACE_ORDER_CREATED",
-      userId: req.user.id,
-      resourceType: "MarketplaceListing",
-      resourceId: String(listing.id),
-      details: `PayPal checkout initiated. Transaction: ${transactionId}, Price: ${listing.price}`
-    });
+ await SOC2Logger.logEvent(req, {
+ action: "MARKETPLACE_ORDER_CREATED",
+ userId: req.user.id,
+ resourceType: "MarketplaceListing",
+ resourceId: String(listing.id),
+ details: `PayPal checkout initiated. Transaction: ${transactionId}, Price: ${listing.price}`
+ });
 
-    res.json({ 
-      url: `${process.env.FRONTEND_URL}/marketplace/checkout?orderId=${transactionId}&listingId=${listingId}`,
-      commission: { platformFee, sellerShare },
-      transactionId
-    });
-  } catch (error: any) {
-    console.error("[MARKETPLACE PURCHASE]", error.message);
-    res.status(500).json({ message: "Checkout failed: " + error.message });
-  }
+ res.json({ 
+ url: `${process.env.FRONTEND_URL}/marketplace/checkout?orderId=${transactionId}&listingId=${listingId}`,
+ commission: { platformFee, sellerShare },
+ transactionId
+ });
+ } catch (error: any) {
+ console.error("[MARKETPLACE PURCHASE]", error.message);
+ res.status(500).json({ message: "Checkout failed: " + error.message });
+ }
 });
 
 /**
@@ -139,20 +139,20 @@ router.post("/marketplace/purchase", isAuthenticated, async (req: any, res) => {
  * AI-driven benchmarking against verified marketplace clauses.
  */
 router.get("/marketplace/benchmark/:contractId", isAuthenticated, async (req: any, res) => {
-  try {
-    const contractId = parseInt(req.params.contractId);
-    
-    // Security Guard: Verify ownership
-    const contract = await storage.getContract(contractId);
-    if (!contract || contract.workspaceId !== req.user.workspaceId) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
+ try {
+ const contractId = parseInt(req.params.contractId);
+ 
+ // Security Guard: Verify ownership
+ const contract = await storage.getContract(contractId);
+ if (!contract || contract.workspaceId !== req.user.workspaceId) {
+ return res.status(404).json({ message: "Contract not found" });
+ }
 
-    const benchmark = await MarketplaceService.benchmarkAgainstMarketplace(contractId);
-    res.json(benchmark);
-  } catch (error: any) {
-    res.status(500).json({ message: "Marketplace benchmarking failed." });
-  }
+ const benchmark = await MarketplaceService.benchmarkAgainstMarketplace(contractId);
+ res.json(benchmark);
+ } catch (error: any) {
+ res.status(500).json({ message: "Marketplace benchmarking failed." });
+ }
 });
 
 /**
@@ -160,20 +160,20 @@ router.get("/marketplace/benchmark/:contractId", isAuthenticated, async (req: an
  * Suggests cyber insurance coverage limits based on financial exposure.
  */
 router.get("/marketplace/insurance-suggestion/:contractId", isAuthenticated, async (req: any, res) => {
-  try {
-    const contractId = parseInt(req.params.contractId);
+ try {
+ const contractId = parseInt(req.params.contractId);
 
-    // Security Guard: Verify ownership
-    const contract = await storage.getContract(contractId);
-    if (!contract || contract.workspaceId !== req.user.workspaceId) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
+ // Security Guard: Verify ownership
+ const contract = await storage.getContract(contractId);
+ if (!contract || contract.workspaceId !== req.user.workspaceId) {
+ return res.status(404).json({ message: "Contract not found" });
+ }
 
-    const suggestion = await MarketplaceService.suggestInsurance(contractId);
-    res.json(suggestion);
-  } catch (error: any) {
-    res.status(500).json({ message: "Insurance suggestion failed." });
-  }
+ const suggestion = await MarketplaceService.suggestInsurance(contractId);
+ res.json(suggestion);
+ } catch (error: any) {
+ res.status(500).json({ message: "Insurance suggestion failed." });
+ }
 });
 
 
@@ -182,30 +182,30 @@ router.get("/marketplace/insurance-suggestion/:contractId", isAuthenticated, asy
  * Allows sellers to update their listings.
  */
 router.put("/marketplace/listings/:id", isAuthenticated, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const listing = await storage.getMarketplaceListing(id);
-    
-    if (!listing) return res.status(404).json({ message: "Listing not found." });
-    if (listing.sellerId !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: "Access denied." });
-    }
+ try {
+ const id = parseInt(req.params.id);
+ const listing = await storage.getMarketplaceListing(id);
+ 
+ if (!listing) return res.status(404).json({ message: "Listing not found." });
+ if (listing.sellerId !== req.user.id && req.user.role !== 'admin') {
+ return res.status(403).json({ message: "Access denied." });
+ }
 
-    const { title, description, category, content, price } = req.body;
-    
-    const updatedListing = await storage.updateMarketplaceListing(id, {
-        title,
-        description,
-        category,
-        content,
-        price: price !== undefined ? parseFloat(price) : undefined
-    });
+ const { title, description, category, content, price } = req.body;
+ 
+ const updatedListing = await storage.updateMarketplaceListing(id, {
+ title,
+ description,
+ category,
+ content,
+ price: price !== undefined ? parseFloat(price) : undefined
+ });
 
-    res.json(updatedListing);
-  } catch (error: any) {
-    console.error("[MARKETPLACE UPDATE]", error.message);
-    res.status(500).json({ message: "Failed to update listing." });
-  }
+ res.json(updatedListing);
+ } catch (error: any) {
+ console.error("[MARKETPLACE UPDATE]", error.message);
+ res.status(500).json({ message: "Failed to update listing." });
+ }
 });
 
 /**
@@ -213,21 +213,21 @@ router.put("/marketplace/listings/:id", isAuthenticated, async (req: any, res) =
  * Allows sellers to remove their listings.
  */
 router.delete("/marketplace/listings/:id", isAuthenticated, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const listing = await storage.getMarketplaceListing(id);
-    
-    if (!listing) return res.status(404).json({ message: "Listing not found." });
-    if (listing.sellerId !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: "Access denied." });
-    }
+ try {
+ const id = parseInt(req.params.id);
+ const listing = await storage.getMarketplaceListing(id);
+ 
+ if (!listing) return res.status(404).json({ message: "Listing not found." });
+ if (listing.sellerId !== req.user.id && req.user.role !== 'admin') {
+ return res.status(403).json({ message: "Access denied." });
+ }
 
-    await storage.deleteMarketplaceListing(id);
-    res.json({ success: true, message: "Listing removed." });
-  } catch (error: any) {
-    console.error("[MARKETPLACE DELETE]", error.message);
-    res.status(500).json({ message: "Failed to remove listing." });
-  }
+ await storage.deleteMarketplaceListing(id);
+ res.json({ success: true, message: "Listing removed." });
+ } catch (error: any) {
+ console.error("[MARKETPLACE DELETE]", error.message);
+ res.status(500).json({ message: "Failed to remove listing." });
+ }
 });
 
 

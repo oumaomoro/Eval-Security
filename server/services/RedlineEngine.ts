@@ -2,67 +2,67 @@ import { storage } from "../storage.js";
 import { type Contract } from "../../shared/schema.js";
 
 export class RedlineEngine {
-  /**
-   * Generates a concrete redline remediation suggestion based on a preexisting Library Clause.
-   */
-  static async generateSuggestionFromClauseId(contractId: number, workspaceId: number, clauseId: number, triggeredByRuleId?: number): Promise<void> {
-    try {
-      // For a robust system, this might look up the explicit library clause
-      // Since `clauseLibrary` exists but its methods in IStorage might be sparse,
-      // we'll attempt a direct DB fetch or simulate a standardized insert based on the rule.
-      
-      const clause = await storage.getClauseLibrary().then(libs => libs.find(l => l.id === clauseId));
-      if (!clause) {
-        throw new Error(`Target remediation clause ID ${clauseId} not found in library.`);
-      }
+ /**
+ * Generates a concrete redline remediation suggestion based on a preexisting Library Clause.
+ */
+ static async generateSuggestionFromClauseId(contractId: number, workspaceId: number, clauseId: number, triggeredByRuleId?: number): Promise<void> {
+ try {
+ // For a robust system, this might look up the explicit library clause
+ // Since `clauseLibrary` exists but its methods in IStorage might be sparse,
+ // we'll attempt a direct DB fetch or simulate a standardized insert based on the rule.
+ 
+ const clause = await storage.getClauseLibrary().then(libs => libs.find(l => l.id === clauseId));
+ if (!clause) {
+ throw new Error(`Target remediation clause ID ${clauseId} not found in library.`);
+ }
 
-      await storage.createRemediationSuggestion({
-        workspaceId,
-        contractId,
-        clauseTitle: clause.clauseName || "Library Recommendation",
-        originalText: "Missing Mandatory Provision", // In sophisticated iterations, IntelligenceGateway provides the exact excerpt
-        suggestedText: clause.standardLanguage,
-        status: "pending",
-        ruleId: triggeredByRuleId,
-      });
+ await storage.createRemediationSuggestion({
+ workspaceId,
+ contractId,
+ clauseTitle: clause.clauseName || "Library Recommendation",
+ originalText: "Missing Mandatory Provision", // In sophisticated iterations, IntelligenceGateway provides the exact excerpt
+ suggestedText: clause.standardLanguage,
+ status: "pending",
+ ruleId: triggeredByRuleId,
+ });
 
-    } catch (err: any) {
-      console.error(`[RedlineEngine] Error generating specific suggestion for Contract ${contractId}:`, err);
-    }
-  }
+ } catch (err: any) {
+ console.error(`[RedlineEngine] Error generating specific suggestion for Contract ${contractId}:`, err);
+ }
+ }
 
-  /**
-   * Generates a generic semantic suggestion payload without pointing to an explicit library clause.
-   */
-  static async generateGenericSuggestion(contractId: number, workspaceId: number, genericMessage: string, triggeredByRuleId?: number): Promise<void> {
-    try {
-      await storage.createRemediationSuggestion({
-        workspaceId,
-        contractId,
-        clauseTitle: "Remediation Recommendation",
-        originalText: "[Section Missing or Deficient]",
-        suggestedText: genericMessage,
-        status: "pending",
-        ruleId: triggeredByRuleId,
-      });
-    } catch (err: any) {
-      console.error(`[RedlineEngine] Error generating generic suggestion for Contract ${contractId}:`, err);
-    }
-  }
+ /**
+ * Generates a generic semantic suggestion payload without pointing to an explicit library clause.
+ */
+ static async generateGenericSuggestion(contractId: number, workspaceId: number, genericMessage: string, triggeredByRuleId?: number): Promise<void> {
+ try {
+ await storage.createRemediationSuggestion({
+ workspaceId,
+ contractId,
+ clauseTitle: "Remediation Recommendation",
+ originalText: "[Section Missing or Deficient]",
+ suggestedText: genericMessage,
+ status: "pending",
+ ruleId: triggeredByRuleId,
+ });
+ } catch (err: any) {
+ console.error(`[RedlineEngine] Error generating generic suggestion for Contract ${contractId}:`, err);
+ }
+ }
 
-  /**
-   * Accepts the redline suggestion, transitioning its status.
-   */
-  static async acceptRedline(suggestionId: string, userId: string): Promise<void> {
-    try {
-      await storage.updateRemediationSuggestion(suggestionId, {
-        status: "accepted",
-        acceptedAt: new Date(),
-        userId: userId
-      });
-    } catch (err: any) {
-      console.error(`[RedlineEngine] Failed to accept Redline Version ${suggestionId}:`, err);
-      throw err;
-    }
-  }
+ /**
+ * Accepts the redline suggestion, transitioning its status.
+ */
+ static async acceptRedline(suggestionId: string, userId: string): Promise<void> {
+ try {
+ await storage.updateRemediationSuggestion(suggestionId, {
+ status: "accepted",
+ acceptedAt: new Date(),
+ userId: userId
+ });
+ } catch (err: any) {
+ console.error(`[RedlineEngine] Failed to accept Redline Version ${suggestionId}:`, err);
+ throw err;
+ }
+ }
 }

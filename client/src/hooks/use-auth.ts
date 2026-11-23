@@ -5,77 +5,77 @@ import { useEffect } from "react";
 import { identifyUser, resetIdentity } from "@/lib/observability";
 
 async function fetchUser(): Promise<User | null> {
-  try {
-    const response = await fetch(getApiUrl("/api/auth/user"), {
-      credentials: "include"
-    });
+ try {
+ const response = await fetch(getApiUrl("/api/auth/user"), {
+ credentials: "include"
+ });
 
-    if (response.status === 401 || response.status === 403) {
-      return null;
-    }
+ if (response.status === 401 || response.status === 403) {
+ return null;
+ }
 
-    if (!response.ok) {
-        // Log Error but don't crash, return null to show Auth Page
-        console.error(`[Auth] Backend responded with ${response.status}: ${response.statusText}`);
-        return null; 
-    }
+ if (!response.ok) {
+ // Log Error but don't crash, return null to show Auth Page
+ console.error(`[Auth] Backend responded with ${response.status}: ${response.statusText}`);
+ return null; 
+ }
 
-    const data = await response.json();
-    return data.user || data;
-  } catch (error: any) {
-    // Prevent spinner-lock on network/DNS/Infrastructure errors
-    console.error('[Auth] Caught infrastructure error during fetchUser:', error.message);
-    return null;
-  }
+ const data = await response.json();
+ return data.user || data;
+ } catch (error: any) {
+ // Prevent spinner-lock on network/DNS/Infrastructure errors
+ console.error('[Auth] Caught infrastructure error during fetchUser:', error.message);
+ return null;
+ }
 }
 
 async function logout(): Promise<void> {
-  // CRITICAL FIX: Use absolute URL so logout works in production where
-  // frontend (costloci.com) and backend (api.costloci.com) are cross-domain.
-  try {
-    await fetch(getApiUrl("/api/auth/logout"), {
-      method: "POST",
-      credentials: "include"
-    });
-  } catch (e) {
-    console.warn("[Auth] Logout request failed, clearing client-side state anyway.");
-  }
-  resetIdentity();
-  window.location.href = "/auth";
+ // CRITICAL FIX: Use absolute URL so logout works in production where
+ // frontend (costloci.com) and backend (api.costloci.com) are cross-domain.
+ try {
+ await fetch(getApiUrl("/api/auth/logout"), {
+ method: "POST",
+ credentials: "include"
+ });
+ } catch (e) {
+ console.warn("[Auth] Logout request failed, clearing client-side state anyway.");
+ }
+ resetIdentity();
+ window.location.href = "/auth";
 }
 
 export function useAuth() {
-  const queryClient = useQueryClient();
-  const { data: user, isLoading, isError } = useQuery<User | null>({
-    queryKey: ["/api/auth/user"],
-    queryFn: fetchUser,
-    retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+ const queryClient = useQueryClient();
+ const { data: user, isLoading, isError } = useQuery<User | null>({
+ queryKey: ["/api/auth/user"],
+ queryFn: fetchUser,
+ retry: false,
+ staleTime: 1000 * 60 * 5, // 5 minutes
+ });
 
-  // Track user identity in observability tools when session is established
-  useEffect(() => {
-    if (user && user.id) {
-      identifyUser(user.id.toString(), user.email || "", {
-        clientId: user.clientId,
-        role: user.role
-      });
-    }
-  }, [user]);
+ // Track user identity in observability tools when session is established
+ useEffect(() => {
+ if (user && user.id) {
+ identifyUser(user.id.toString(), user.email || "", {
+ clientId: user.clientId,
+ role: user.role
+ });
+ }
+ }, [user]);
 
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/user"], null);
-    },
-  });
+ const logoutMutation = useMutation({
+ mutationFn: logout,
+ onSuccess: () => {
+ queryClient.setQueryData(["/api/auth/user"], null);
+ },
+ });
 
-  return {
-    user: user as User | null,
-    isLoading,
-    isError,
-    isAuthenticated: !!user,
-    logout: logoutMutation.mutate,
-    isLoggingOut: logoutMutation.isPending,
-  };
+ return {
+ user: user as User | null,
+ isLoading,
+ isError,
+ isAuthenticated: !!user,
+ logout: logoutMutation.mutate,
+ isLoggingOut: logoutMutation.isPending,
+ };
 }

@@ -11,198 +11,198 @@ import type { Report, ReportSchedule } from "../../shared/schema.js";
  * executive summaries, compliance artifacts, and savings trackers.
  */
 export class ReportService {
-  /**
-   * Generates a new report artifact based on requested type and scope.
-   */
-  static async generateReport(workspaceId: number, type: string, filters: any = {}): Promise<Report> {
+ /**
+ * Generates a new report artifact based on requested type and scope.
+ */
+ static async generateReport(workspaceId: number, type: string, filters: any = {}): Promise<Report> {
 
-    // 1. Fetch relevant data clusters
-    const [contracts, compliance, risks, savings, scorecards] = await Promise.all([
-      storage.getContracts({}),
-      storage.getComplianceAudits(), // Filtered later
-      storage.getRisks(),
-      storage.getSavingsOpportunities(),
-      storage.getVendorScorecards()
-    ]);
+ // 1. Fetch relevant data clusters
+ const [contracts, compliance, risks, savings, scorecards] = await Promise.all([
+ storage.getContracts({}),
+ storage.getComplianceAudits(), // Filtered later
+ storage.getRisks(),
+ storage.getSavingsOpportunities(),
+ storage.getVendorScorecards()
+ ]);
 
-    // 3. Synthesize Intelligence Payload with AI Executive Summary
-    const { cachedCompletion } = await import("./openai.js");
-    
-    const aiPrompt = `You are an expert Cybersecurity Strategist. 
-    Synthesize an executive summary for this organization based on the following data points:
-    - Total Contracts: ${contracts.length}
-    - Total Annual Spend: $${contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0)}
-    - Compliance Health: ${this.calculateComplianceHealth(compliance, workspaceId)}%
-    - Critical Risks: ${risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length}
-    - Savings Identified: $${savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0)}
-    - Vendor Performance (Avg Score): ${scorecards.length > 0 ? (scorecards.reduce((sum, s) => sum + (s.complianceScore || 0), 0) / scorecards.length).toFixed(1) : 'N/A'}
-    
-    Write a 2-paragraph professional assessment. Paragraph 1: Strategic Posture. Paragraph 2: Priority Actions.
-    Return only the summary text.`;
+ // 3. Synthesize Intelligence Payload with AI Executive Summary
+ const { cachedCompletion } = await import("./openai.js");
+ 
+ const aiPrompt = `You are an expert Cybersecurity Strategist. 
+ Synthesize an executive summary for this organization based on the following data points:
+ - Total Contracts: ${contracts.length}
+ - Total Annual Spend: $${contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0)}
+ - Compliance Health: ${this.calculateComplianceHealth(compliance, workspaceId)}%
+ - Critical Risks: ${risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length}
+ - Savings Identified: $${savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0)}
+ - Vendor Performance (Avg Score): ${scorecards.length > 0 ? (scorecards.reduce((sum, s) => sum + (s.complianceScore || 0), 0) / scorecards.length).toFixed(1) : 'N/A'}
+ 
+ Write a 2-paragraph professional assessment. Paragraph 1: Strategic Posture. Paragraph 2: Priority Actions.
+ Return only the summary text.`;
 
-    let executiveSummary = `Executive summary for ${type} report is being synthesized based on ${contracts.length} active assets.`;
-    try {
-      const response = await cachedCompletion({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: aiPrompt }]
-      });
-      if (response) executiveSummary = response;
-    } catch (e: any) {
-      await storage.createInfrastructureLog({
-        component: "ReportService",
-        event: "AI_SUMMARY_FAILURE",
-        status: "analyzing",
-        actionTaken: `AI Executive Summary failed for workspace ${workspaceId}: ${e.message}`
-      }).catch(() => {});
-    }
+ let executiveSummary = `Executive summary for ${type} report is being synthesized based on ${contracts.length} active assets.`;
+ try {
+ const response = await cachedCompletion({
+ model: "gpt-4o",
+ messages: [{ role: "user", content: aiPrompt }]
+ });
+ if (response) executiveSummary = response;
+ } catch (e: any) {
+ await storage.createInfrastructureLog({
+ component: "ReportService",
+ event: "AI_SUMMARY_FAILURE",
+ status: "analyzing",
+ actionTaken: `AI Executive Summary failed for workspace ${workspaceId}: ${e.message}`
+ }).catch(() => {});
+ }
 
-    const summary = {
-      timestamp: new Date().toISOString(),
-      totalContracts: contracts.length,
-      totalAnnualSpend: contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0),
-      complianceHealth: this.calculateComplianceHealth(compliance, workspaceId),
-      criticalRiskCount: risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length,
-      identifiedSavings: savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0),
-      averageVendorScore: scorecards.length > 0 ? scorecards.reduce((sum, s) => sum + (s.complianceScore || 0), 0) / scorecards.length : 0,
-      topRecommendations: this.extractTopRecommendations(risks, savings),
-      executiveSummary: executiveSummary
-    };
+ const summary = {
+ timestamp: new Date().toISOString(),
+ totalContracts: contracts.length,
+ totalAnnualSpend: contracts.reduce((sum, c) => sum + (c.annualCost || 0), 0),
+ complianceHealth: this.calculateComplianceHealth(compliance, workspaceId),
+ criticalRiskCount: risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated').length,
+ identifiedSavings: savings.filter(s => s.status === 'identified').reduce((sum, s) => sum + (s.estimatedSavings || 0), 0),
+ averageVendorScore: scorecards.length > 0 ? scorecards.reduce((sum, s) => sum + (s.complianceScore || 0), 0) / scorecards.length : 0,
+ topRecommendations: this.extractTopRecommendations(risks, savings),
+ executiveSummary: executiveSummary
+ };
 
-    // 4. Persist Report Entity
-    const report = await storage.createReport({
-      workspaceId,
-      title: `${type.toUpperCase()} Report - ${new Date().toLocaleDateString()}`,
-      type,
-      content: summary,
-      status: "completed",
-      generatedBy: "SYSTEM"
-    });
+ // 4. Persist Report Entity
+ const report = await storage.createReport({
+ workspaceId,
+ title: `${type.toUpperCase()} Report - ${new Date().toLocaleDateString()}`,
+ type,
+ content: summary,
+ status: "completed",
+ generatedBy: "SYSTEM"
+ });
 
-    return report;
-  }
+ return report;
+ }
 
-  /**
-   * Internal helper for compliance health aggregation
-   */
-  private static calculateComplianceHealth(audits: any[], workspaceId: number): number {
-     const relevant = audits.filter(a => a.status === 'completed');
-     if (relevant.length === 0) return 0;
-     return Math.round(relevant.reduce((sum, a) => sum + (a.overallComplianceScore || 0), 0) / relevant.length);
-  }
+ /**
+ * Internal helper for compliance health aggregation
+ */
+ private static calculateComplianceHealth(audits: any[], workspaceId: number): number {
+ const relevant = audits.filter(a => a.status === 'completed');
+ if (relevant.length === 0) return 0;
+ return Math.round(relevant.reduce((sum, a) => sum + (a.overallComplianceScore || 0), 0) / relevant.length);
+ }
 
-  /**
-   * Extracts prioritized actions for the executive summary
-   */
-  private static extractTopRecommendations(risks: any[], savings: any[]): string[] {
-    const recs: string[] = [];
-    
-    // Add critical risks
-    risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated')
-         .slice(0, 3)
-         .forEach(r => recs.push(`MITIGATE: ${r.riskTitle}`));
-         
-    // Add high-value savings
-    savings.filter(s => s.status === 'identified' && s.estimatedSavings > 5000)
-           .slice(0, 3)
-           .forEach(s => recs.push(`OPTIMIZE: ${s.description.substring(0, 50)}...`));
-           
-    return recs;
-  }
+ /**
+ * Extracts prioritized actions for the executive summary
+ */
+ private static extractTopRecommendations(risks: any[], savings: any[]): string[] {
+ const recs: string[] = [];
+ 
+ // Add critical risks
+ risks.filter(r => r.severity === 'critical' && r.mitigationStatus !== 'mitigated')
+ .slice(0, 3)
+ .forEach(r => recs.push(`MITIGATE: ${r.riskTitle}`));
+ 
+ // Add high-value savings
+ savings.filter(s => s.status === 'identified' && s.estimatedSavings > 5000)
+ .slice(0, 3)
+ .forEach(s => recs.push(`OPTIMIZE: ${s.description.substring(0, 50)}...`));
+ 
+ return recs;
+ }
 
-  /**
-   * CRON HANDLER: Executes scheduled reports and dispatches via email.
-   */
-  static async processSchedules(): Promise<void> {
-    const schedules = await storage.getReportSchedules();
-    const now = new Date();
+ /**
+ * CRON HANDLER: Executes scheduled reports and dispatches via email.
+ */
+ static async processSchedules(): Promise<void> {
+ const schedules = await storage.getReportSchedules();
+ const now = new Date();
 
-    for (const schedule of schedules) {
-       if (!schedule.isActive) continue;
-       
-       // Simple frequency check logic (Daily/Weekly/Monthly)
-       const lastRun = schedule.lastRun ? new Date(schedule.lastRun) : new Date(0);
-       const diffDays = (now.getTime() - lastRun.getTime()) / (1000 * 3600 * 24);
+ for (const schedule of schedules) {
+ if (!schedule.isActive) continue;
+ 
+ // Simple frequency check logic (Daily/Weekly/Monthly)
+ const lastRun = schedule.lastRun ? new Date(schedule.lastRun) : new Date(0);
+ const diffDays = (now.getTime() - lastRun.getTime()) / (1000 * 3600 * 24);
 
-       let shouldRun = false;
-       if (schedule.frequency === 'daily' && diffDays >= 1) shouldRun = true;
-       if (schedule.frequency === 'weekly' && diffDays >= 7) shouldRun = true;
-       if (schedule.frequency === 'monthly' && diffDays >= 30) shouldRun = true;
+ let shouldRun = false;
+ if (schedule.frequency === 'daily' && diffDays >= 1) shouldRun = true;
+ if (schedule.frequency === 'weekly' && diffDays >= 7) shouldRun = true;
+ if (schedule.frequency === 'monthly' && diffDays >= 30) shouldRun = true;
 
-       if (shouldRun) {
-          try {
-             const report = await this.generateReport(schedule.workspaceId!, "automated_summary");
-             
-             // Update schedule
-             await storage.updateReportSchedule(schedule.id, {
-                lastRun: now,
-                nextRun: this.calculateNextRun(schedule.frequency)
-             });
-             
-             // Dispatch notification if recipient exists
-             if (schedule.recipientEmail) {
-                await EmailService.sendReportReadyNotification(
-                   schedule.recipientEmail, 
-                   report.id, 
-                   report.title
-                 ).catch(async e => {
-                    await storage.createInfrastructureLog({
-                       component: "ReportService",
-                       event: "REPORT_DISPATCH_FAILURE",
-                       status: "analyzing",
-                       actionTaken: `Email dispatch failed for schedule ${schedule.id}: ${e.message}`
-                    }).catch(() => {});
-                 });
-              }
+ if (shouldRun) {
+ try {
+ const report = await this.generateReport(schedule.workspaceId!, "automated_summary");
+ 
+ // Update schedule
+ await storage.updateReportSchedule(schedule.id, {
+ lastRun: now,
+ nextRun: this.calculateNextRun(schedule.frequency)
+ });
+ 
+ // Dispatch notification if recipient exists
+ if (schedule.recipientEmail) {
+ await EmailService.sendReportReadyNotification(
+ schedule.recipientEmail, 
+ report.id, 
+ report.title
+ ).catch(async e => {
+ await storage.createInfrastructureLog({
+ component: "ReportService",
+ event: "REPORT_DISPATCH_FAILURE",
+ status: "analyzing",
+ actionTaken: `Email dispatch failed for schedule ${schedule.id}: ${e.message}`
+ }).catch(() => {});
+ });
+ }
 
-          } catch (err: any) {
-             await storage.createInfrastructureLog({
-                component: "ReportService",
-                event: "SCHEDULE_EXECUTION_FAILURE",
-                status: "analyzing",
-                actionTaken: `Schedule processing failed for ID ${schedule.id}: ${err.message}`
-             }).catch(() => {});
-          }
-       }
-    }
-  }
+ } catch (err: any) {
+ await storage.createInfrastructureLog({
+ component: "ReportService",
+ event: "SCHEDULE_EXECUTION_FAILURE",
+ status: "analyzing",
+ actionTaken: `Schedule processing failed for ID ${schedule.id}: ${err.message}`
+ }).catch(() => {});
+ }
+ }
+ }
+ }
 
-  /**
-   * Manually execute a specific report schedule.
-   */
-  static async runSchedule(id: number): Promise<Report> {
-    const schedule = await storage.getReportSchedule(id);
-    if (!schedule) throw new Error("Schedule not found");
+ /**
+ * Manually execute a specific report schedule.
+ */
+ static async runSchedule(id: number): Promise<Report> {
+ const schedule = await storage.getReportSchedule(id);
+ if (!schedule) throw new Error("Schedule not found");
 
-    const report = await this.generateReport(schedule.workspaceId!, schedule.type || "automated_summary");
-    
-    await storage.updateReportSchedule(schedule.id, {
-      lastRun: new Date(),
-      nextRun: this.calculateNextRun(schedule.frequency)
-    });
+ const report = await this.generateReport(schedule.workspaceId!, schedule.type || "automated_summary");
+ 
+ await storage.updateReportSchedule(schedule.id, {
+ lastRun: new Date(),
+ nextRun: this.calculateNextRun(schedule.frequency)
+ });
 
-    if (schedule.recipientEmail) {
-      await EmailService.sendReportReadyNotification(
-        schedule.recipientEmail, 
-        report.id, 
-        report.title
-      ).catch(async e => {
-        await storage.createInfrastructureLog({
-           component: "ReportService",
-           event: "REPORT_MANUAL_DISPATCH_FAILURE",
-           status: "analyzing",
-           actionTaken: `Email dispatch failed for schedule ${schedule.id}: ${e.message}`
-        }).catch(() => {});
-      });
-    }
+ if (schedule.recipientEmail) {
+ await EmailService.sendReportReadyNotification(
+ schedule.recipientEmail, 
+ report.id, 
+ report.title
+ ).catch(async e => {
+ await storage.createInfrastructureLog({
+ component: "ReportService",
+ event: "REPORT_MANUAL_DISPATCH_FAILURE",
+ status: "analyzing",
+ actionTaken: `Email dispatch failed for schedule ${schedule.id}: ${e.message}`
+ }).catch(() => {});
+ });
+ }
 
-    return report;
-  }
+ return report;
+ }
 
-  private static calculateNextRun(freq: string): Date {
-     const next = new Date();
-     if (freq === 'daily') next.setDate(next.getDate() + 1);
-     else if (freq === 'weekly') next.setDate(next.getDate() + 7);
-     else next.setMonth(next.getMonth() + 1);
-     return next;
-  }
+ private static calculateNextRun(freq: string): Date {
+ const next = new Date();
+ if (freq === 'daily') next.setDate(next.getDate() + 1);
+ else if (freq === 'weekly') next.setDate(next.getDate() + 7);
+ else next.setMonth(next.getMonth() + 1);
+ return next;
+ }
 }

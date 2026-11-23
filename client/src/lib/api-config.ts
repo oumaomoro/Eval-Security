@@ -12,17 +12,17 @@ const VITE_API_URL = import.meta.env.VITE_API_URL || "";
  * @param path The API endpoint path (e.g., '/api/dashboard/stats')
  */
 export function getApiUrl(path: string): string {
-  if (path.startsWith('http')) return path;
-  
-  // Clean leading slash for consistency
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  
-  // If VITE_API_URL already ends with '/api' and path starts with '/api', prevent duplication
-  if (VITE_API_URL.endsWith('/api') && cleanPath.startsWith('/api/')) {
-    return `${VITE_API_URL}${cleanPath.substring(4)}`;
-  }
-  
-  return `${VITE_API_URL}${cleanPath}`;
+ if (path.startsWith('http')) return path;
+ 
+ // Clean leading slash for consistency
+ const cleanPath = path.startsWith('/') ? path : `/${path}`;
+ 
+ // If VITE_API_URL already ends with '/api' and path starts with '/api', prevent duplication
+ if (VITE_API_URL.endsWith('/api') && cleanPath.startsWith('/api/')) {
+ return `${VITE_API_URL}${cleanPath.substring(4)}`;
+ }
+ 
+ return `${VITE_API_URL}${cleanPath}`;
 }
 
 export const API_BASE_URL = VITE_API_URL;

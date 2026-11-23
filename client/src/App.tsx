@@ -44,111 +44,111 @@ import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
 
 function PrivateRouter() {
-  return (
-    <ErrorBoundary>
-      <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-950"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>}>
-        <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/infrastructure" component={InfrastructureDashboard} />
-        <Route path="/dpo" component={DPODashboard} />
-        <Route path="/dpo-command" component={DPODashboard} />
-        <Route path="/contracts" component={Contracts} />
-        <Route path="/contracts/:id" component={ContractDetail} />
-        <Route path="/compliance" component={Compliance} />
-        <Route path="/risks" component={Risks} />
-        <Route path="/clauses" component={Clauses} />
-        <Route path="/vendors" component={Vendors} />
-        <Route path="/policies" component={Rulesets} />
-        <Route path="/playbooks" component={Playbooks} />
-        <Route path="/playbooks/:id/rules" component={PlaybookRules} />
-        <Route path="/system" component={SystemHealth} />
-        <Route path="/audit" component={AuditLog} />
-        <Route path="/reports" component={Reports} />
-        <Route path="/billing" component={Billing} />
-        <Route path="/workspace" component={WorkspaceSettings} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/marketplace" component={Marketplace} />
-        <Route path="/roi" component={ExecutiveROI} />
-        <Route path="/savings" component={Savings} />
-        <Route path="/benchmarking" component={Benchmarking} />
-        <Route path="/cyber-insurance" component={CyberInsurance} />
-        <Route path="/redline-studio" component={RedliningStudio} />
-        <Route path="/history" component={History} />
-        <Route path="/notifications" component={NotificationSettings} />
-        <Route path="/admin" component={AdminDashboard} />
-        <Route path="/governance" component={GovernanceStudio} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
-  </ErrorBoundary>
-  );
+ return (
+ <ErrorBoundary>
+ <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-950"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>}>
+ <Switch>
+ <Route path="/" component={Dashboard} />
+ <Route path="/infrastructure" component={InfrastructureDashboard} />
+ <Route path="/dpo" component={DPODashboard} />
+ <Route path="/dpo-command" component={DPODashboard} />
+ <Route path="/contracts" component={Contracts} />
+ <Route path="/contracts/:id" component={ContractDetail} />
+ <Route path="/compliance" component={Compliance} />
+ <Route path="/risks" component={Risks} />
+ <Route path="/clauses" component={Clauses} />
+ <Route path="/vendors" component={Vendors} />
+ <Route path="/policies" component={Rulesets} />
+ <Route path="/playbooks" component={Playbooks} />
+ <Route path="/playbooks/:id/rules" component={PlaybookRules} />
+ <Route path="/system" component={SystemHealth} />
+ <Route path="/audit" component={AuditLog} />
+ <Route path="/reports" component={Reports} />
+ <Route path="/billing" component={Billing} />
+ <Route path="/workspace" component={WorkspaceSettings} />
+ <Route path="/settings" component={Settings} />
+ <Route path="/marketplace" component={Marketplace} />
+ <Route path="/roi" component={ExecutiveROI} />
+ <Route path="/savings" component={Savings} />
+ <Route path="/benchmarking" component={Benchmarking} />
+ <Route path="/cyber-insurance" component={CyberInsurance} />
+ <Route path="/redline-studio" component={RedliningStudio} />
+ <Route path="/history" component={History} />
+ <Route path="/notifications" component={NotificationSettings} />
+ <Route path="/admin" component={AdminDashboard} />
+ <Route path="/governance" component={GovernanceStudio} />
+ <Route component={NotFound} />
+ </Switch>
+ </Suspense>
+ </ErrorBoundary>
+ );
 }
 
 import { useAnalytics } from "@/hooks/use-analytics";
 
 function AnalyticsWrapper() {
-  useAnalytics();
-  return null;
+ useAnalytics();
+ return null;
 }
 
 import { useLocation } from "wouter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function AuthWrapper() {
-  const { user, isLoading, isError } = useAuth();
-  const [, setLocation] = useLocation();
+ const { user, isLoading, isError } = useAuth();
+ const [, setLocation] = useLocation();
 
-  if (isLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-950">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      </div>
-    );
-  }
+ if (isLoading) {
+ return (
+ <div className="h-screen w-screen flex items-center justify-center bg-slate-950">
+ <Loader2 className="w-10 h-10 animate-spin text-primary" />
+ </div>
+ );
+ }
 
-  // Unauthenticated: Marketing vs Auth
-  if (!user || isError) {
-    return (
-      <Switch>
-        <Route path="/" component={LandingPage} />
-        <Route path="/auth" component={AuthPage} />
-        <Route path="/auth/callback" component={AuthCallback} />
-        <Route path="/reset-password" component={ResetPassword} />
-        {/* Redirect unknown routes to Landing on auth-fail */}
-        <Route component={() => {
-          // If trying to access protected route while unauth, go to /auth
-          const path = window.location.pathname;
-          if (path !== "/" && path !== "/reset-password" && path !== "/auth") {
-            React.useEffect(() => {
-              setLocation("/auth");
-            }, []);
-            return null;
-          }
-          return <LandingPage />;
-        }} />
-      </Switch>
-    );
-  }
+ // Unauthenticated: Marketing vs Auth
+ if (!user || isError) {
+ return (
+ <Switch>
+ <Route path="/" component={LandingPage} />
+ <Route path="/auth" component={AuthPage} />
+ <Route path="/auth/callback" component={AuthCallback} />
+ <Route path="/reset-password" component={ResetPassword} />
+ {/* Redirect unknown routes to Landing on auth-fail */}
+ <Route component={() => {
+ // If trying to access protected route while unauth, go to /auth
+ const path = window.location.pathname;
+ if (path !== "/" && path !== "/reset-password" && path !== "/auth") {
+ React.useEffect(() => {
+ setLocation("/auth");
+ }, []);
+ return null;
+ }
+ return <LandingPage />;
+ }} />
+ </Switch>
+ );
+ }
 
-  return <PrivateRouter />;
+ return <PrivateRouter />;
 }
 
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 
 function App() {
-  return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WorkspaceProvider>
-            <AnalyticsWrapper />
-            <Toaster />
-            <AuthWrapper />
-          </WorkspaceProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  );
+ return (
+ <ErrorBoundary>
+ <QueryClientProvider client={queryClient}>
+ <TooltipProvider>
+ <WorkspaceProvider>
+ <AnalyticsWrapper />
+ <Toaster />
+ <AuthWrapper />
+ </WorkspaceProvider>
+ </TooltipProvider>
+ </QueryClientProvider>
+ </ErrorBoundary>
+ );
 }
 
 export default App;

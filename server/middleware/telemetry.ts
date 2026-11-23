@@ -9,28 +9,28 @@ let requestCount = 0;
  * Logs every 100th request or any error (status >= 400).
  */
 export async function telemetryMiddleware(req: Request, res: Response, next: NextFunction) {
-  const start = Date.now();
-  const originalSend = res.send;
+ const start = Date.now();
+ const originalSend = res.send;
 
-  // Type-safe override of res.send
-  res.send = function (body?: any): Response {
-    const duration = Date.now() - start;
-    const status = res.statusCode;
-    requestCount++;
+ // Type-safe override of res.send
+ res.send = function (body?: any): Response {
+ const duration = Date.now() - start;
+ const status = res.statusCode;
+ requestCount++;
 
-    // Log every 25th request or any error for visibility in low/high traffic environments
-    if (requestCount % 25 === 0 || status >= 400) {
-      const user = (req as any).user;
-      storage.createInfrastructureLog({
-        status: status >= 500 ? 'critical' : status >= 400 ? 'resolving' : 'healed',
-        component: "API_GATEWAY",
-        event: `${req.method} ${req.path} - ${status} [${user?.ip || 'unknown'}]`,
-        actionTaken: `Lat: ${duration}ms | UA: ${user?.userAgent?.substring(0, 30) || 'unknown'}`,
-      }).catch(err => console.error("[TELEMETRY ERROR]", err));
-    }
+ // Log every 25th request or any error for visibility in low/high traffic environments
+ if (requestCount % 25 === 0 || status >= 400) {
+ const user = (req as any).user;
+ storage.createInfrastructureLog({
+ status: status >= 500 ? 'critical' : status >= 400 ? 'resolving' : 'healed',
+ component: "API_GATEWAY",
+ event: `${req.method} ${req.path} - ${status} [${user?.ip || 'unknown'}]`,
+ actionTaken: `Lat: ${duration}ms | UA: ${user?.userAgent?.substring(0, 30) || 'unknown'}`,
+ }).catch(err => console.error("[TELEMETRY ERROR]", err));
+ }
 
-    return originalSend.call(this, body);
-  };
+ return originalSend.call(this, body);
+ };
 
-  next();
+ next();
 }

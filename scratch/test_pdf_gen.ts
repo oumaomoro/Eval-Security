@@ -9,7 +9,7 @@ async function test() {
   doc.text("Clause 1: Data residency must be in Kenya (KDPA 2019 compliance).", 10, 30);
   const buffer = Buffer.from(doc.output('arraybuffer'));
   fs.writeFileSync('test_contract_real.pdf', buffer);
-  console.log("✅ PDF generated successfully.");
+  console.log(" PDF generated successfully.");
 }
 
 test().catch(console.error);

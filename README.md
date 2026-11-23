@@ -1,66 +1,52 @@
-# Costloci: The Enterprise Governance Operating System
+# Costloci
 
-![Costloci Platform](https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=2070)
+Enterprise cybersecurity contract management and governance platform.
 
-> [!IMPORTANT]
-> **Production Status**: Enterprise-Ready (Phase 9 Hardening 100% Completed).
-> **Objective**: Transitioning cybersecurity contract management into an autonomous, AI-driven governance ecosystem.
+## Overview
 
----
+Costloci automates contract review, compliance auditing, and risk management for cybersecurity teams. It surfaces savings opportunities, enforces regulatory standards, and provides real-time vendor intelligence.
 
-## 🚀 PLATFORM CAPABILITIES
+**Production URLs**
+- Frontend: [costloci.com](https://costloci.com) — Cloudflare Pages
+- Backend API: [api.costloci.com](https://api.costloci.com) — Vercel
 
-### ⚖️ Jurisdictional Compliance Hub
-- **KDPA, GDPR, POPIA**: Built-in support for regional and international data protection standards.
-- **AI Ruleset Engine**: Define custom jurisdictional benchmarks and automate document auditing.
-- **Multi-Standard Intelligence**: Benchmark single contracts against multiple regulatory frameworks simultaneously.
+## Stack
 
-### 🛡️ Strategic Risk Governance
-- **Executive Heatmap**: Visualize vendor risk vs. compliance posture in a high-fidelity scatter-plot.
-- **Vendor Scorecards**: Automated grading of vendor performance, security, and SLA adherence.
-- **Clause Library**: A professional-grade, AI-assisted repository for standard legal provisions.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18, Tailwind CSS, Shadcn/ui, Recharts |
+| Backend | Node.js, Express, Drizzle ORM, PostgreSQL |
+| Auth | Supabase (JWT + RBAC) |
+| AI | OpenAI GPT-4o |
+| Deploy | Cloudflare Pages (frontend), Vercel (backend) |
 
-### 🔌 Cross-Platform Intelligence
-- **Microsoft Word Add-in**: Analyze contracts and identify risks directly within MS Word using the Costloci Intelligence Hub.
-
-### 🛠️ Infrastructure Resilience
-- **Global Health Console**: Real-time monitoring of system performance, API latency, and uptime.
-- **Immutable Audit Ledger**: Persistent, traceable history of all sensitive governance and administration events.
-- **Self-Healing Grid**: Autonomous infrastructure remediation and incident tracking.
-
----
-
-## 🛠️ TECHNICAL ARCHITECTURE
-
-- **Frontend**: React 18, Tailwind CSS, Shadcn/ui, Recharts.
-- **Backend**: Node.js, Express, Drizzle ORM, PostgreSQL.
-- **Intelligence**: GPT-4o via OpenAI (Structured AI Analysis).
-- **Security**: RBAC, JWT-based authentication, and jurisdictional data mapping.
-
----
-
-## 📖 DOCUMENTATION
-
-For a detailed deep-dive into the platform's technical design and governance framework, see the [Enterprise Architecture Handover](ENTERPRISE_ARCHITECTURE.md).
-
----
-
-## 🚦 QUICK START
+## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Run the development server
 npm run dev
-
-# Perform Enterprise Integrity Check
-npm run check
-
-# Generate Production Bundle
-npm run build
 ```
 
----
+```bash
+# Type check
+npm run check
 
+# Build
+npm run build
 
+# Tests
+npm run test:unit
+npm run test:security
+```
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the required values. See `docs/` for service-specific setup guides.
+
+## Architecture
+
+See [ENTERPRISE_ARCHITECTURE.md](ENTERPRISE_ARCHITECTURE.md) for the full technical design.
+
+## Compliance
+
+Supports KDPA, GDPR, POPIA, CBK, ISO 27001, and SOC 2 frameworks.
