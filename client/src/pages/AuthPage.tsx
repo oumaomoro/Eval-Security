@@ -15,28 +15,57 @@ import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function AuthPage() {
- const { t } = useTranslation();
- const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
- const { toast } = useToast();
- const { user } = useAuth();
- const [searchParams] = useState(() => new URLSearchParams(window.location.search));
- const [showPassword, setShowPassword] = useState(false);
+  const { t } = useTranslation();
+  const [searchParams] = useState(() => {
+    const query = new URLSearchParams(window.location.search);
+    const hash = window.location.hash ? new URLSearchParams(window.location.hash.replace("#", "?")) : new URLSearchParams();
+    return {
+      get: (key: string) => query.get(key) || hash.get(key)
+    };
+  });
+  const [mode, setMode] = useState<"login" | "register" | "forgot">(() => {
+    const m = new URLSearchParams(window.location.search).get("mode");
+    if (m === "forgot" || m === "reset") return "forgot";
+    if (m === "register") return "register";
+    return "login";
+  });
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
 
- useEffect(() => {
- if (searchParams.get("verified") === "true") {
- toast({
- title: "Email Verified",
- description: "Your account is active. You can now sign in.",
- });
- }
- if (searchParams.get("error") === "verification_failed") {
- toast({
- title: "Verification Failed",
- description: "The link has expired. Please request a new one.",
- variant: "destructive",
- });
- }
- }, [searchParams, toast]);
+  useEffect(() => {
+    if (searchParams.get("verified") === "true") {
+      toast({
+        title: "Email Verified",
+        description: "Your account is active. You can now sign in.",
+      });
+    }
+    if (searchParams.get("error") === "verification_failed") {
+      toast({
+        title: "Verification Failed",
+        description: "The link has expired. Please request a new one.",
+        variant: "destructive",
+      });
+    }
+
+    const errCode = searchParams.get("error_code");
+    const err = searchParams.get("error");
+    if (errCode === "otp_expired" || err === "access_denied") {
+      toast({
+        title: "Reset Link Expired",
+        description: "Your password reset link has expired. Please enter your email below to request a new link.",
+        variant: "destructive",
+      });
+      setMode("forgot");
+    } else if (err && err !== "verification_failed") {
+      const desc = searchParams.get("error_description");
+      toast({
+        title: "Authentication Notice",
+        description: desc ? decodeURIComponent(desc.replace(/\+/g, " ")) : "An authentication error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [searchParams, toast]);
 
  const [email, setEmail] = useState("");
  const [password, setPassword] = useState("");

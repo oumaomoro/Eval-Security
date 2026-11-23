@@ -375,7 +375,7 @@ export function registerAuthRoutes(app: Express): void {
  try {
  const { email } = forgotPasswordSchema.parse(req.body);
  const { error } = await createAuthClientWithIp(req.ip).auth.resetPasswordForEmail(email, {
- redirectTo: `${process.env.FRONTEND_URL}/auth?mode=reset`,
+ redirectTo: `${process.env.FRONTEND_URL}/auth/callback?type=recovery`,
  });
  if (error) throw error;
  res.json({ message: "Password reset link sent successfully." });
