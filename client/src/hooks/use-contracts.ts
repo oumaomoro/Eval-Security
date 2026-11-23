@@ -97,22 +97,25 @@ export function useAnalyzeContract() {
 }
 
 export function useUploadContractFile() {
- return useMutation({
- mutationFn: async (formData: FormData) => { const res = await fetch(getApiUrl(api.contracts.upload.path), {
- method: api.contracts.upload.method,
- body: formData, // FormData automatically sets correct Content-Type boundary
- credentials: "include", });
- if (!res.ok) {
- const errorData = await res.json().catch(() => ({}));
- throw new Error(errorData.message || "Upload failed");
- }
- return api.contracts.upload.responses[200].parse(await res.json());
- },
- onSuccess: async () => {
- const { toast } = (await import("@/hooks/use-toast")).useToast();
- const queryClient = (await import("@tanstack/react-query")).useQueryClient();
- queryClient.invalidateQueries({ queryKey: [api.contracts.list.path] });
- },
- });
-}
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch(getApiUrl(api.contracts.upload.path), {
+        method: api.contracts.upload.method,
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Upload failed");
+      }
+      return api.contracts.upload.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.contracts.list.path] });
+      toast({ title: "Upload Successful", description: "Contract uploaded and analysis initiated." });
+    },
+  });
+}

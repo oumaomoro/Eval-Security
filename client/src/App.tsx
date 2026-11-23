@@ -67,6 +67,7 @@ function PrivateRouter() {
  <Route path="/billing" component={Billing} />
  <Route path="/workspace" component={WorkspaceSettings} />
  <Route path="/settings" component={Settings} />
+          <Route path="/reset-password" component={ResetPassword} />
  <Route path="/marketplace" component={Marketplace} />
  <Route path="/roi" component={ExecutiveROI} />
  <Route path="/savings" component={Savings} />
