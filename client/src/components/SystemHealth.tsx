@@ -16,9 +16,9 @@ export function SystemHealth() {
  <TooltipProvider>
  <Tooltip>
  <TooltipTrigger>
- <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 animate-pulse">
+ <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 ">
  <ShieldCheck className="w-3.5 h-3.5" />
- <span className="text-[10px] font-bold uppercase tracking-wider">Sovereign Mode</span>
+ <span className="text-[10px] font-bold uppercase tracking-wider">System Online</span>
  </div>
  </TooltipTrigger>
  <TooltipContent>
@@ -33,7 +33,7 @@ export function SystemHealth() {
  <TooltipProvider>
  <Tooltip>
  <TooltipTrigger>
- <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+ <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 ">
  <AlertCircle className="w-3.5 h-3.5" />
  <span className="text-[10px] font-bold uppercase tracking-wider">Degraded Mode</span>
  </div>

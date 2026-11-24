@@ -30,7 +30,7 @@ export function SelfHealingSentinel({ asset }: { asset: any }) {
  },
  onSuccess: (data) => {
  setFix(data);
- toast({ title: "Fix Generated", description: "The Sentinel has analyzed the risk and drafted a resolution." });
+ toast({ title: "Fix Generated", description: "Remediation plan generated." });
  },
  onError: () => {
  toast({ variant: "destructive", title: "Healing Failed", description: "Could not generate fix at this time." });
@@ -56,8 +56,8 @@ export function SelfHealingSentinel({ asset }: { asset: any }) {
  <Sparkles className="w-4 h-4 text-cyan-400" />
  </div>
  <div>
- <CardTitle className="text-sm">Self-Healing Sentinel</CardTitle>
- <CardDescription className="text-[10px]">Autonomic Risk Remediation</CardDescription>
+ <CardTitle className="text-sm font-semibold">Automated Remediation</CardTitle>
+ <CardDescription className="text-xs text-muted-foreground">Misconfiguration Fix Generator</CardDescription>
  </div>
  </div>
  <Badge variant="outline" className="text-[10px] uppercase font-bold text-cyan-400 border-cyan-400/30">

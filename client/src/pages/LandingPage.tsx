@@ -44,10 +44,10 @@ export default function LandingPage() {
  transition={{ duration: 0.6 }}
  >
  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8">
- <Zap className="w-3 h-3 animate-pulse" /> The Pioneer in Zero-Touch Legal SecOps
+ <Zap className="w-3 h-3 animate-pulse" /> The Pioneer in Enterprise Contract Intelligence
  </div>
  <h1 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter mb-6 max-w-5xl mx-auto">
- Zero-Touch Legal SecOps for <br />
+ Enterprise Contract Intelligence for <br />
  <span className="text-emerald-500 italic drop-shadow-[0_0_30px_rgba(16,185,129,0.4)]">CISOs & DPOs</span>
  </h1>
  <p className="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed mb-10 font-medium">

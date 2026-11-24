@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { DiamondIcon } from "@/components/DiamondIcon";
 import { SEO } from "@/components/SEO";
 import { apiRequest } from "@/lib/queryClient";
+import { getApiUrl } from "@/lib/api-config";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
@@ -210,7 +211,7 @@ export default function AuthPage() {
  <Button
  variant="outline"
  className="w-full border-slate-700 bg-slate-900 hover:bg-slate-800 h-12 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-3 mb-6 transition-colors"
- onClick={() => { window.location.href = "/api/auth/google" }}
+ onClick={() => { window.location.href = getApiUrl("/api/auth/google") }}
  >
  <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
  Continue with Google

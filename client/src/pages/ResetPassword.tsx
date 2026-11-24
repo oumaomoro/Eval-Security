@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2, Lock, ShieldCheck, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
 import { getApiUrl } from "@/lib/api-config";
 
 export default function ResetPassword() {
@@ -18,10 +17,20 @@ export default function ResetPassword() {
       if (password !== confirmPassword) throw new Error("Passwords do not match");
       if (password.length < 8) throw new Error("Password must be at least 8 characters");
 
+      const hash = window.location.hash;
+      const hashParams = hash ? new URLSearchParams(hash.replace("#", "?")) : new URLSearchParams();
+      const searchParams = new URLSearchParams(window.location.search);
+      const token = hashParams.get("access_token") || searchParams.get("access_token") || sessionStorage.getItem("recovery_token") || "";
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch(getApiUrl("/api/auth/reset-password"), {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ password })
       });
 
@@ -40,65 +49,56 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 p-6 selection:bg-primary/30">
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent pointer-events-none" />
-      
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md relative z-10"
-      >
-        <Card className="bg-slate-900 border-slate-800 shadow-2xl rounded-3xl overflow-hidden backdrop-blur-md">
+      <div className="w-full max-w-md relative z-10">
+        <Card className="bg-card border-border shadow-2xl rounded-2xl overflow-hidden">
           <CardHeader className="text-center pt-8 pb-4">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 mx-auto mb-6">
-              <ShieldCheck className="w-9 h-9 text-primary" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mx-auto mb-4">
+              <ShieldCheck className="w-6 h-6 text-primary" />
             </div>
-            <CardTitle className="text-3xl font-black text-white uppercase tracking-tighter">Reset Password</CardTitle>
-            <CardDescription className="text-slate-400 font-medium mt-2">Enter your new account password</CardDescription>
+            <CardTitle className="text-2xl font-bold text-foreground">Reset Password</CardTitle>
+            <CardDescription className="text-muted-foreground font-medium mt-1">Enter your new account password</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6 px-8">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-400 ml-1">New Password</label>
+          <CardContent className="space-y-4 px-8">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">New Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input 
                   type="password" 
                   placeholder="Minimum 8 characters" 
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="bg-black/50 border-slate-800 focus:border-primary pl-10 h-12 rounded-xl text-slate-200"
+                  className="bg-background border-border pl-10 h-11 rounded-lg text-foreground"
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-400 ml-1">Confirm Password</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Confirm Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input 
                   type="password" 
                   placeholder="Re-enter password" 
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
-                  className="bg-black/50 border-slate-800 focus:border-primary pl-10 h-12 rounded-xl text-slate-200"
+                  className="bg-background border-border pl-10 h-11 rounded-lg text-foreground"
                 />
               </div>
             </div>
             <Button 
               onClick={() => resetMutation.mutate()}
               disabled={resetMutation.isPending || !password || !confirmPassword}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold uppercase tracking-tight h-12 rounded-xl group"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-11 rounded-lg"
             >
-              {resetMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                <>
-                  Update Password <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
+              {resetMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Update Password
             </Button>
           </CardContent>
-          <CardFooter className="bg-slate-950/50 p-6 border-t border-slate-800 flex justify-center">
-            <a href="/auth" className="text-xs text-slate-400 hover:text-white transition-colors">Back to sign in</a>
+          <CardFooter className="bg-muted/20 p-4 border-t border-border flex justify-center">
+            <a href="/auth" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Back to sign in</a>
           </CardFooter>
         </Card>
-      </motion.div>
+      </div>
     </div>
   );
 }

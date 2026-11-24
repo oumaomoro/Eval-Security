@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { supabase, adminClient, createAuthClientWithIp } from "../../services/supabase.js";
+import { supabase, adminClient, createAuthClientWithIp, createUserClient } from "../../services/supabase.js";
 import { storage } from "../../storage.js";
 import { authStorage } from "./storage.js";
 import { WebAuthnService } from "../../services/WebAuthn.js";
@@ -473,19 +473,31 @@ export function registerAuthRoutes(app: Express): void {
  });
 
  // Reset Password
- app.post("/api/auth/reset-password", async (req: any, res) => {
- try {
- const { password } = resetPasswordSchema.parse(req.body);
- const { error } = await createAuthClientWithIp(req.ip).auth.updateUser({ password });
- if (error) throw error;
- res.json({ message: "Password updated successfully" });
- } catch (err: any) {
- if (err instanceof z.ZodError) {
- return res.status(400).json({ message: err.errors[0].message });
- }
- res.status(400).json({ message: err.message });
- }
- });
+  app.post("/api/auth/reset-password", async (req: any, res) => {
+    try {
+      const { password } = resetPasswordSchema.parse(req.body);
+      const token =
+        req.cookies?.costloci_session ||
+        req.headers.authorization?.replace(/^Bearer\s+/i, "") ||
+        (req as any).session?.supabase_token;
+
+      if (!token) {
+        return res.status(401).json({
+          message: "Auth session missing. Your reset link may have expired. Please request a new one."
+        });
+      }
+
+      const userClient = createUserClient(token);
+      const { error } = await userClient.auth.updateUser({ password });
+      if (error) throw error;
+      res.json({ message: "Password updated successfully" });
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(400).json({ message: err.message });
+    }
+  });
 
  // Logout
  app.post("/api/auth/logout", (req: any, res) => {

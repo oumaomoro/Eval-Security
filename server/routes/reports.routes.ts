@@ -30,7 +30,7 @@ router.get("/reports", isAuthenticated, async (req: any, res) => {
 router.post("/reports/generate", isAuthenticated, async (req: any, res) => {
  try {
  const { title, type, regulatoryBody = "General" } = req.body;
- const workspaceId = req.workspaceId;
+ const workspaceId = req.user?.workspaceId || (req.headers["x-workspace-id"] ? parseInt(req.headers["x-workspace-id"]) : undefined) || 1;
  
  const report = await storage.createReport({
  workspaceId,
@@ -73,7 +73,7 @@ router.post("/reports/schedules", isAuthenticated, async (req: any, res) => {
  const data = insertReportScheduleSchema.parse(req.body);
  const schedule = await storage.createReportSchedule({
  ...data,
- workspaceId: req.workspaceId
+ workspaceId: req.user?.workspaceId || (req.headers["x-workspace-id"] ? parseInt(req.headers["x-workspace-id"]) : undefined) || 1
  });
  res.status(201).json(schedule);
  } catch (err: any) {
