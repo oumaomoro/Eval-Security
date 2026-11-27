@@ -9,6 +9,7 @@
     "build:client": "cross-env NODE_ENV=production vite build",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "blog:publish": "tsx scripts/auto_publish_blog.ts",
     "db:push": "drizzle-kit push",
     "db:verify": "tsx scripts/verify_db_sync.ts",
     "test": "playwright test",

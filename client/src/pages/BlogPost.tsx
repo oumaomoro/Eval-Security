@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { 
   ArrowLeft, Calendar, Clock, Share2, ShieldCheck, 
   Sparkles, CheckCircle2, AlertTriangle, ArrowRight, 
-  Copy, MessageCircle, Linkedin, Twitter 
+  Copy, MessageCircle, Linkedin, Twitter, ExternalLink, BookmarkCheck 
 } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
@@ -217,6 +217,44 @@ export default function BlogPost() {
             </section>
           ))}
         </div>
+
+        {/* Authoritative Citations & Legal Sources (SEO Backlinks) */}
+        {article.externalSources && article.externalSources.length > 0 && (
+          <div className="mt-14 p-6 md:p-8 rounded-3xl bg-slate-900/40 border border-slate-800 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-emerald-400">
+              <BookmarkCheck className="w-5 h-5 text-emerald-400" /> Authoritative Sources & Statutory References
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              This guide references official statutes, regulatory directives, and published industry benchmarks:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              {article.externalSources.map((source, sIdx) => (
+                <a
+                  key={sIdx}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900/80 transition-all group flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300 group-hover:text-emerald-400 transition-colors">
+                      <span className="line-clamp-1">{source.title}</span>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0 ml-1 text-slate-500 group-hover:text-emerald-400" />
+                    </div>
+                    {source.description && (
+                      <p className="text-[11px] text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                        {source.description}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-emerald-500/80 font-mono mt-3 uppercase tracking-wider">
+                    {source.publisher}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Embedded Monetization Lead Magnet CTA */}
         <div className="mt-16 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-emerald-500/40 rounded-3xl p-8 md:p-12 text-center space-y-4 shadow-2xl">
