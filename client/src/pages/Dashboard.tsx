@@ -15,7 +15,6 @@ import { MetricCard } from "@/components/MetricCard";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { useClients } from "@/hooks/use-clients";
 import { useComplianceAudits } from "@/hooks/use-compliance";
-import { SovereignTelemetry } from "@/components/SovereignTelemetry";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 interface RegionalSharding {
@@ -154,9 +153,7 @@ export default function Dashboard() {
  </CardContent>
  </Card>
 
- <ErrorBoundary>
- <SovereignTelemetry />
- </ErrorBoundary>
+ 
  </div>
 
  {stats?.totalContracts === 0 ? (

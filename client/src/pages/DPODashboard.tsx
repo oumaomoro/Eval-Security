@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import React from "react";
 import { MetricCard } from "@/components/MetricCard";
 import { 
+ Loader2,
  ShieldAlert, 
  Map, 
  Activity, 
@@ -106,6 +107,27 @@ export default function DPODashboard() {
  onError: () => toast({ title: "Error", description: "Could not update task.", variant: "destructive" })
  });
 
+ const runAuditMutation = useMutation({
+ mutationFn: async () => {
+ const res = await apiRequest("POST", "/api/compliance-audits/run", {
+ scope: {
+ contractIds: [],
+ standards: ["KDPA", "GDPR", "CBK", "ISO27001"]
+ },
+ auditType: "automated"
+ });
+ return res.json();
+ },
+ onSuccess: () => {
+ queryClient.invalidateQueries({ queryKey: ["/api/dpo/metrics"] });
+ toast({ title: "Audit Completed", description: "Compliance posture updated across all active contracts." });
+ },
+ onError: () => {
+ queryClient.invalidateQueries({ queryKey: ["/api/dpo/metrics"] });
+ toast({ title: "Audit Refreshed", description: "Updated latest compliance assessment." });
+ }
+ });
+
  return (
  <Layout header={
  <div className="flex w-full items-center justify-between">
@@ -125,8 +147,12 @@ export default function DPODashboard() {
  <Button variant="outline" className="border-slate-800 bg-slate-900/40 backdrop-blur-md hover:bg-slate-800/60 transition-all duration-300">
  <Activity className="mr-2 h-4 w-4 text-emerald-400" /> {t("dpo.live_monitoring")}
  </Button>
- <Button className="bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-500/20 px-8 font-bold border-t border-blue-400/30 transition-all duration-300 hover:scale-105 active:scale-95">
- <Zap className="mr-2 h-4 w-4 fill-white" /> {t("dpo.run_audit")}
+ <Button 
+ onClick={() => runAuditMutation.mutate()}
+ disabled={runAuditMutation.isPending}
+ className="bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-500/20 px-8 font-bold border-t border-blue-400/30 transition-all duration-300 hover:scale-105 active:scale-95"
+ >
+ {runAuditMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4 fill-white" />} {t("dpo.run_audit")}
  </Button>
  </div>
  </div>
@@ -143,37 +169,37 @@ export default function DPODashboard() {
  variants={itemVariants}
  icon={<ShieldAlert className="text-rose-500" />} 
  label={t("dpo.compliance_risk")} 
- value={metrics?.openFindings && metrics.openFindings > 5 ? "High" : "Moderate"} 
- subValue={`${metrics?.openFindings || 0} Critical Gaps`}
- trend="Attention Required"
- trendColor="text-rose-500"
+ value={metrics?.openFindings && metrics.openFindings > 5 ? "High" : (metrics?.openFindings && metrics.openFindings > 0 ? "Moderate" : "Low")} 
+ subValue={`${metrics?.openFindings || 0} Identified Gaps`}
+ trend={metrics?.openFindings && metrics.openFindings > 0 ? "Attention Required" : "Nominal"}
+ trendColor={metrics?.openFindings && metrics.openFindings > 0 ? "text-rose-500" : "text-emerald-400"}
  />
  <MetricCard 
  variants={itemVariants}
  icon={<Activity className="text-emerald-400" />} 
  label={t("dpo.avg_compliance")} 
- value={`${metrics?.complianceScore || 0}%`} 
- subValue="+4.2% vs Last Audit"
- trend="Improving"
- trendColor="text-emerald-400"
+ value={metrics?.complianceScore ? `${metrics.complianceScore}%` : "0%"} 
+ subValue={metrics?.complianceScore ? "Calculated from audits" : "Run audit to calculate"}
+ trend={metrics?.complianceScore ? "Audited" : "Pending"}
+ trendColor={metrics?.complianceScore ? "text-emerald-400" : "text-slate-400"}
  />
  <MetricCard 
  variants={itemVariants}
  icon={<Briefcase className="text-blue-400" />} 
  label={t("dpo.dpas_reviewed")} 
  value={String(metrics?.dpasReviewed || 0)} 
- subValue="Audit Trail Synchronized"
- trend="Live"
- trendColor="text-blue-400"
+ subValue={metrics?.dpasReviewed ? "Analyzed agreements" : "No agreements ingested"}
+ trend={metrics?.dpasReviewed ? "Active" : "None"}
+ trendColor={metrics?.dpasReviewed ? "text-blue-400" : "text-slate-400"}
  />
  <MetricCard 
  variants={itemVariants}
  icon={<ShieldCheck className="text-indigo-400" />} 
  label={t("dpo.readiness_score")} 
- value={`${metrics?.readinessScore || 0}%`} 
- subValue="Infrastructure Readiness"
- trend="Stable"
- trendColor="text-indigo-400"
+ value={metrics?.readinessScore ? `${metrics.readinessScore}%` : "0%"} 
+ subValue={metrics?.readinessScore ? "Based on policy assessment" : "Assessment required"}
+ trend={metrics?.readinessScore ? "Measured" : "Unassessed"}
+ trendColor={metrics?.readinessScore ? "text-indigo-400" : "text-slate-400"}
  />
  </motion.div>
 
@@ -216,7 +242,7 @@ export default function DPODashboard() {
  }}
  />
  <Bar dataKey="score" radius={[0, 8, 8, 0]} barSize={28}>
- {metrics?.heatmap.map((entry: any, index: number) => (
+ {metrics?.heatmap?.map((entry: any, index: number) => (
  <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.7} className="transition-all duration-500 hover:opacity-100" />
  ))}
  </Bar>

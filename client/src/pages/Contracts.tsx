@@ -133,15 +133,24 @@ function CreateContractDialog() {
  const onSubmit = async (data: InsertContract) => {
  try {
  if (file) {
- const formData = new FormData();
- formData.append("file", file);
- if (activeWorkspaceId) formData.append("workspaceId", String(activeWorkspaceId));
- 
- toast({ title: "Analyzing File", description: "Our Intelligence is extracting contract terms." });
- await uploadFile(formData);
- setIsOpen(false);
- return;
- }
+        const formData = new FormData();
+        formData.append("file", file);
+        if (activeWorkspaceId) formData.append("workspaceId", String(activeWorkspaceId));
+        if (data.vendorName) formData.append("vendorName", data.vendorName);
+        if (data.productService) formData.append("productService", data.productService);
+        if (data.category) formData.append("category", data.category);
+        if (data.annualCost) formData.append("annualCost", String(data.annualCost));
+        if (data.contractStartDate) formData.append("contractStartDate", String(data.contractStartDate));
+        if (data.renewalDate) formData.append("renewalDate", String(data.renewalDate));
+        if (data.contractTermMonths) formData.append("contractTermMonths", String(data.contractTermMonths));
+        const defaultClientId = clients && clients.length > 0 ? clients[0].id : undefined;
+        if (defaultClientId) formData.append("clientId", String(defaultClientId));
+        
+        toast({ title: "Analyzing File", description: "Our Intelligence is extracting contract terms." });
+        await uploadFile(formData);
+        setIsOpen(false);
+        return;
+      }
  
  const defaultClientId = clients && clients.length > 0 ? clients[0].id : undefined;
 

@@ -1,3 +1,4 @@
+import { getApiUrl } from "@/lib/api-config";
 import { useState } from "react";
 import { 
  FileText, 
@@ -300,7 +301,7 @@ export default function Reports() {
  <TableCell>
  <Badge 
  className={`text-[9px] font-bold uppercase tracking-tight rounded-md px-1.5 py-0.5 ${
- report.status === 'generated' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+ (report.status === 'completed' || report.status === 'generated') ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
  report.status === 'failed' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
  'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse'
  }`}
@@ -314,8 +315,8 @@ export default function Reports() {
  variant="ghost"
  size="sm"
  className="h-8 text-xs font-semibold text-muted-foreground hover:text-foreground"
- disabled={report.status !== 'generated'}
- onClick={() => window.open(`/api/reports/${report.id}/export`, "_blank")}
+ disabled={report.status !== 'completed' && report.status !== 'generated'}
+ onClick={() => window.open(getApiUrl(`/api/reports/${report.id}/export`), "_blank")}
  >
  <Download className="w-3.5 h-3.5 mr-2" />
  Export PDF

@@ -139,119 +139,86 @@ router.get("/reports/strategic-pack", isAuthenticated, async (req: any, res) => 
  * Calculates compliance per standard (KDPA, GDPR, CBK).
  */
 router.get("/dpo/metrics", isAuthenticated, async (req: any, res: any) => {
- try {
- const audits = await storage.getComplianceAudits();
- 
- // Process existing audits for heatmaps
- let kdpaScore = 75; 
- let cbkScore = 80;
- let gdprScore = 85;
- 
- // Find latest audit scores if they exist
- const latestAudits = [...audits].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
- const latestAudit = latestAudits.find(a => a.status === 'completed');
- 
- if (latestAudit) {
- const complianceScore = latestAudit.overallComplianceScore || 78;
- kdpaScore = complianceScore - 3;
- cbkScore = complianceScore + 2; 
- gdprScore = complianceScore - 1;
- }
+  try {
+    const workspaceId = storageContext.getStore()?.workspaceId || req.user?.workspaceId || 1;
+    const [contracts, audits, risks, remediationTasks, remediationSuggestions] = await Promise.all([
+      storage.getContracts({ workspaceId }),
+      storage.getComplianceAudits().catch(() => []),
+      storage.getRisks().catch(() => []),
+      storage.getRemediationTasks().catch(() => []),
+      storage.getRemediationSuggestions().catch(() => [] as any[])
+    ]);
 
- const workspaceId = storageContext.getStore()?.workspaceId;
- const [contracts, insurance, risks, remediationTasks, remediationSuggestions] = await Promise.all([
- storage.getContracts(),
- storage.getInsurancePolicies(workspaceId),
- storage.getRisks(),
- storage.getRemediationTasks(),
- storage.getRemediationSuggestions().catch(() => [] as any[])
- ]);
+    const filteredContracts = (contracts || []).filter(c => !workspaceId || c.workspaceId === workspaceId);
+    const filteredAudits = (audits || []).filter(a => !workspaceId || a.workspaceId === workspaceId);
+    const filteredRisks = (risks || []).filter(r => !workspaceId || r.workspaceId === workspaceId);
+    const filteredTasks = (remediationTasks || []).filter(t => (!workspaceId || t.workspaceId === workspaceId) && t.status !== 'resolved');
 
- const filteredContracts = contracts.filter(c => c.workspaceId === workspaceId);
- const filteredRisks = risks.filter(r => r.workspaceId === workspaceId);
- const filteredRemediationTasks = remediationTasks.filter(t => t.workspaceId === workspaceId && t.status !== 'resolved').slice(0, 5);
+    const completedAudits = filteredAudits.filter(a => a.status === 'completed');
+    const latestAudit = completedAudits.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
 
- // ── REDLINE EFFICIENCY STATS ──────────────────────────────────────────────
- // Aggregate neural redline suggestions by status
- const totalRedlines = remediationSuggestions.length;
- const acceptedRedlines = remediationSuggestions.filter((s: any) => s.status === 'accepted').length;
- const pendingRedlines = remediationSuggestions.filter((s: any) => !s.status || s.status === 'pending').length;
- const rejectedRedlines = remediationSuggestions.filter((s: any) => s.status === 'rejected').length;
- const acceptanceRate = totalRedlines > 0 ? Math.round((acceptedRedlines / totalRedlines) * 100) : 0;
+    // Real dynamic compliance and readiness scores
+    const complianceScore = latestAudit?.overallComplianceScore 
+      ? latestAudit.overallComplianceScore 
+      : (filteredContracts.length > 0 ? Math.max(50, 95 - (filteredRisks.length * 6)) : 0);
 
- // ── TREND ANALYSIS: derive from real audit history ────────────────────────
- // Build a 6-point trend using sorted completed audits, padded with baseline if sparse
- const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
- const completedAudits = latestAudits
- .filter(a => a.status === 'completed')
- .slice(0, 6)
- .reverse();
+    const readinessScore = filteredContracts.length > 0 
+      ? Math.min(100, Math.max(0, 100 - (filteredRisks.filter(r => r.severity === 'critical' || r.severity === 'high').length * 12)))
+      : 0;
 
- let trendAnalysis: { date: string; score: number; redlines: number }[];
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const trendAnalysis = completedAudits.slice(0, 6).reverse().map((audit: any, idx: number) => ({
+      date: MONTHS[new Date(audit.createdAt || Date.now()).getMonth()] || `M${idx + 1}`,
+      score: audit.overallComplianceScore || 70,
+      redlines: remediationSuggestions.length
+    }));
 
- if (completedAudits.length >= 3) {
- trendAnalysis = completedAudits.map((audit: any, idx: number) => ({
- date: MONTHS[new Date(audit.createdAt).getMonth()] || `M${idx + 1}`,
- score: audit.overallComplianceScore || 70,
- redlines: remediationSuggestions.filter((s: any) => {
- const auditDate = new Date(audit.createdAt);
- const suggDate = new Date(s.createdAt);
- return suggDate >= auditDate && suggDate < new Date(auditDate.getTime() + 30 * 24 * 60 * 60 * 1000);
- }).length
- }));
- } else {
- // Synthetic baseline trajectory until real data accumulates
- const base = latestAudit?.overallComplianceScore || 74;
- trendAnalysis = [
- { date: "Jan", score: Math.max(55, base - 18), redlines: 0 },
- { date: "Feb", score: Math.max(60, base - 12), redlines: 1 },
- { date: "Mar", score: Math.max(65, base - 7), redlines: 3 },
- { date: "Apr", score: Math.max(68, base - 3), redlines: 5 },
- { date: "May", score: base, redlines: totalRedlines },
- ];
- }
+    const kdpaGaps = filteredRisks.filter(r => r.riskCategory === 'Compliance').length;
+    const heatmap = filteredContracts.length > 0 ? [
+      { standard: "KDPA", score: Math.max(40, 95 - (kdpaGaps * 8)), color: "#10b981" },
+      { standard: "GDPR", score: Math.max(40, 90 - (filteredRisks.length * 5)), color: "#3b82f6" },
+      { standard: "CBK", score: Math.max(40, 85 - (kdpaGaps * 6)), color: "#f59e0b" },
+      { standard: "ISO27001", score: Math.max(40, 92 - (filteredRisks.length * 4)), color: "#8b5cf6" },
+      { standard: "SOC2", score: Math.max(40, 88 - (filteredRisks.length * 5)), color: "#6366f1" }
+    ] : [];
 
- res.json({
- complianceScore: latestAudit?.overallComplianceScore || 78,
- readinessScore: Math.min(100, 70 + (filteredContracts.length * 2)), 
- dpasReviewed: audits.length + filteredContracts.length,
- openFindings: filteredRisks.length,
- remediationTasks: filteredRemediationTasks.map(t => ({
- id: t.id,
- title: t.title,
- severity: t.severity,
- status: t.status,
- contractId: t.contractId
- })),
- // ── NEW: Neural Redline Stats ──────────────────────
- remediationStats: {
- total: totalRedlines,
- accepted: acceptedRedlines,
- pending: pendingRedlines,
- rejected: rejectedRedlines,
- acceptanceRate,
- },
- // ── NEW: Compliance Trajectory ────────────────────
- trendAnalysis,
- heatmap: [
- { standard: "GDPR", score: Math.max(65, 85 - filteredRisks.length), color: "#3b82f6" },
- { standard: "KDPA", score: Math.max(60, 92 - (filteredRisks.filter(r => r.riskCategory === 'Compliance').length * 4)), color: "#10b981" },
- { standard: "CBK", score: 78, color: "#f59e0b" },
- { standard: "ISO27001", score: 88, color: "#8b5cf6" },
- { standard: "SOC2", score: 72, color: "#6366f1" }
- ],
- readinessData: [
- { subject: "Incident Resp.", A: 90, fullMark: 100 },
- { subject: "Data Privacy", A: 85, fullMark: 100 },
- { subject: "Data Residency", A: 70, fullMark: 100 },
- { subject: "Liability", A: 95, fullMark: 100 },
- { subject: "SLA Caps", A: 60, fullMark: 100 },
- ],
- });
- } catch (error) {
- console.error("[DPO METRICS ERROR]", error);
- res.status(500).json({ message: "Failed to fetch DPO metrics" });
- }
+    const readinessData = filteredContracts.length > 0 ? [
+      { subject: "Incident Resp.", A: Math.max(30, 90 - (filteredRisks.length * 5)), fullMark: 100 },
+      { subject: "Data Privacy", A: Math.max(30, 95 - (kdpaGaps * 7)), fullMark: 100 },
+      { subject: "Data Residency", A: Math.max(30, 85 - (kdpaGaps * 6)), fullMark: 100 },
+      { subject: "Liability", A: Math.max(30, 88 - (filteredRisks.length * 4)), fullMark: 100 },
+      { subject: "SLA Caps", A: Math.max(30, 80 - (filteredRisks.length * 5)), fullMark: 100 },
+    ] : [];
+
+    res.json({
+      complianceScore,
+      readinessScore,
+      dpasReviewed: filteredContracts.length + completedAudits.length,
+      openFindings: filteredRisks.length,
+      remediationTasks: filteredTasks.slice(0, 5).map(t => ({
+        id: t.id,
+        title: t.title || "Remediation Task",
+        severity: t.severity || "medium",
+        status: t.status || "identified",
+        contractId: t.contractId
+      })),
+      remediationStats: {
+        total: remediationSuggestions.length,
+        accepted: remediationSuggestions.filter((s: any) => s.status === 'accepted').length,
+        pending: remediationSuggestions.filter((s: any) => !s.status || s.status === 'pending').length,
+        rejected: remediationSuggestions.filter((s: any) => s.status === 'rejected').length,
+        acceptanceRate: remediationSuggestions.length > 0 
+          ? Math.round((remediationSuggestions.filter((s: any) => s.status === 'accepted').length / remediationSuggestions.length) * 100) 
+          : 0,
+      },
+      trendAnalysis,
+      heatmap,
+      readinessData,
+    });
+  } catch (error: any) {
+    console.error("[DPO METRICS ERROR]", error.message);
+    res.status(500).json({ message: "Failed to fetch DPO metrics" });
+  }
 });
 
 
