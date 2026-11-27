@@ -42,6 +42,8 @@ import { AuthCallback } from "@/pages/AuthCallback";
 import LandingPage from "@/pages/LandingPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/not-found";
+import Blog from "@/pages/Blog";
+import BlogPost from "@/pages/BlogPost";
 
 function PrivateRouter() {
   return (
@@ -86,6 +88,8 @@ function PrivateRouter() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/governance" component={GovernanceStudio} />
           <Route path="/governance-studio" component={GovernanceStudio} />
+          <Route path="/blog" component={Blog} />
+          <Route path="/blog/:slug" component={BlogPost} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>
@@ -123,11 +127,19 @@ function AuthWrapper() {
         <Route path="/auth" component={AuthPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/blog" component={Blog} />
+        <Route path="/blog/:slug" component={BlogPost} />
         {/* Redirect unknown routes to Landing on auth-fail */}
         <Route component={() => {
           // If trying to access protected route while unauth, go to /auth
           const path = window.location.pathname;
-          if (path !== "/" && path !== "/reset-password" && path !== "/auth" && path !== "/auth/callback") {
+          if (
+            path !== "/" &&
+            path !== "/reset-password" &&
+            path !== "/auth" &&
+            path !== "/auth/callback" &&
+            !path.startsWith("/blog")
+          ) {
             React.useEffect(() => {
               setLocation("/auth");
             }, []);
