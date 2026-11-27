@@ -190,11 +190,32 @@ router.get("/dpo/metrics", isAuthenticated, async (req: any, res: any) => {
       { subject: "SLA Caps", A: Math.max(30, 80 - (filteredRisks.length * 5)), fullMark: 100 },
     ] : [];
 
+    const criticalRisks = filteredRisks.filter(r => r.severity === 'critical' || r.severity === 'high');
+    const totalExposure = criticalRisks.reduce((sum, r: any) => sum + (Number(r.financialExposureMax) || Number(r.financialExposureMin) || Number(r.financialExposure?.maxEstimate) || 0), 0);
+    const topAlert = criticalRisks.length > 0 ? {
+      title: criticalRisks[0].riskTitle || "Regulatory Compliance Gap",
+      severity: criticalRisks[0].severity?.toUpperCase() || "HIGH",
+      description: criticalRisks[0].riskDescription || `Detected ${criticalRisks.length} compliance vulnerability across active agreements requiring remediation.`,
+      exposure: totalExposure > 0 ? `$${totalExposure.toLocaleString()}` : `$${(criticalRisks.length * 25000).toLocaleString()}`,
+      impact: criticalRisks[0].impact ? (criticalRisks[0].impact.charAt(0).toUpperCase() + criticalRisks[0].impact.slice(1)) : "Major",
+      isCritical: criticalRisks[0].severity === 'critical'
+    } : {
+      title: filteredContracts.length > 0 ? "Statutory Posture Nominal" : "Awaiting Contract Ingestion",
+      severity: "OPTIMAL",
+      description: filteredContracts.length > 0 
+        ? "No critical statutory non-compliance or unmitigated liability exposures detected across your active agreements."
+        : "Upload vendor agreements or execute a compliance audit to activate automated regulatory monitoring.",
+      exposure: "$0",
+      impact: "Nominal",
+      isCritical: false
+    };
+
     res.json({
       complianceScore,
       readinessScore,
       dpasReviewed: filteredContracts.length + completedAudits.length,
       openFindings: filteredRisks.length,
+      topAlert,
       remediationTasks: filteredTasks.slice(0, 5).map(t => ({
         id: t.id,
         title: t.title || "Remediation Task",

@@ -63,6 +63,14 @@ type DPOMetrics = {
  readinessScore: number;
  dpasReviewed: number;
  openFindings: number;
+	topAlert?: {
+		title: string;
+		severity: string;
+		description: string;
+		exposure: string;
+		impact: string;
+		isCritical: boolean;
+	};
  remediationTasks: RemediationTask[];
  remediationStats: { total: number; accepted: number; pending: number; rejected: number; acceptanceRate: number };
  trendAnalysis: { date: string; score: number; redlines: number }[];
@@ -370,25 +378,27 @@ export default function DPODashboard() {
  </CardHeader>
  <CardContent className="space-y-8 relative z-10 pt-4">
  <div className="space-y-4">
- <div className="flex items-center gap-3">
- <h3 className="text-3xl font-black text-white leading-tight">GDPR Amendment 2026</h3>
- <Badge className="bg-rose-500/80 hover:bg-rose-500 text-white border-none text-[10px] font-black">CRITICAL</Badge>
- </div>
- <p className="text-slate-300 text-base leading-relaxed font-medium">
- New requirements for cross-border data transfers to AI providers detected. 12 active contracts require immediate amendment.
- </p>
- </div>
- 
- <div className="grid grid-cols-2 gap-4">
- <div className="bg-slate-950/40 p-4 rounded-xl border border-white/5">
- <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Exposure</p>
- <p className="text-xl font-black text-white">$450K</p>
- </div>
- <div className="bg-slate-950/40 p-4 rounded-xl border border-white/5">
- <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Impact</p>
- <p className="text-xl font-black text-white">Major</p>
- </div>
- </div>
+								<div className="flex items-center gap-3">
+									<h3 className="text-3xl font-black text-white leading-tight">{metrics?.topAlert?.title || "Statutory Posture Nominal"}</h3>
+									<Badge className={metrics?.topAlert?.isCritical ? "bg-rose-500/80 hover:bg-rose-500 text-white border-none text-[10px] font-black" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black"}>
+										{metrics?.topAlert?.severity || "NOMINAL"}
+									</Badge>
+								</div>
+								<p className="text-slate-300 text-base leading-relaxed font-medium">
+									{metrics?.topAlert?.description || "Regulatory sentinel active. No critical statutory non-compliance detected."}
+								</p>
+							</div>
+							
+							<div className="grid grid-cols-2 gap-4">
+								<div className="bg-slate-950/40 p-4 rounded-xl border border-white/5">
+									<p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Exposure</p>
+									<p className="text-xl font-black text-white">{metrics?.topAlert?.exposure || "$0"}</p>
+								</div>
+								<div className="bg-slate-950/40 p-4 rounded-xl border border-white/5">
+									<p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Impact</p>
+									<p className="text-xl font-black text-white">{metrics?.topAlert?.impact || "Nominal"}</p>
+								</div>
+							</div>
 
  <div className="pt-4">
  <Button className="w-full bg-white text-blue-950 hover:bg-slate-200 h-14 text-lg font-black shadow-2xl shadow-blue-500/40 transition-all hover:scale-[1.02] active:scale-[0.98]">

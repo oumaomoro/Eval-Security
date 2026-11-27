@@ -11,6 +11,7 @@ import {
 import { RiskHeatmap } from "@/components/Intelligence/RiskHeatmap";
 import { motion } from "framer-motion";
 import { SEO } from "@/components/SEO";
+import { Link } from "wouter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Vendors() {
@@ -22,14 +23,26 @@ export default function Vendors() {
  return <Layout><div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
  }
 
- // Heatmap data mapping from benchmarks
- const heatmapData = benchmarks?.map((b: any) => ({
- name: b.vendor,
- compliance: b.avgCompliance,
- risk: b.highestRisk,
- impact: Math.min(Math.floor((b.totalCost || 0) / 5000), 100)
- })) || [];
+	// Dynamic metrics calculated from active vendor benchmarks
+	const vendorList = benchmarks || [];
+	const totalSpend = vendorList.reduce((sum: number, b: any) => sum + (b.totalCost || 0), 0);
+	const vendorCount = vendorList.length;
+	const avgRisk = vendorCount > 0 
+		? Math.round(vendorList.reduce((sum: number, b: any) => sum + (b.highestRisk || 0), 0) / vendorCount) 
+		: 0;
+	const avgCompliance = vendorCount > 0 
+		? Math.round(vendorList.reduce((sum: number, b: any) => sum + (b.avgCompliance || 0), 0) / vendorCount) 
+		: 0;
+	const riskLabel = avgRisk > 60 ? "Critical Risk" : avgRisk > 30 ? "Elevated Risk" : avgRisk > 0 ? "Moderate Risk" : "Nominal";
+	const riskBadgeClass = avgRisk > 60 ? "bg-red-500/10 text-red-500 border-red-500/20" : avgRisk > 30 ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
 
+	// Heatmap data mapping from benchmarks
+	const heatmapData = vendorList.map((b: any) => ({
+		name: b.vendor,
+		compliance: b.avgCompliance,
+		risk: b.highestRisk,
+		impact: Math.min(Math.floor((b.totalCost || 0) / 5000), 100)
+	}));
  return (
  <Layout header={
  <div className="flex w-full items-center justify-between">
@@ -60,31 +73,30 @@ export default function Vendors() {
  </CardHeader>
  <CardContent className="space-y-6 relative z-10">
  <div className="p-6 rounded-[2rem] bg-slate-900/80 border border-slate-800 shadow-inner group-hover:border-primary/20 transition-all">
- <div className="flex justify-between items-center mb-2">
- <span className="text-[10px] font-black text-slate-500 font-semibold">Global Risk Exposure</span>
- <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[10px] font-black uppercase tracking-tighter">Elevated Risk</Badge>
- </div>
- <div className="flex items-baseline gap-2">
- <p className="text-4xl font-black text-slate-100 font-mono tracking-tighter">42.5</p>
- <span className="text-xs font-bold text-slate-500 italic">/ 100 Risk Index</span>
- </div>
- </div>
- <div className="grid grid-cols-2 gap-4">
- <div className="p-5 rounded-[2rem] bg-slate-900/40 border border-slate-800/50 group-hover:bg-slate-900/60 transition-all">
- <p className="text-[9px] font-black text-slate-500 font-semibold mb-1">Cost Variance</p>
- <div className="flex items-center gap-2">
- <TrendingDown className="w-4 h-4 text-emerald-500" />
- <span className="text-base font-black text-emerald-500 tracking-tighter">-8.4% YoY</span>
- </div>
- </div>
- <div className="p-5 rounded-[2rem] bg-slate-900/40 border border-slate-800/50 group-hover:bg-slate-900/60 transition-all">
- <p className="text-[9px] font-black text-slate-500 font-semibold mb-1">Compliance Drift</p>
- <div className="flex items-center gap-2">
- <TrendingUp className="w-4 h-4 text-red-500" />
- <span className="text-base font-black text-red-500 tracking-tighter">+4.2%</span>
- </div>
- </div>
- </div>
+								<div className="flex justify-between items-center mb-2">
+									<span className="text-[10px] font-black text-slate-500 font-semibold">Global Risk Exposure</span>
+									<Badge className={`${riskBadgeClass} text-[10px] font-black uppercase tracking-tighter`}>{riskLabel}</Badge>
+								</div>
+								<div className="flex items-baseline gap-2">
+									<p className="text-4xl font-black text-slate-100 font-mono tracking-tighter">{avgRisk}</p>
+									<span className="text-xs font-bold text-slate-500 italic">/ 100 Risk Index</span>
+								</div>
+							</div>
+							<div className="grid grid-cols-2 gap-4">
+								<div className="p-5 rounded-[2rem] bg-slate-900/40 border border-slate-800/50 group-hover:bg-slate-900/60 transition-all">
+									<p className="text-[9px] font-black text-slate-500 font-semibold mb-1">Active Portfolio Spend</p>
+									<div className="flex items-center gap-2">
+										<span className="text-base font-black text-emerald-500 tracking-tighter font-mono">${totalSpend.toLocaleString()}</span>
+									</div>
+								</div>
+								<div className="p-5 rounded-[2rem] bg-slate-900/40 border border-slate-800/50 group-hover:bg-slate-900/60 transition-all">
+									<p className="text-[9px] font-black text-slate-500 font-semibold mb-1">Portfolio Compliance</p>
+									<div className="flex items-center gap-2">
+										<TrendingUp className="w-4 h-4 text-emerald-500" />
+										<span className="text-base font-black text-emerald-500 tracking-tighter">{avgCompliance}% Avg</span>
+									</div>
+								</div>
+							</div>
  </CardContent>
  </Card>
  </div>
@@ -95,7 +107,19 @@ export default function Vendors() {
  <Activity className="w-6 h-6 text-primary" /> Active Vendor Matrix
  </h2>
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
- {benchmarks?.map((b: any) => (
+ {(benchmarks || []).length === 0 ? (
+					<Card className="col-span-full py-16 text-center bg-slate-950/40 border-slate-800 rounded-[2.5rem]">
+						<div className="flex flex-col items-center justify-center gap-3">
+							<Users className="w-12 h-12 text-slate-700" />
+							<h3 className="text-lg font-bold text-slate-300">No Active Vendors Registered</h3>
+							<p className="text-xs text-slate-500 max-w-md">Add your vendor agreements to view live compliance benchmarking, SLAs, and risk intelligence.</p>
+							<Button asChild className="mt-2 bg-primary text-black font-bold text-xs">
+								<Link href="/contracts">Add First Contract</Link>
+							</Button>
+						</div>
+					</Card>
+				) : (
+					(benchmarks || []).map((b: any) => (
  <motion.div key={b.vendor} whileHover={{ y: -8, scale: 1.02 }} className="h-full">
  <Card className="bg-slate-950/60 backdrop-blur-xl border-slate-800 hover:border-primary/50 transition-all duration-300 group rounded-[2.5rem] overflow-hidden h-full shadow-2xl">
  <CardHeader className="pb-4">
@@ -143,8 +167,9 @@ export default function Vendors() {
  </div>
  </Card>
  </motion.div>
- ))}
- </div>
+ ))
+					)}
+				</div>
  </div>
 
  {/* Historical Ledger Card */}

@@ -1,134 +1,74 @@
 import { useRoute, Link } from "wouter";
-import { ARTICLES, Article } from "./Blog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, Clock, Share2, ShieldCheck, Sparkles, CheckCircle2 } from "lucide-react";
+import { 
+  ArrowLeft, Calendar, Clock, Share2, ShieldCheck, 
+  Sparkles, CheckCircle2, AlertTriangle, ArrowRight, 
+  Copy, MessageCircle, Linkedin, Twitter 
+} from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
-
-const ARTICLE_CONTENT: Record<string, { body: string[]; keyTakeaways: string[] }> = {
-  "kdpa-compliance-guide": {
-    keyTakeaways: [
-      "Section 25 mandates that data controllers only engage processors with sufficient technical and organizational safeguards.",
-      "Section 50 requires proof of adequate data protection laws or binding corporate rules before data leaves Kenya.",
-      "72-hour breach notification clauses must be explicitly included with specified penalty indemnities.",
-      "Failure to include mandatory KDPA clauses exposes corporate officers to direct statutory fines up to KES 5,000,000."
-    ],
-    body: [
-      "The Kenya Data Protection Act 2019 (KDPA) has shifted from initial advisory enforcement into aggressive audit penalties by the Office of the Data Protection Commissioner (ODPC). For Chief Information Security Officers (CISOs) and Data Protection Officers (DPOs), third-party vendor agreements represent the single largest liability vulnerability.",
-      "When engaging cloud providers, Managed Service Providers (MSPs), and software vendors, generic international MSAs often fail to comply with Kenyan statutory mandates. Under Section 25, a data controller remains vicariously liable for the actions, breaches, and negligence of its data processors unless a compliant Data Processing Agreement (DPA) is executed.",
-      "A compliant KDPA agreement must explicitly define the scope and nature of processing, mandate sub-processor authorization protocols, guarantee audit rights for the controller, and establish strict breach notification windows under Section 43.",
-      "Costloci automates this audit process by cross-referencing your contracts against our pre-compiled KDPA 2019 statutory ruleset, instantly identifying missing statutory warranties and generating enforceable addenda."
-    ]
-  },
-  "cyber-insurance-liability-caps": {
-    keyTakeaways: [
-      "Standard cloud provider limitation-of-liability clauses typically cap damages at '12 months fees paid', leaving a massive uninsured gap.",
-      "If vendor negligence causes a data breach exceeding their contract cap, enterprise cyber insurance subrogation claims frequently fail.",
-      "Negotiate a 'Super Cap' or complete carve-out for data breaches, confidentiality violations, and gross negligence.",
-      "Correlate policy aggregate limits with vendor contractual indemnities to prevent solvency risks."
-    ],
-    body: [
-      "Most enterprise security leaders mistakenly assume their cyber insurance policy will absorb the financial fallout of a third-party vendor security breach. In reality, insurance carriers scrutinize vendor contracts during claim investigations.",
-      "If your vendor agreement contains an aggressive limitation of liability—such as capping vendor responsibility to 12 months of software subscription fees—the insurer's right of subrogation is severely impaired, often resulting in claim denials or significant out-of-pocket deductibles.",
-      "To safeguard your organization, enterprise procurement teams must establish a direct correlation between their cyber insurance policy limits and the indemnity terms negotiated with vendors. Critical vendors handling sensitive customer data or cloud infrastructure must agree to uncapped liability or an expanded super-cap for data privacy breaches.",
-      "Costloci's Cyber Insurance Correlation engine automatically scans uploaded insurance policies and vendor contracts side-by-side, flagging contracts where vendor liability is below your insurance threshold."
-    ]
-  },
-  "cbk-cybersecurity-guidelines": {
-    keyTakeaways: [
-      "Central Bank of Kenya (CBK) requires commercial banks and payment service providers to audit critical third-party vendors annually.",
-      "Vendor contracts must stipulate explicit right-to-audit clauses accessible by both internal auditors and CBK regulators.",
-      "Cloud agreements must include defined disaster recovery (RTO/RPO) objectives and exit strategy migration support.",
-      "Service Level Agreements (SLAs) must specify financial penalties for downtime affecting core payment rails."
-    ],
-    body: [
-      "The Central Bank of Kenya (CBK) Cybersecurity Guidelines establish rigorous risk management standards for commercial banks, microfinance institutions, and licensed Payment Service Providers (PSPs). Vendor risk management is a centerpiece of these directives.",
-      "Under CBK guidelines, financial institutions cannot outsource accountability. Every third-party IT vendor, core banking software provider, and cloud infrastructure host must be governed by contracts that allow regulatory inspection and forensic audit rights.",
-      "Key contractual terms must address business continuity, real-time cyber incident escalation within 2 hours of discovery, and guaranteed data portability in the event of vendor insolvency.",
-      "Costloci provides banking compliance teams with a dedicated CBK audit module that benchmarks contracts against central bank expectations and generates regulator-ready audit trail packages."
-    ]
-  },
-  "dpa-negotiation-best-practices": {
-    keyTakeaways: [
-      "Never accept standard click-wrap vendor DPAs without checking for jurisdiction-specific transfer clauses.",
-      "Ensure the definition of 'Personal Data' aligns with local statutory broadness, including biometric and location data.",
-      "Demand indemnification for regulatory fines levied against your firm due to vendor non-compliance.",
-      "Establish strict 48-hour sub-processor notification windows with clear opt-out termination rights."
-    ],
-    body: [
-      "When negotiating software contracts with international enterprise vendors, legal teams are frequently pressured to sign pre-packaged US or generic EU DPAs that ignore African statutory jurisdictions.",
-      "The most common mistake is accepting a unilateral indemnity clause that only protects the vendor. If an international cloud vendor experiences an internal credential breach exposing your customer data, your firm faces local regulatory enforcement while remaining powerless under foreign dispute resolution clauses.",
-      "Best practice requires demanding reciprocal indemnification, explicit local law governing jurisdiction (e.g. High Court of Kenya), and mandatory cooperation during regulatory inquiries.",
-      "With Costloci's Autonomous Redline Studio, procurement officers can inject balanced, battle-tested DPA clauses with a single click, cutting negotiation cycles from weeks to minutes."
-    ]
-  },
-  "how-ai-redlining-saves-22-percent": {
-    keyTakeaways: [
-      "Enterprises overpay by an average of 18–25% due to unmonitored auto-renewals, unused seat tiers, and lack of regional benchmarking.",
-      "Proactive 90-day renewal alerts give procurement teams leverage before vendors trigger automatic price escalations.",
-      "Consolidating overlapping cybersecurity tools (e.g., SIEM, EDR, Vulnerability Management) generates immediate six-figure savings.",
-      "Autonomous benchmarking provides real-time pricing intelligence on prevailing market rates across East African enterprises."
-    ],
-    body: [
-      "Cybersecurity and IT software spending is often the fastest-growing operational expenditure in mid-to-large enterprises. Yet, more than 40% of vendor contracts renew automatically without competitive price reviews.",
-      "Vendors routinely include annual price escalation clauses of 5% to 10% tucked into standard renewal terms. Without automated tracking, procurement teams only discover the price hike after the cancellation notice window has expired.",
-      "By centralizing contract repository intelligence, Costloci monitors renewal deadlines, highlights redundant tools, and benchmarks contract rates against peer organizations in your industry.",
-      "Our users report an average of 22% annual cost reduction within their first 60 days of deploying Costloci's automated contract intelligence."
-    ]
-  }
-};
+import { BLOG_POSTS, getArticleBySlug } from "@/data/blog-content";
 
 export default function BlogPost() {
   const [, params] = useRoute("/blog/:slug");
   const slug = params?.slug || "";
-  const article = ARTICLES.find((a) => a.slug === slug);
-  const content = ARTICLE_CONTENT[slug] || {
-    keyTakeaways: [
-      "Maintain active inventory of all third-party vendor agreements.",
-      "Audit contracts regularly against evolving regional statutory frameworks.",
-      "Ensure indemnity caps adequately cover potential enterprise breach liabilities."
-    ],
-    body: [
-      "Enterprise contract management requires continuous oversight of both regulatory compliance and cost efficiency. As regulatory bodies step up enforcement, organizations must adopt automated intelligence to protect their assets and bottom line."
-    ]
-  };
-
+  const article = getArticleBySlug(slug);
   const { toast } = useToast();
-
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: article?.title || "Costloci Intelligence",
-        url: window.location.href,
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast({ title: "Link Copied", description: "Article link copied to clipboard." });
-    }
-  };
 
   if (!article) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Article Not Found</h2>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
+        <div className="text-center space-y-4 max-w-md p-8 bg-slate-900 border border-slate-800 rounded-3xl">
+          <h2 className="text-2xl font-bold text-white">Article Not Found</h2>
+          <p className="text-slate-400 text-sm">The requested guide may have moved or been updated.</p>
           <Link href="/blog">
-            <Button variant="outline">Back to Blog</Button>
+            <Button variant="outline" className="border-slate-700 hover:bg-slate-800">
+              Back to Blog Overview
+            </Button>
           </Link>
         </div>
       </div>
     );
   }
 
+  const currentUrl = typeof window !== "undefined" ? window.location.href : `https://costloci.com/blog/${article.slug}`;
+
+  const handleCopyLink = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(currentUrl);
+      toast({ title: "Link Copied", description: "Article URL copied to clipboard." });
+    }
+  };
+
+  const handleShareLinkedIn = () => {
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentUrl)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareTwitter = () => {
+    const text = `${article.title} - Essential reading via @Costloci`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(currentUrl)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareWhatsApp = () => {
+    const text = `${article.title}: ${currentUrl}`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // Related articles (excluding current)
+  const relatedArticles = BLOG_POSTS.filter((p) => p.slug !== article.slug).slice(0, 3);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500/30">
       <SEO 
         title={`${article.title}`}
         description={article.excerpt}
         article={{
-          publishedTime: "2026-11-24",
-          author: article.author,
+          publishedTime: article.date,
+          author: article.author.name,
           section: article.category,
         }}
       />
@@ -137,22 +77,24 @@ export default function BlogPost() {
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/blog" className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to Blog
+            <ArrowLeft className="w-4 h-4" /> Back to All Guides
           </Link>
 
-          <Link href="/auth">
-            <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg">
-              Start Free Audit
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/auth">
+              <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg">
+                Start Free Contract Audit
+              </Button>
+            </Link>
+          </div>
         </div>
       </nav>
 
       <main className="max-w-4xl mx-auto px-6 pt-36 pb-24">
         {/* Article Header */}
         <header className="space-y-6 mb-12">
-          <div className="flex items-center gap-3">
-            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs font-bold uppercase">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider">
               {article.category}
             </Badge>
             <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -163,55 +105,165 @@ export default function BlogPost() {
             </span>
           </div>
 
-          <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight tracking-tight">
+          <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight">
             {article.title}
           </h1>
 
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800 text-xs text-slate-400">
-            <span>By <strong className="text-slate-200">{article.author}</strong></span>
-            <Button variant="ghost" size="sm" onClick={handleShare} className="text-slate-400 hover:text-white">
-              <Share2 className="w-4 h-4 mr-1.5" /> Share
-            </Button>
+          <p className="text-lg md:text-xl text-slate-300 leading-relaxed font-normal">
+            {article.excerpt}
+          </p>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-800 text-xs text-slate-400">
+            <div>
+              <span className="text-slate-500">Authored by </span>
+              <strong className="text-slate-200">{article.author.name}</strong>
+              <span className="text-slate-500 block sm:inline sm:ml-2">({article.author.role})</span>
+            </div>
+
+            {/* Social Share Buttons */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 text-[11px] font-semibold mr-1">Share:</span>
+              <Button size="sm" variant="outline" onClick={handleShareLinkedIn} className="h-8 px-2.5 bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300">
+                <Linkedin className="w-3.5 h-3.5 text-blue-400" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleShareTwitter} className="h-8 px-2.5 bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300">
+                <Twitter className="w-3.5 h-3.5 text-sky-400" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleShareWhatsApp} className="h-8 px-2.5 bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300">
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCopyLink} className="h-8 px-2.5 bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300">
+                <Copy className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </div>
         </header>
 
-        {/* Key Takeaways Box */}
-        <div className="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-6 mb-12 space-y-4 shadow-xl">
-          <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm uppercase tracking-wide">
-            <Sparkles className="w-4 h-4" /> Executive Summary & Key Takeaways
+        {/* Executive Summary & Key Takeaways Card */}
+        <div className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 md:p-8 mb-14 shadow-2xl space-y-4">
+          <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-sm uppercase tracking-wider">
+            <Sparkles className="w-4 h-4" /> Executive Summary & Statutory Takeaways
           </div>
-          <ul className="space-y-2 text-sm text-slate-300">
-            {content.keyTakeaways.map((takeaway, i) => (
-              <li key={i} className="flex items-start gap-2.5">
+          <ul className="space-y-3 text-sm text-slate-200">
+            {article.keyTakeaways.map((takeaway, i) => (
+              <li key={i} className="flex items-start gap-3">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span>{takeaway}</span>
+                <span className="leading-snug">{takeaway}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* Article Body */}
-        <div className="space-y-6 text-base text-slate-300 leading-relaxed font-normal">
-          {content.body.map((para, i) => (
-            <p key={i}>{para}</p>
+        {/* Structured Sections */}
+        <div className="space-y-12 text-slate-300 leading-relaxed font-normal text-base">
+          {article.sections.map((section, idx) => (
+            <section key={idx} className="space-y-4">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight pt-2">
+                {section.heading}
+              </h2>
+
+              {section.paragraphs.map((p, pIdx) => (
+                <p key={pIdx} className="leading-relaxed">
+                  {p}
+                </p>
+              ))}
+
+              {/* Callout Quote */}
+              {section.callout && (
+                <div className="p-5 my-6 rounded-2xl bg-emerald-950/20 border-l-4 border-emerald-500 text-emerald-200 text-sm font-semibold italic">
+                  "{section.callout}"
+                </div>
+              )}
+
+              {/* Bullet Points */}
+              {section.bulletPoints && section.bulletPoints.length > 0 && (
+                <ul className="space-y-2.5 pl-2 my-4">
+                  {section.bulletPoints.map((bp, bpIdx) => (
+                    <li key={bpIdx} className="flex items-start gap-2.5 text-sm text-slate-200">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0" />
+                      <span>{bp}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Good vs Bad Clause Box */}
+              {section.clauseExample && (
+                <div className="my-8 rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/60 shadow-xl">
+                  <div className="p-4 bg-rose-950/30 border-b border-rose-900/40 text-xs">
+                    <div className="flex items-center gap-2 font-black text-rose-400 uppercase tracking-wider mb-2">
+                      <AlertTriangle className="w-4 h-4" /> Risky Vendor Language (To Avoid)
+                    </div>
+                    <code className="block bg-slate-950/80 p-3 rounded-lg text-rose-200 font-mono text-xs leading-relaxed border border-rose-900/30">
+                      "{section.clauseExample.badClause}"
+                    </code>
+                  </div>
+
+                  <div className="p-4 bg-emerald-950/30 border-b border-emerald-900/40 text-xs">
+                    <div className="flex items-center gap-2 font-black text-emerald-400 uppercase tracking-wider mb-2">
+                      <CheckCircle2 className="w-4 h-4" /> Costloci Enforceable Standard Language
+                    </div>
+                    <code className="block bg-slate-950/80 p-3 rounded-lg text-emerald-200 font-mono text-xs leading-relaxed border border-emerald-900/30">
+                      "{section.clauseExample.goodClause}"
+                    </code>
+                  </div>
+
+                  <div className="p-4 bg-slate-950/60 text-xs text-slate-400">
+                    <strong className="text-slate-200">Why this matters: </strong>
+                    {section.clauseExample.explanation}
+                  </div>
+                </div>
+              )}
+            </section>
           ))}
         </div>
 
-        {/* Embedded Monetization / Lead Magnet CTA */}
-        <div className="mt-16 bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
-          <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto" />
-          <h3 className="text-2xl font-bold text-white">
-            Audit Your Vendor Contracts for KDPA & Liability Gaps
+        {/* Embedded Monetization Lead Magnet CTA */}
+        <div className="mt-16 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-emerald-500/40 rounded-3xl p-8 md:p-12 text-center space-y-4 shadow-2xl">
+          <ShieldCheck className="w-12 h-12 text-emerald-400 mx-auto" />
+          <h3 className="text-2xl md:text-3xl font-extrabold text-white">
+            {article.leadMagnet.title}
           </h3>
-          <p className="text-slate-400 text-sm max-w-lg mx-auto">
-            Upload your master service agreements into Costloci's AI engine to discover compliance risks, indemnity shortfalls, and cost savings in under 3 minutes.
+          <p className="text-slate-300 text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+            {article.leadMagnet.description}
           </p>
-          <div className="pt-2">
-            <Link href="/auth">
-              <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-8 h-12 rounded-xl">
-                Start Free Contract Analysis
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href={article.leadMagnet.ctaLink}>
+              <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-8 h-12 rounded-xl text-sm shadow-lg shadow-emerald-500/20">
+                {article.leadMagnet.ctaText} <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
+            <Link href="/billing">
+              <Button variant="outline" className="border-slate-700 hover:bg-slate-800 text-slate-300 h-12 px-6 rounded-xl text-sm">
+                View Pricing & Plans
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Related Articles Section */}
+        <div className="mt-20 pt-12 border-t border-slate-800/80">
+          <h3 className="text-xl font-bold text-white mb-6">
+            Recommended Contract Governance Guides
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {relatedArticles.map((rel) => (
+              <Link key={rel.slug} href={`/blog/${rel.slug}`}>
+                <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-all group h-full flex flex-col justify-between">
+                  <div>
+                    <Badge variant="outline" className="text-emerald-400 border-emerald-500/20 text-[10px] font-bold mb-2">
+                      {rel.category}
+                    </Badge>
+                    <h4 className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm line-clamp-2 mb-2">
+                      {rel.title}
+                    </h4>
+                  </div>
+                  <span className="text-xs text-slate-500 flex items-center gap-1 mt-4">
+                    <Clock className="w-3 h-3" /> {rel.readTime}
+                  </span>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </main>

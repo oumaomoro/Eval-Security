@@ -1078,32 +1078,28 @@ export class SupabaseRESTStorage implements IStorage {
  return (data || []).map(d => this.mapRisk(d));
  }
 
- async createRisk(risk: InsertRisk): Promise<Risk> {
- const workspaceId = storageContext.getStore()?.workspaceId;
- const payload = {
- ...risk,
- workspace_id: workspaceId || risk.workspaceId,
- contract_id: risk.contractId,
- risk_title: risk.riskTitle,
- risk_category: risk.riskCategory,
- risk_description: risk.riskDescription,
- risk_score: risk.riskScore,
- mitigation_status: risk.mitigationStatus,
- mitigation_strategies: risk.mitigationStrategies
- };
- // Clean up camelCase keys if they exist in spread for snake_case DB
- delete (payload as any).contractId;
- delete (payload as any).riskTitle;
- delete (payload as any).riskCategory;
- delete (payload as any).riskDescription;
- delete (payload as any).riskScore;
- delete (payload as any).mitigationStatus;
- delete (payload as any).mitigationStrategies;
- delete (payload as any).workspaceId;
+  async createRisk(risk: InsertRisk): Promise<Risk> {
+    const workspaceId = storageContext.getStore()?.workspaceId;
+    const payload: any = {
+      workspace_id: workspaceId || risk.workspaceId,
+      contract_id: risk.contractId,
+      risk_title: risk.riskTitle,
+      risk_category: risk.riskCategory,
+      risk_description: risk.riskDescription,
+      severity: risk.severity || "medium",
+      likelihood: risk.likelihood || "low",
+      impact: risk.impact || "low",
+      risk_score: risk.riskScore || 0,
+      mitigation_status: risk.mitigationStatus || "identified",
+      mitigation_strategies: risk.mitigationStrategies || [],
+      financial_exposure_min: risk.financialExposureMin || 0,
+      financial_exposure_max: risk.financialExposureMax || 0,
+      ai_confidence: risk.intelligenceConfidence || 85
+    };
 
- const data = await this.handleResponse<any>(supabase.from("risks").insert(payload).select().single());
- return this.mapRisk(data);
- }
+    const data = await this.handleResponse<any>(supabase.from("risks").insert(payload).select().single());
+    return this.mapRisk(data);
+  }
 
  async updateRisk(id: number, updates: Partial<Risk>): Promise<Risk> {
  const payload: any = {};

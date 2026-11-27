@@ -1,95 +1,68 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Calendar, Clock, BookOpen, ShieldCheck, Sparkles, Tag } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { 
+  ArrowRight, Calendar, Clock, BookOpen, ShieldCheck, 
+  Sparkles, Tag, Search, CheckCircle2, TrendingUp, Mail 
+} from "lucide-react";
 import { SEO } from "@/components/SEO";
-
-export interface Article {
-  slug: string;
-  title: string;
-  excerpt: string;
-  category: "KDPA Compliance" | "Cyber Insurance" | "Cost Optimization" | "FinTech Governance";
-  date: string;
-  readTime: string;
-  author: string;
-  featured?: boolean;
-}
-
-export const ARTICLES: Article[] = [
-  {
-    slug: "kdpa-compliance-guide",
-    title: "The Definitive KDPA 2019 Contract Compliance Guide for CISOs & DPOs",
-    excerpt: "Learn how the Office of the Data Protection Commissioner (ODPC) evaluates vendor agreements, mandatory Section 25 clauses, and cross-border data transfer safeguards.",
-    category: "KDPA Compliance",
-    date: "November 24, 2026",
-    readTime: "7 min read",
-    author: "Legal & Security Research Team",
-    featured: true,
-  },
-  {
-    slug: "cyber-insurance-liability-caps",
-    title: "Cyber Insurance Liability Caps: How to Stop Cloud Vendors Limiting Indemnity",
-    excerpt: "Why standard vendor limitation-of-liability clauses invalidate enterprise cyber insurance payouts, and how to negotiate balanced indemnity caps.",
-    category: "Cyber Insurance",
-    date: "November 18, 2026",
-    readTime: "6 min read",
-    author: "Risk Intelligence Bureau",
-    featured: true,
-  },
-  {
-    slug: "cbk-cybersecurity-guidelines",
-    title: "CBK Cybersecurity Guidelines 2026: Mandatory Contract Provisions for Banks & FinTechs",
-    excerpt: "A clause-by-clause breakdown of Central Bank of Kenya requirements for third-party IT service providers, cloud resilience, and continuous testing.",
-    category: "FinTech Governance",
-    date: "November 12, 2026",
-    readTime: "8 min read",
-    author: "FinTech Compliance Unit",
-  },
-  {
-    slug: "dpa-negotiation-best-practices",
-    title: "5 Critical Data Processing Agreement (DPA) Traps That Trigger Fines",
-    excerpt: "Avoid common negotiation mistakes with international software vendors. Protect your enterprise from vicarious liability in high-stakes breaches.",
-    category: "KDPA Compliance",
-    date: "October 29, 2026",
-    readTime: "5 min read",
-    author: "DPO Advisory Practice",
-  },
-  {
-    slug: "how-ai-redlining-saves-22-percent",
-    title: "How Automated Contract Benchmarking Slashes 22% Off Software Renewals",
-    excerpt: "Case study on how proactive feature consolidation, license rightsizing, and regional rate benchmarking turn procurement teams into profit centers.",
-    category: "Cost Optimization",
-    date: "October 15, 2026",
-    readTime: "6 min read",
-    author: "Enterprise Procurement Team",
-  }
-];
+import { useToast } from "@/hooks/use-toast";
+import { BLOG_POSTS, BlogPostData } from "@/data/blog-content";
 
 export default function Blog() {
-  const featuredArticle = ARTICLES.find((a) => a.featured) || ARTICLES[0];
-  const regularArticles = ARTICLES.filter((a) => a.slug !== featuredArticle.slug);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const { toast } = useToast();
+
+  const categories = ["All", "KDPA Compliance", "Cyber Insurance", "Cost Optimization", "FinTech Governance"];
+
+  const filteredArticles = BLOG_POSTS.filter((post) => {
+    const matchesSearch = 
+      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory = selectedCategory === "All" || post.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const featuredPost = BLOG_POSTS.find((p) => p.featured) || BLOG_POSTS[0];
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail || !newsletterEmail.includes("@")) {
+      toast({ title: "Valid Email Required", description: "Please enter your enterprise work email.", variant: "destructive" });
+      return;
+    }
+    setIsSubscribed(true);
+    toast({ title: "Subscribed Successfully", description: "You will receive our monthly regulatory briefings and contract teardowns." });
+    setNewsletterEmail("");
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500/30">
       <SEO 
-        title="Enterprise Contract Intelligence & Compliance Blog" 
-        description="Expert insights on KDPA 2019 compliance, cyber insurance indemnity caps, CBK guidelines, and enterprise software cost optimization." 
+        title="Costloci Contract Intelligence & Regulatory Blog" 
+        description="Authoritative legal and cybersecurity contract guides on KDPA 2019 compliance, CBK banking directives, cyber insurance liability caps, and software cost reduction." 
       />
 
-      {/* Navigation */}
+      {/* Navigation Bar */}
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center border border-emerald-500/30">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
             </div>
-            <span className="text-xl font-black text-white uppercase italic">Costloci</span>
+            <span className="text-xl font-black text-white uppercase italic tracking-wider">Costloci</span>
           </Link>
 
           <div className="flex items-center gap-6">
             <Link href="/" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
-              Platform
+              Platform Overview
             </Link>
             <Link href="/auth">
               <Button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg">
@@ -100,106 +73,157 @@ export default function Blog() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 pt-36 pb-24">
-        {/* Header */}
-        <div className="mb-14 text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-4">
-            <BookOpen className="w-3.5 h-3.5" /> Niche Intelligence & Market Insights
-          </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-            Cybersecurity Contract Intelligence & Regulatory Governance
+      <main className="max-w-7xl mx-auto px-6 pt-32 pb-24">
+        {/* Header Hero */}
+        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+          <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase tracking-wider px-3 py-1">
+            Enterprise Contract Intelligence & Compliance Bureau
+          </Badge>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white">
+            Practical Guides for CISOs, DPOs, & Procurement Leaders
           </h1>
-          <p className="text-slate-400 text-base mt-4 leading-relaxed">
-            In-depth guides, legal analysis, and cost reduction strategies for CISOs, DPOs, and procurement leaders navigating East African and global cybersecurity mandates.
+          <p className="text-lg text-slate-400 leading-relaxed">
+            Statutory analysis of the Kenya Data Protection Act 2019, CBK guidelines, uninsurable vendor liability traps, and proven frameworks for cutting software renewals by 20%+.
           </p>
+
+          {/* Search Bar */}
+          <div className="pt-6 max-w-xl mx-auto relative">
+            <Search className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+            <Input 
+              type="text" 
+              placeholder="Search by topic, regulation, or keyword (e.g. KDPA, CBK, Liability)..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-slate-900/80 border-slate-800 pl-12 h-13 rounded-2xl text-slate-100 placeholder:text-slate-500 focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-4">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+                  selectedCategory === cat 
+                    ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20" 
+                    : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Featured Article Card */}
-        {featuredArticle && (
+        {/* Featured Banner Article (when no active search) */}
+        {!searchQuery && selectedCategory === "All" && featuredPost && (
           <div className="mb-16">
-            <Link href={`/blog/${featuredArticle.slug}`}>
-              <Card className="bg-slate-900/80 border-slate-800 hover:border-emerald-500/40 transition-all rounded-3xl overflow-hidden p-8 cursor-pointer shadow-2xl group">
-                <div className="flex flex-col md:flex-row gap-8 items-start justify-between">
-                  <div className="space-y-4 max-w-3xl">
-                    <div className="flex items-center gap-3">
-                      <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs font-bold uppercase">
-                        {featuredArticle.category}
-                      </Badge>
-                      <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                        <Calendar className="w-3.5 h-3.5" /> {featuredArticle.date}
-                      </span>
-                      <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                        <Clock className="w-3.5 h-3.5" /> {featuredArticle.readTime}
-                      </span>
-                    </div>
-
-                    <h2 className="text-2xl md:text-3xl font-extrabold text-white group-hover:text-emerald-400 transition-colors">
-                      {featuredArticle.title}
-                    </h2>
-
-                    <p className="text-slate-400 text-sm leading-relaxed">
-                      {featuredArticle.excerpt}
-                    </p>
-
-                    <div className="pt-2 flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                      Read Full Analysis <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
+            <Link href={`/blog/${featuredPost.slug}`}>
+              <Card className="bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-emerald-500/30 rounded-3xl overflow-hidden hover:border-emerald-500/60 transition-all duration-300 group shadow-2xl">
+                <CardContent className="p-8 md:p-12">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Badge className="bg-emerald-500 text-slate-950 font-black text-xs uppercase">
+                      Featured Guide
+                    </Badge>
+                    <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 text-xs font-semibold">
+                      {featuredPost.category}
+                    </Badge>
+                    <span className="text-xs text-slate-400 flex items-center gap-1 ml-auto">
+                      <Clock className="w-3.5 h-3.5" /> {featuredPost.readTime}
+                    </span>
                   </div>
-                </div>
+                  <h2 className="text-2xl md:text-4xl font-extrabold text-white group-hover:text-emerald-400 transition-colors mb-4">
+                    {featuredPost.title}
+                  </h2>
+                  <p className="text-slate-300 text-base md:text-lg mb-6 leading-relaxed max-w-4xl">
+                    {featuredPost.excerpt}
+                  </p>
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-800/80">
+                    <div className="text-xs text-slate-400">
+                      <span>By <strong className="text-slate-200">{featuredPost.author.name}</strong> • {featuredPost.date}</span>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-400 flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                      Read Full Analysis <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                </CardContent>
               </Card>
             </Link>
           </div>
         )}
 
-        {/* Regular Articles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {regularArticles.map((article) => (
+        {/* Articles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredArticles.map((article) => (
             <Link key={article.slug} href={`/blog/${article.slug}`}>
-              <Card className="bg-slate-900/60 border-slate-800 hover:border-emerald-500/30 transition-all rounded-2xl p-6 cursor-pointer group h-full flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-[11px] font-bold text-emerald-400 border-emerald-500/20 bg-emerald-500/5">
-                      {article.category}
-                    </Badge>
-                    <span className="text-xs text-slate-500">{article.readTime}</span>
+              <Card className="bg-slate-900/40 border-slate-800 hover:border-slate-700 transition-all duration-300 rounded-3xl overflow-hidden group h-full flex flex-col hover:-translate-y-1">
+                <CardContent className="p-7 flex flex-col justify-between h-full">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-emerald-400 border-emerald-500/20 bg-emerald-500/5 text-xs font-bold">
+                        {article.category}
+                      </Badge>
+                      <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                        <Clock className="w-3 h-3" /> {article.readTime}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors leading-snug">
+                      {article.title}
+                    </h3>
+                    <p className="text-sm text-slate-400 line-clamp-3 leading-relaxed">
+                      {article.excerpt}
+                    </p>
                   </div>
 
-                  <h3 className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors leading-snug">
-                    {article.title}
-                  </h3>
-
-                  <p className="text-slate-400 text-xs leading-relaxed line-clamp-3">
-                    {article.excerpt}
-                  </p>
-                </div>
-
-                <div className="pt-6 mt-4 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
-                  <span>{article.date}</span>
-                  <span className="text-emerald-400 font-semibold group-hover:underline flex items-center gap-1">
-                    Read article <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
+                  <div className="pt-6 mt-6 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+                    <span>{article.date}</span>
+                    <span className="font-bold text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                      Read Guide <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </CardContent>
               </Card>
             </Link>
           ))}
         </div>
 
-        {/* Lead Magnet / CTA Box */}
-        <div className="mt-20 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/40 border border-emerald-500/30 rounded-3xl p-10 text-center space-y-4 shadow-2xl">
-          <Sparkles className="w-8 h-8 text-emerald-400 mx-auto" />
-          <h3 className="text-2xl md:text-3xl font-extrabold text-white">
-            Evaluate Your Vendor Agreements Against 2026 Standards
-          </h3>
-          <p className="text-slate-300 text-sm max-w-xl mx-auto">
-            Upload your contracts into Costloci's private AI auditor to detect KDPA non-compliance, insurance liability shortfalls, and vendor overpricing in under 3 minutes.
-          </p>
-          <div className="pt-2">
-            <Link href="/auth">
-              <Button size="lg" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-8">
-                Scan Your First Contract Free <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+        {filteredArticles.length === 0 && (
+          <div className="text-center py-20 bg-slate-900/20 rounded-3xl border border-slate-800">
+            <BookOpen className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-slate-300">No matching articles found</h3>
+            <p className="text-xs text-slate-500 mt-1">Try searching for other keywords like "KDPA", "CBK", or "Liability".</p>
           </div>
+        )}
+
+        {/* Lead Capture Newsletter Box */}
+        <div className="mt-24 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 rounded-3xl p-8 md:p-12 text-center max-w-4xl mx-auto shadow-2xl">
+          <Mail className="w-10 h-10 text-emerald-400 mx-auto mb-4" />
+          <h3 className="text-2xl md:text-3xl font-extrabold text-white mb-2">
+            Join 1,400+ Enterprise Security & Legal Leaders
+          </h3>
+          <p className="text-slate-400 text-sm max-w-xl mx-auto mb-6">
+            Get our monthly executive regulatory briefing on ODPC enforcement actions, emerging vendor liability cases, and market price benchmarks.
+          </p>
+
+          {isSubscribed ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-400 font-bold text-sm max-w-md mx-auto">
+              ✓ You are subscribed! Check your inbox for our latest KDPA contract audit checklist.
+            </div>
+          ) : (
+            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <Input 
+                type="email" 
+                placeholder="Enter your enterprise work email..." 
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-500 h-12 rounded-xl focus:border-emerald-500"
+              />
+              <Button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold h-12 px-6 rounded-xl shrink-0">
+                Subscribe Free
+              </Button>
+            </form>
+          )}
         </div>
       </main>
 
